@@ -1,0 +1,103 @@
+%% ============================================================
+%%  生成AI利用申告書 — テンプレート
+%%  ハッカソン1 提出課題用 (塩澤 / 2026)
+%%  コンパイル: docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%%              ghcr.io/paperist/texlive-ja:debian latexmk main.tex
+%% ============================================================
+\documentclass[a4paper,11pt,dvipdfmx]{jsarticle}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{plistings}  % 日本語コメント混在時の文字幅補正
+\usepackage[dvipdfmx,hidelinks]{hyperref}
+\usepackage{pxjahyper}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame=single,
+  breaklines=true,
+  xleftmargin=1em,
+  aboveskip=6pt, belowskip=6pt,
+  columns=flexible,
+}
+
+\newcommand{\cboxon}{$\boxtimes$}
+\newcommand{\cboxoff}{$\square$}
+
+\begin{document}
+
+{\LARGE\bfseries 生成AI利用申告書}
+\vspace{1em}
+
+\begin{itemize}
+  \item 氏名：佐藤涼菜
+  \item 学籍番号：25G1059
+  \item プログラムファイル名： HCK02\_02.ino,HCK02\_02.pde
+  \item 使用したAIツール（例：ChatGPT など）： Gemini pro, claude
+\end{itemize}
+
+\section*{1. 何に使ったか}
+今回の課題で、生成AIをどの部分に使いましたか。
+
+
+提出課題Ⅱの内容理解とコードの案だし．
+
+\section*{2. AIへの指示（プロンプト）}
+AIにどのような質問・指示を出しましたか。重要なものを1〜2個書いてください。
+
+・マイクから入力された音信号の波形をprocessing側に送信する方法\par
+・processing側の処理内容の理解とコードの案だし\par
+
+\section*{3. AIの出力の使い方}
+AIの出力をどのように使いましたか。
+\begin{itemize}
+  \item \cboxon 一部修正して使った
+  \item \cboxon 参考にしただけ
+\end{itemize}
+$\rightarrow$ 上で選んだ理由を書いてください：
+マイク音信号の受信方法や，マイクからの入力波形と楽曲波形を視覚的に比較・描画する方法について案出しを指示した．提案されたコードに対し，
+実機による検証および別の生成AIによるダブルチェックを行い，必要に応じて修正を加えたため一部修正して使ったを選択した．
+また，課題の内容が正しく認識できているか確認するために生成AIを利用したため，内容の齟齬がみられなければそのまま課題に
+取り組んだので参考にしただけを選択した．
+
+\section*{4. 正しいと確認した方法}
+AIの出力が正しいと、どのように確認しましたか。
+
+
+実際に実行し，動作が想定の通りに実行されたかどうかを確認し，コードを読んで意味を理解するまで調べた．また，関数や変数の仕組みについては，
+Arduino日本語リファレンスや公式ドキュメントなどで確認をしハルシネーションが発生していないか確認した．更に，
+別の生成AIにも同様のプロンプトを送り，回答結果を検証することで，信憑性を高めた．
+
+
+\section*{5. 問題や間違い}
+AIの出力に問題や間違いはありましたか。
+\begin{itemize}
+  \item \cboxon あった
+  \item \cboxoff なかった（※本当に？と思って確認した内容を書くこと）
+\end{itemize}
+確認した内容や気づいたこと：
+同じプロンプトで質問をしても，生成AIの種類によって出力結果は異なっていた．また，何度も同様の質問を行うことにより，
+出力内容が高度化されたり，逆に間違った解釈をされてしまったりと一概に出力結果を鵜呑みにしてはいけないことがわかった．
+新しいチャットに同様のプロンプトを投げることや，別の生成AIを用いて検証を行うことが
+ハルシネーションを鵜呑みにしない方法であると考えた．
+
+\section*{6. 自分で工夫した点}
+マイクから入力された音信号の波形(赤)とprocessingで作成した楽曲の波形(緑)を同時にウィンドウに描画することで，
+正常に課題の要件が満たせているか可視化を行った．また，Arduino側でdelayMicrosecondsを挿入することにより，シリアル通信の同期を安定させ，音信号の
+欠落や遅延を抑制する工夫を施した．
+
+\section*{7. 参考文献}
+
+  ・Arduino日本語リファレンス.  
+  \url{https://www.musashinodenpa.com/arduino/ref/}
+
+  ・Arduino公式ドキュメント
+  \url{https://docs.arduino.cc/}\par
+
+  ・processing公式ドキュメント
+  \url{https://processing.org/reference/}
+
+
+ 
+\end{document}

@@ -1,0 +1,129 @@
+\documentclass[uplatex,dvipdfmx]{jlreq}
+\usepackage[fleqn,tbtags]{mathtools}
+\usepackage{jlreq-deluxe}
+\usepackage[noalphabet]{pxchfon} % must be after otf package
+\usepackage{stix2} %欧文＆数式フォント
+\usepackage[fleqn,tbtags]{mathtools} % 数式関連 (w/ amsmath)
+% \usepackage{hira-stix} % ヒラギノフォント＆STIX2 フォント代替定義（Warning回避）
+\usepackage{tabularx}
+
+% FBS書く設定
+\usepackage{tikz}
+\usetikzlibrary{trees,shadows}
+\makeatletter
+\@ifundefined{kanjiskip}{}{\usepackage{pxpgfmark}}
+\makeatother
+
+
+\begin{document}
+
+\title{第三回 事前課題: 担当箇所の基本設計・詳細設計のたたき台}
+\author{25G1059 佐藤涼菜}
+\date{2026年4月22日}
+\maketitle
+
+
+
+
+\section{基本設計}
+
+\subsection{指揮デバイス}
+・本体(図)→加速度センサ？\par
+・指揮デバイス振ったらドラムArduinoに接続\par
+・ボタン押したら音量，強さ変化\par
+(・ボタン押したらBPM変化？おそらくドラムArduinoになりそ)\par
+
+
+
+
+
+FBSについて示すにょ
+
+\begin{center}
+    \begin{tikzpicture}[
+        node distance=1.5cm,
+        every node/.style={
+            draw=black!70!black,
+            thick,
+            rounded corners=3pt,
+            fill=white,
+            align=center,
+            font=\small\sffamily,
+            inner sep=5pt,
+            % drop shadow % 影
+        },
+        edge from parent/.style={
+            draw=black!70!black,
+            thick
+        },
+        level 1/.style={sibling distance=4.5cm},
+        level 2/.style={sibling distance=2.2cm}
+    ]
+    
+    % ルート
+    \node {指揮デバイス}
+        child { node {予定管理 \\ \scriptsize 新規作成/編集/削除}
+            child { node {日時の設定} }
+            child { node {場所の設定} }
+        }
+        child { node {通知 \\ \scriptsize メール通知}
+            child { node {登録確認 \\ メール} }
+            child { node {リマインド \\ メール} }
+        }
+        child { node {予定の共有 \\ \scriptsize アカウント}
+            child { node {アカウント \\ 登録} }
+            child { node {共有ユーザ \\ の選択} }
+        };
+    \end{tikzpicture}
+    \end{center}
+
+
+
+
+\section{詳細設計}
+
+\subsection{サーボモータ}
+    \subsubsection{メトロサーボ}
+    BPMに合わせてぶん回す
+
+    \subsubsection{ドラムサーボ}
+
+    \subsection{LED}
+    BPMに合わせて光る
+
+    \subsection{LEDマトリックス}
+    楽曲の音程に合わせて表示(グラデーション？)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{thebibliography}{999}
+
+\bibitem{ref:kitai}星野悦子．音楽心理学の研究動向ー音楽で喚起される感情の研究を中心にー．音楽教育学第51-2.(2022)．
+\bibitem{ref:eko}Helmut Haas．Über den Einfluss eines Einfachechos auf die Hörsamkeit von Sprache．Acustica, Vol. 1, pp. 49-58．
+\bibitem{ref:yamaha}YAMAHA.SYNCROOM公式HP．
+\small\url{https://syncroom.yamaha.com/}
+
+\bibitem{ref:adsr}島村．アナログシンセ超入門～その2：EG（エンベロープジェネレーター、ADSR）編.(2026年4月21日閲覧)
+\small\url{https://info.shimamura.co.jp/digital/guide/2018/02/122103}
+
+\end{thebibliography}
+
+\end{document}
+
+
+
+

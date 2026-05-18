@@ -1,0 +1,799 @@
+\documentclass[lualatex,book,paper=a4paper,jafontsize=11.5pt,jafontscale=1.05]{jlreq}
+
+%フォント:
+\usepackage{luatexja-fontspec}
+\usepackage{hack-fonts}
+
+
+
+
+%表紙用:
+\usepackage{hack-cover}
+
+% リンク
+\usepackage[hidelinks]{hyperref}
+
+% 画像
+\usepackage{graphicx}
+
+% 表
+\usepackage{tabularray} % 高機能なテーブル作成パッケージ
+\UseTblrLibrary{booktabs}
+\usepackage[margin=25mm]{geometry}
+
+% リンク（tabularray の後に読み込む）
+\usepackage[hidelinks]{hyperref}
+
+% 状態遷移
+\usepackage{tikz}
+\usetikzlibrary{automata, positioning, arrows.meta, shapes.geometric}
+
+% ファイル構造
+\usepackage{dirtree}
+
+
+
+
+
+\title{ハッカソン}
+\subtitle{～計画書と設計書～}
+\team{チーム40}
+\author{
+	24G1021 : 宇井 祐真\\
+        24G1026 : 梅野 大誠\\
+	24G1136 : 山口 侑希 \\
+        25G1020 : 薄井 悠希\\
+        25G1041 : 菊池 侑人\\
+        25G1059 : 佐藤 涼菜  
+        }
+\date{\today}
+\version{x.x}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\maketitle
+
+\setcounter{tocdepth}{2}
+\tableofcontents \thispagestyle{empty}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{プロジェクトの計画書} \label{chap:project-plan}\setcounter{page}{1}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{プロジェクトの概要}
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクトの題目}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクトの目的}
+プロジェクトの目的と最終的なゴール，解決すべき課題を記述する．
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{既存の技術とプロジェクトの独自性}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{スコープ・マネジメント}
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{成果物}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクトの対象範囲と非対象範囲}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{機能分解構造FBS}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{製品分解構造PBS}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{FBSとPBSの対応関係}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{作業計画}
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{作業分解構造WBSと管理番号}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{アローダイアグラムとクリティカルパス}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{役割分担}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{ガントチャート}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{検証と妥当性確認: V\&V計画}
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクトの成果物に対する有効指標MOE}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{有効指標MOEに対応する性能指標MOP}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{システムテストで評価する性能指標MOP}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{結合テストで評価する性能指標MOP}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{単体テストで評価する性能指標MOP}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクト中に監視する技術性能指標TPM}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクト中に監視する指標TPM}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{資源・調達管理}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{リスク管理}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{システムの基本設計}
+
+指揮デバイスについて説明を行う．
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{機能一覧}
+% 機能分解構造FBSの要素の説明
+・無線通信によるデータ転送:指揮デバイスを上下に振ることによってドラム(Arduino)にBPM情報を送信．\\
+・楽曲の音量制御：つまみを動かすことで楽曲の音量を調整．
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{システム構成図}
+% ハードウェア，ソフトウェアなどの構成図を記載する．
+指揮デバイスによるBPM情報の送信方法を図\ref{fig:siki-device}に，
+指揮デバイスによる音量制御方法を図\ref{fig:siki-device_big}に示す．
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{指揮デバイス_通信.pdf} % 横幅を列幅の80%に指定
+        \caption{指揮デバイスとドラムArduinoの接続} % 図の説明
+        \label{fig:siki-device} % 本文中で参照するためのラベル
+\end{figure}
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{指揮デバイス_音量.pdf} % 横幅を列幅の80%に指定
+        \caption{指揮デバイスによる音量調整} % 図の説明
+        \label{fig:siki-device_big} % 本文中で参照するためのラベル
+\end{figure}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{操作インターフェース設計}
+% 画面やスイッチなどのインターフェースの設計図を記載する
+指揮デバイスの概要図を図\ref{fig:siki-device_zu}に示す．
+また，指揮デバイスの操作に関する定義を表\ref{tab:operation_definition}に示す．
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{操作インターフェース.pdf} % 横幅を列幅の80%に指定
+        \caption{指揮デバイスの概要図} % 図の説明
+        \label{fig:siki-device_zu} % 本文中で参照するためのラベル
+\end{figure}
+
+
+
+
+
+\begin{table}[htbp]
+        \caption{指揮デバイス 操作定義一覧}
+        \label{tab:operation_definition}
+        \centering
+        \begin{tblr}{
+          width = \linewidth, % テーブル幅をページ幅に合わせる
+          colspec = {Q[c,m,2.5cm] Q[l,m,5cm] Q[l,m,5.5cm]}, % 列幅を調整
+          hlines = {1pt, solid}, % 線の太さとスタイルを指定
+          vlines = {1pt, solid}, % 線の太さとスタイルを指定
+          row{1} = {font=\bfseries, c}, % ヘッダーを太字・中央揃え
+        }
+          操作対象 & ユーザーのアクション & システムの挙動 \\
+          加速度センサ & デバイスを上下に振る & 動きを検知し，設定された閾値を超えた瞬間に楽曲のBPM情報をドラム側へ送信． \\
+          可変抵抗器\par（つまみ） & つまみを左右に回して絞りを調整する & アナログ値を読み取り，BPM送信とは独立して音量情報をリアルタイムに送信． \\
+        \end{tblr}
+\end{table}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{状態遷移図}
+指揮デバイスの内部で処理される状態遷移について図\ref{fig:siki-device_senni}に示す．
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{指揮デバイス_遷移.pdf} % 横幅を列幅の80%に指定
+        \caption{指揮デバイス内部の状態遷移図} % 図の説明
+        \label{fig:siki-device_senni} % 本文中で参照するためのラベル
+\end{figure}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{システムの詳細設計}
+
+楽曲表現の詳細設計について説明を行う．楽曲表現に関する案は以下に示すとおりである．\\
+
+・ArduinoのLEDマトリクスを利用して楽曲の音階を表示．\\
+・ドラム用のArduinoから楽曲のBPM情報を取得し，サーボモータでメトロノームを表現．\\
+・ドラム用のArduinoから楽曲のBPM情報を取得し，サーボモータでドラムを叩いている動作を表現．\\
+・ドラム用のArduinoから楽曲のBPM情報を取得し，LEDをBPMに合わせて点灯．
+
+% 設計書は作成する成果物によって変化します．
+% 適宜修正して利用してください．
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{部品一覧}
+% 製品分解構造PBSの要素の説明
+楽曲表現を行うにあたり必要となる部品一覧を表\ref{tab:parts}に，電源仕様を表\ref{tab:power}に示す．
+ 
+\begin{table}[htbp]
+        \caption{使用部品一覧}
+        \label{tab:parts}
+        \centering
+        \begin{tblr}{
+          width = \linewidth,
+          colspec = {Q[l,m,5.5cm] Q[c,m,1.5cm] Q[c,m,3.0cm] Q[l,m,5.5cm]},
+          hlines = {1pt, solid, black},
+          vlines = {1pt, solid, black},
+          row{1} = {font=\bfseries, c},
+        }
+          部品名 / 型番 & 数量 & 回路図記号 & 役割 \\
+          Arduino UNO R4             & 1 & A1      & マイコンボード \\
+          サーボモータ SG92           & 2 & M1, M2  & PWM制御（5\,V動作） \\
+          LED                        & 6 & D1〜D6  & 順方向電圧 $V_F = 2.0$\,V，動作電流 $I_F \approx 9.1$\,mA \\
+          カーボン抵抗 330\,$\Omega$  & 6 & R1〜R6  & LED電流制限（消費電力 $P \approx 27$\,mW，定格1/4\,W） \\
+        \end{tblr}
+\end{table}
+ 
+\begin{table}[htbp]
+        \caption{電源仕様}
+        \label{tab:power}
+        \centering
+        \begin{tblr}{
+          width = \linewidth,
+          colspec = {Q[c,m,3.5cm] Q[c,m,2.5cm] Q[c,m,3.5cm] Q[l,m,6cm]},
+          hlines = {1pt, solid, black},
+          vlines = {1pt, solid, black},
+          row{1} = {font=\bfseries, c},
+        }
+          回路図ネット名 & 電圧 & 電源種別 & 供給先 \\
+          \texttt{+5V}   & 5\,V & Arduino出力 & LED（D1〜D6）・Arduino内部 \\
+          \texttt{+BATT} & 5\,V & 外部電源    & サーボモータ M1, M2 \\
+          \texttt{GND}   & 0\,V & 共通グランド & 全部品共通 \\
+        \end{tblr}
+\end{table}
+ 
+ 
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{ハードウェア設計}
+楽曲表現を行う箇所の回路図を図\ref{fig:hyougenhyougen}に示す．
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{回路図.pdf} % 横幅を列幅の80%に指定
+        \caption{楽曲表現を行う回路図} % 図の説明
+        \label{fig:hyougen} % 本文中で参照するためのラベル
+\end{figure}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{ソフトウェア設計}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{ファイル構成}
+
+\begin{center}
+        \renewcommand{\dtstyle}{\ttfamily} % フォントを等幅に設定
+        \dirtree{%
+        .1 ArduinoProject/.
+        .2 ArduinoProject.ino \DTcomment{メインスケッチ}.
+        .2 src/.
+        .3 Common.h \DTcomment{共通定数・ピン定義}.
+        .3 BpmUnit/ \DTcomment{BPM受信・計算部門}.
+        .4 BpmManager.h.
+        .4 BpmManager.cpp.
+        .3 LedUnit/ \DTcomment{LED点灯処理部門}.
+        .4 LedController.h.
+        .4 LedController.cpp.
+        .3 ServoUnit/ \DTcomment{サーボ制御部門}.
+        .4 ServoDriver.h.
+        .4 ServoDriver.cpp.
+        .3 MatrixUnit/ \DTcomment{LEDマトリクス表示部門}.
+        .4 MatrixVisualizer.h.
+        .4 MatrixVisualizer.cpp.
+        .2 README.md.
+        }
+        \end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{オブジェクト設計(クラス図)}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{関数設計}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{処理フローの設計}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{テストの設計}
+% どのようにテストを行うのか，例えば，テストデータの設計などを記述．
+
+
+\end{document}
+%表紙用:
+\usepackage{hack-cover}
+
+% リンク
+\usepackage[hidelinks]{hyperref}
+
+% 画像
+\usepackage{graphicx}
+
+% 表
+\usepackage{tabularray} % 高機能なテーブル作成パッケージ
+\UseTblrLibrary{booktabs}
+\usepackage[margin=25mm]{geometry}
+
+% リンク（tabularray の後に読み込む）
+\usepackage[hidelinks]{hyperref}
+
+% 状態遷移
+\usepackage{tikz}
+\usetikzlibrary{automata, positioning, arrows.meta, shapes.geometric}
+
+% ファイル構造
+\usepackage{dirtree}
+
+
+
+
+
+\title{ハッカソン}
+\subtitle{～計画書と設計書～}
+\team{チーム40}
+\author{
+	24G1021 : 宇井 祐真\\
+        24G1026 : 梅野 大誠\\
+	24G1136 : 山口 侑希 \\
+        25G1020 : 薄井 悠希\\
+        25G1041 : 菊池 侑人\\
+        25G1059 : 佐藤 涼菜  
+        }
+\date{\today}
+\version{x.x}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\maketitle
+
+\setcounter{tocdepth}{2}
+\tableofcontents \thispagestyle{empty}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{プロジェクトの計画書} \label{chap:project-plan}\setcounter{page}{1}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{プロジェクトの概要}
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクトの題目}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクトの目的}
+プロジェクトの目的と最終的なゴール，解決すべき課題を記述する．
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{既存の技術とプロジェクトの独自性}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{スコープ・マネジメント}
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{成果物}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクトの対象範囲と非対象範囲}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{機能分解構造FBS}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{製品分解構造PBS}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{FBSとPBSの対応関係}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{作業計画}
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{作業分解構造WBSと管理番号}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{アローダイアグラムとクリティカルパス}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{役割分担}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{ガントチャート}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{検証と妥当性確認: V\&V計画}
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクトの成果物に対する有効指標MOE}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{有効指標MOEに対応する性能指標MOP}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{システムテストで評価する性能指標MOP}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{結合テストで評価する性能指標MOP}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{単体テストで評価する性能指標MOP}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクト中に監視する技術性能指標TPM}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{プロジェクト中に監視する指標TPM}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{資源・調達管理}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{リスク管理}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{システムの基本設計}
+
+指揮デバイスについて説明を行う．
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{機能一覧}
+% 機能分解構造FBSの要素の説明
+・無線通信によるデータ転送:指揮デバイスを上下に振ることによってドラム(Arduino)にBPM情報を送信．\\
+・楽曲の音量制御：つまみを動かすことで楽曲の音量を調整．
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{システム構成図}
+% ハードウェア，ソフトウェアなどの構成図を記載する．
+指揮デバイスによるBPM情報の送信方法を図\ref{fig:siki-device}に，
+指揮デバイスによる音量制御方法を図\ref{fig:siki-device_big}に示す．
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{指揮デバイス_通信.pdf} % 横幅を列幅の80%に指定
+        \caption{指揮デバイスとドラムArduinoの接続} % 図の説明
+        \label{fig:siki-device} % 本文中で参照するためのラベル
+\end{figure}
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{指揮デバイス_音量.pdf} % 横幅を列幅の80%に指定
+        \caption{指揮デバイスによる音量調整} % 図の説明
+        \label{fig:siki-device_big} % 本文中で参照するためのラベル
+\end{figure}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{操作インターフェース設計}
+% 画面やスイッチなどのインターフェースの設計図を記載する
+指揮デバイスの概要図を図\ref{fig:siki-device_zu}に示す．
+また，指揮デバイスの操作に関する定義を表\ref{tab:operation_definition}に示す．
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{操作インターフェース.pdf} % 横幅を列幅の80%に指定
+        \caption{指揮デバイスの概要図} % 図の説明
+        \label{fig:siki-device_zu} % 本文中で参照するためのラベル
+\end{figure}
+
+
+
+
+
+\begin{table}[htbp]
+        \caption{指揮デバイス 操作定義一覧}
+        \label{tab:operation_definition}
+        \centering
+        \begin{tblr}{
+          width = \linewidth, % テーブル幅をページ幅に合わせる
+          colspec = {Q[c,m,2.5cm] Q[l,m,5cm] Q[l,m,5.5cm]}, % 列幅を調整
+          hlines = {1pt, solid}, % 線の太さとスタイルを指定
+          vlines = {1pt, solid}, % 線の太さとスタイルを指定
+          row{1} = {font=\bfseries, c}, % ヘッダーを太字・中央揃え
+        }
+          操作対象 & ユーザーのアクション & システムの挙動 \\
+          加速度センサ & デバイスを上下に振る & 動きを検知し，設定された閾値を超えた瞬間に楽曲のBPM情報をドラム側へ送信． \\
+          可変抵抗器\par（つまみ） & つまみを左右に回して絞りを調整する & アナログ値を読み取り，BPM送信とは独立して音量情報をリアルタイムに送信． \\
+        \end{tblr}
+\end{table}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{状態遷移図}
+指揮デバイスの内部で処理される状態遷移について図\ref{fig:siki-device_senni}に示す．
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{指揮デバイス_遷移.pdf} % 横幅を列幅の80%に指定
+        \caption{指揮デバイス内部の状態遷移図} % 図の説明
+        \label{fig:siki-device_senni} % 本文中で参照するためのラベル
+\end{figure}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{システムの詳細設計}
+
+楽曲表現の詳細設計について説明を行う．楽曲表現に関する案は以下に示すとおりである．\\
+
+・ArduinoのLEDマトリクスを利用して楽曲の音階を表示．\\
+・ドラム用のArduinoから楽曲のBPM情報を取得し，サーボモータでメトロノームを表現．\\
+・ドラム用のArduinoから楽曲のBPM情報を取得し，サーボモータでドラムを叩いている動作を表現．\\
+・ドラム用のArduinoから楽曲のBPM情報を取得し，LEDをBPMに合わせて点灯．
+
+% 設計書は作成する成果物によって変化します．
+% 適宜修正して利用してください．
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{部品一覧}
+% 製品分解構造PBSの要素の説明
+楽曲表現を行うにあたり必要となる部品一覧を表\ref{tab:parts}に，電源仕様を表\ref{tab:power}に示す．
+ 
+\begin{table}[htbp]
+        \caption{使用部品一覧}
+        \label{tab:parts}
+        \centering
+        \begin{tblr}{
+          width = \linewidth,
+          colspec = {Q[l,m,5.5cm] Q[c,m,1.5cm] Q[c,m,3.0cm] Q[l,m,5.5cm]},
+          hlines = {1pt, solid, black},
+          vlines = {1pt, solid, black},
+          row{1} = {font=\bfseries, c},
+        }
+          部品名 / 型番 & 数量 & 回路図記号 & 役割 \\
+          Arduino UNO R4             & 1 & A1      & マイコンボード \\
+          サーボモータ SG92           & 2 & M1, M2  & PWM制御（5\,V動作） \\
+          LED                        & 6 & D1〜D6  & 順方向電圧 $V_F = 2.0$\,V，動作電流 $I_F \approx 9.1$\,mA \\
+          カーボン抵抗 330\,$\Omega$  & 6 & R1〜R6  & LED電流制限（消費電力 $P \approx 27$\,mW，定格1/4\,W） \\
+        \end{tblr}
+\end{table}
+ 
+\begin{table}[htbp]
+        \caption{電源仕様}
+        \label{tab:power}
+        \centering
+        \begin{tblr}{
+          width = \linewidth,
+          colspec = {Q[c,m,3.5cm] Q[c,m,2.5cm] Q[c,m,3.5cm] Q[l,m,6cm]},
+          hlines = {1pt, solid, black},
+          vlines = {1pt, solid, black},
+          row{1} = {font=\bfseries, c},
+        }
+          回路図ネット名 & 電圧 & 電源種別 & 供給先 \\
+          \texttt{+5V}   & 5\,V & Arduino出力 & LED（D1〜D6）・Arduino内部 \\
+          \texttt{+BATT} & 5\,V & 外部電源    & サーボモータ M1, M2 \\
+          \texttt{GND}   & 0\,V & 共通グランド & 全部品共通 \\
+        \end{tblr}
+\end{table}
+ 
+ 
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{ハードウェア設計}
+楽曲表現を行う箇所の回路図を図\ref{fig:hyougenhyougen}に示す．
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{回路図.pdf} % 横幅を列幅の80%に指定
+        \caption{楽曲表現を行う回路図} % 図の説明
+        \label{fig:hyougen} % 本文中で参照するためのラベル
+\end{figure}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{ソフトウェア設計}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{ファイル構成}
+
+\begin{center}
+        \renewcommand{\dtstyle}{\ttfamily} % フォントを等幅に設定
+        \dirtree{%
+        .1 Arduino_orchestra/.
+        .2 Arduino_orchestra.ino \DTcomment{メインスケッチ}.
+        .2 src/.
+        .3 Common.h \DTcomment{共通定数・ピン定義}.
+        .3 BpmUnit/ \DTcomment{BPM受信・計算}.
+        .4 BpmManager.h.
+        .4 BpmManager.cpp.
+        .3 LedUnit/ \DTcomment{LED点灯処理}.
+        .4 LedController.h.
+        .4 LedController.cpp.
+        .3 ServoUnit/ \DTcomment{サーボ制御}.
+        .4 ServoDriver.h.
+        .4 ServoDriver.cpp.
+        .3 MatrixUnit/ \DTcomment{LEDマトリクス表示}.
+        .4 MatrixVisualizer.h.
+        .4 MatrixVisualizer.cpp.
+        }
+        \end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{オブジェクト設計（クラス図）}
+ 
+システムの各モジュールをクラスとして定義し，その構成と関係性を表\ref{tab:class_design_table}に示す．
+ 
+\begin{table}[htbp]
+    \caption{オブジェクト設計（クラス定義一覧）}
+    \label{tab:class_design_table}
+    \centering
+    \begin{tblr}{
+        width = \linewidth,
+        colspec = {Q[l,m,3.5cm] Q[l,m,3.5cm] Q[l,m,8.5cm]},
+        hlines = {1pt, solid, black},
+        vlines = {1pt, solid, black},
+        row{1} = {font=\bfseries, c},
+    }
+        クラス名 & 種別 & 内容 \\
+        \texttt{BpmManager} & 属性 &
+          \texttt{bpm : int} \par
+          \texttt{lastBeatTime : unsigned long} \\
+        & 操作 &
+          \texttt{+ setBpm(bpm : int) : void} \par
+          \texttt{+ isBeatTick() : bool} \par
+          \texttt{+ getProgress() : float} \\
+        \texttt{LedController} & 属性 &
+          \texttt{ledPins[6] : int} \\
+        & 操作 &
+          \texttt{+ begin() : void} \par
+          \texttt{+ blink() : void} \\
+        \texttt{ServoDriver} & 属性 &
+          \texttt{metronomeServo : Servo} \par
+          \texttt{servoPin : int} \\
+        & 操作 &
+          \texttt{+ begin() : void} \par
+          \texttt{+ update(progress : float) : void} \\
+        \texttt{MatrixVisualizer} & 属性 &
+          \texttt{matrix : ArduinoLEDMatrix} \\
+        & 操作 &
+          \texttt{+ begin() : void} \par
+          \texttt{+ drawKeyboard(note : int) : void} \par
+          \texttt{+ clear() : void} \\
+    \end{tblr}
+\end{table}
+ 
+\noindent
+\textbf{依存関係：}
+\texttt{BpmManager} は各コントローラクラス（\texttt{LedController}，\texttt{ServoDriver}，\texttt{MatrixVisualizer}）へタイミング情報および進捗同期データを通知する．
+ 
+
+% %%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection{関数設計}
+% 各クラスが保持する主要な関数の仕様を表\ref{tab:function_spec}に示す。
+
+% \begin{table}[htbp]
+%     \caption{主要関数仕様一覧}
+%     \label{tab:function_spec}
+%     \centering
+%     \begin{tblr}{
+%       width = \linewidth,
+%       colspec = {Q[l,m,3cm] Q[l,m,4cm] Q[l,m,7cm]},
+%       hlines = {1pt, solid},
+%       vlines = {1pt, solid},
+%       row{1} = {font=\bfseries, c},
+%     }
+%       クラス名 & 関数名 & 処理内容 \\
+%       BpmManager & isBeatTick & 現在時刻と前回打点時刻を比較し，拍のタイミングであればtrueを返す． \\
+%       BpmManager & getProgress & 現在の拍内における進捗度（0.0〜1.0）を算出し，サーボの滑らかな動きに供する． \\
+%       LedController & blink & 指令を受けた際，LEDを一定時間点灯させ拍を視覚化する． \\
+%       ServoDriver & update & 進捗度に基づき，サーボをメトロノームのように左右へ往復運動させる． \\
+%       MatrixVisualizer & drawKey & 受信した音階データに対応するLED列を点灯し，鍵盤のような表示を行う． \\
+%     \end{tblr}
+% \end{table}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%
+% \section{処理フローの設計}
+% システム全体のメインループにおける処理フローを図\ref{fig:flowchart}に示す。
+
+% \begin{figure}[htbp]
+%     \centering
+%     \begin{tikzpicture}[
+%         node distance = 1.2cm,
+%         auto,
+%         block/.style = {rectangle, draw, text width=8em, text centered, rounded corners, minimum height=3em},
+%         decision/.style = {diamond, draw, text width=5em, text centered, inner sep=0pt, aspect=2},
+%         line/.style = {draw, -{Stealth}}
+%     ]
+%         % ノードの配置
+%         \node [block] (start) {ループ開始};
+%         \node [block, below of=start] (receive) {BPM情報の受信};
+%         \node [block, below of=receive] (calc) {拍内進捗度の計算\\(getProgress)};
+%         \node [decision, below of=calc, node distance=2.5cm] (beat) {拍の瞬間か？\\(isBeatTick)};
+%         \node [block, right of=beat, node distance=4.5cm] (led) {LED点灯処理};
+%         \node [block, below of=beat, node distance=2.5cm] (servo) {サーボ角度更新\\(update)};
+%         \node [block, below of=servo] (matrix) {LEDマトリクス更新};
+%         \node [block, below of=matrix] (end) {ループ終了};
+
+%         % 線の接続
+%         \path [line] (start) -- (receive);
+%         \path [line] (receive) -- (calc);
+%         \path [line] (calc) -- (beat);
+%         \path [line] (beat) -- node {Yes} (led);
+%         \path [line] (beat) -- node {No} (servo);
+%         \path [line] (led) |- (servo);
+%         \path [line] (servo) -- (matrix);
+%         \path [line] (matrix) -- (end);
+%         \path [line] (end.west) -- ++(-1,0) |- (start.west);
+%     \end{tikzpicture}
+%     \caption{メインループの処理フロー}
+%     \label{fig:flowchart}
+% \end{figure}
+
+
+% \section{テストの設計}
+% % どのようにテストを行うのか，例えば，テストデータの設計などを記述．
+
+
+\end{document}
