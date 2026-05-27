@@ -81,12 +81,12 @@ ArduinoLEDMatrix matrix;
 
 //関数
 
-void displeyBPM(int bpm){
+void displayBPM(int bpm){
   //初期化
   uint32_t frame[12] = {0}; 
   matrix.renderBitmap(frame,12,8); 
 
-  drawDugit(bpm,0);
+  drawDigit(bpm,0);
 }
 
 void drawDigit(int digit, int x_offset){
