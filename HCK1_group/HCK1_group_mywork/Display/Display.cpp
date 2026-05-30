@@ -102,6 +102,8 @@ static int currentBPM = -1;
 //   5. 値が更新されていれば displayBPM() で描画更新する
 // -------------------------
 void checkUDP() {
+  // ※通信部は未実装のためコメントアウト（描画動作の確認用にBPMは直接 displayBPM() へ与える）
+  /*
   int packetSize = Udp.parsePacket();
   if (packetSize <= 0) return;  // パケット未到達
 
@@ -126,6 +128,7 @@ void checkUDP() {
     currentBPM = bpm;
     displayBPM(bpm);
   }
+  */
 }
 
 // -------------------------
