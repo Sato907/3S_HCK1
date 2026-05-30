@@ -1,4 +1,6 @@
-const int CDS_PIN = A0;   
+const int CDS_PIN = A0; 
+
+//3.3kΩに変更
 
 void setup() {
   Serial.begin(9600);       
