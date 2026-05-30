@@ -1,93 +1,106 @@
 /*
- * CdSセル 受光動作検証プログラム（LEDを光源として使用）
+ * CdSセル 受光動作検証プログラム（手による遮光方式）
  *
  * 対象: Arduino UNO (楽器デバイス受光部 / 計画書 図3.4)
  * 目的: CdS セル(GL5516) が光を正しく検知できるかを検証する．
- *       検証用の光源として LED を用い，LED を消灯/点灯させたときに
- *       CdS セルのアナログ値が変化するかを比較することで判定する．
- *       （LED は検知結果の表示用ではなく，CdS に当てる「光源」として使う）
+ *       手で CdS セルを覆う（遮光）・外す操作を行い，A0 の値が変化すれば
+ *       「CdS セルは光を検知できている」と判定する．
  *
  * 配線（計画書 図3.4 の分圧回路に準拠）:
  *   5V  ── CdS セル(GL5516) ──┬── A0       … 明るいほど A0 の値が大きくなる
  *                              └── 10kΩ ── GND
- *   検証用光源 LED: D13 ── 220Ω ── LED ── GND   … CdS セルに向けて配置する
  *
- * 検証の考え方:
- *   LED 消灯時(暗)と点灯時(明)で CdS の値を測定し，その差が一定以上あれば
- *   「CdS セルは光を検知できている」と判定する．
+ * 検証の手順:
+ *   1. Arduino に書き込み，シリアルモニタ(115200 bps)を開く
+ *   2. 起動後，CdS セルを覆わずに「明時基準値」を自動測定する（3秒間）
+ *   3. 次に手で CdS セルを覆い，「暗時基準値」を自動測定する（3秒間）
+ *   4. 以降はリアルタイムで A0 値と明暗判定を表示し続ける
+ *      → 手で覆う/外すたびに値と判定が変化すれば「検知OK」
  *
  * シリアルモニタ(115200 bps)で各値と判定結果を確認する．
  */
 
 // --- ピン定義 ---
-const int CDS_PIN = A0;           // CdS セルの分圧出力
-const int LED_PIN = 13;           // CdS に光を当てる検証用LED（外付け推奨）
+const int CDS_PIN = A0;
 
 // --- 測定パラメータ ---
-const int SETTLE_MS = 200;        // LED 切替後，CdS が安定するまでの待ち時間[ms]
-const int MEASURE_SAMPLES = 20;   // 1回の測定で平均するサンプル数
+const int CALIB_SAMPLES = 50;  // 基準値測定のサンプル数
+const int CALIB_MS = 3000;     // 基準値測定にかける時間[ms]
+
+// 明暗の境界値（明時と暗時の中間値として setup() で自動算出）
+int threshold = 0;
 
 // --- 判定パラメータ ---
-// LED 点灯時と消灯時の CdS 値の差が，この値以上あれば「光を検知できた」と判定する．
-// 環境光や LED の明るさ・距離に応じて調整する．
-const int DETECT_DIFF = 50;
+// 明時と暗時の差がこの値以上あれば，CdS が正常に光を検知できていると判定する．
+const int VALID_DIFF = 50;
 
 void setup() {
   Serial.begin(115200);
   while (!Serial) {}
 
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
+  Serial.println("=== CdSセル 受光動作検証（手による遮光） ===");
+  Serial.println();
 
-  Serial.println("=== CdSセル 受光動作検証（LED光源） ===");
-  Serial.println("LED を消灯/点灯させ，CdS の値変化で受光できるか判定します．");
-  Serial.print("判定基準: 点灯時と消灯時の差 >= ");
-  Serial.print(DETECT_DIFF);
-  Serial.println(" で「検知OK」");
+  // --- (1) 明時基準値の測定（CdS を覆わない状態） ---
+  Serial.println("[ステップ1] CdSセルを覆わずにそのまま待ってください...");
+  delay(1000);
+  int brightBase = measureAverage(CALIB_SAMPLES, CALIB_MS / CALIB_SAMPLES);
+  Serial.print("  明時基準値: ");
+  Serial.println(brightBase);
+  Serial.println();
+
+  // --- (2) 暗時基準値の測定（手で覆った状態） ---
+  Serial.println("[ステップ2] 手でCdSセルを覆ってください...");
+  delay(2000);
+  int darkBase = measureAverage(CALIB_SAMPLES, CALIB_MS / CALIB_SAMPLES);
+  Serial.print("  暗時基準値: ");
+  Serial.println(darkBase);
+  Serial.println();
+
+  // --- 判定基準の評価 ---
+  int diff = brightBase - darkBase;
+  Serial.print("  明暗の差: ");
+  Serial.print(diff);
+  if (diff >= VALID_DIFF) {
+    Serial.println("  => キャリブレーションOK：CdSセルは明暗を検知できています");
+    // 閾値は明時と暗時の中間値
+    threshold = (brightBase + darkBase) / 2;
+    Serial.print("  判定閾値(明暗中間値): ");
+    Serial.println(threshold);
+  } else {
+    Serial.println("  => 要確認：明暗の差が小さすぎます（配線を確認してください）");
+    // 差が小さくても閾値を設定して以降の表示は続ける
+    threshold = (brightBase + darkBase) / 2;
+  }
+
+  Serial.println();
+  Serial.println("手でCdSセルを覆う/外す操作を繰り返してください．");
+  Serial.println("出力形式: [A0生値]  [明/暗]");
   Serial.println("---------------------------------------------------");
 }
 
 void loop() {
-  // --- (1) LED 消灯時（暗）の CdS 値を測定 ---
-  digitalWrite(LED_PIN, LOW);
-  delay(SETTLE_MS);
-  int darkValue = readCdsAverage();
+  int value = analogRead(CDS_PIN);
 
-  // --- (2) LED 点灯時（明）の CdS 値を測定 ---
-  digitalWrite(LED_PIN, HIGH);
-  delay(SETTLE_MS);
-  int brightValue = readCdsAverage();
+  Serial.print("A0=");
+  Serial.print(value);
+  Serial.print("\t");
 
-  // --- (3) 差分から受光できているかを判定 ---
-  // CdS は 5V 側に接続されているため，明るいほど A0 の値は大きくなる．
-  int diff = brightValue - darkValue;
-
-  Serial.print("消灯時(暗)=");
-  Serial.print(darkValue);
-  Serial.print("  点灯時(明)=");
-  Serial.print(brightValue);
-  Serial.print("  差=");
-  Serial.print(diff);
-
-  if (diff >= DETECT_DIFF) {
-    Serial.println("  => 検知OK：CdSセルは光を検知できています");
-  } else if (diff <= -DETECT_DIFF) {
-    Serial.println("  => 要確認：明暗が逆です（CdSの接続向きを確認）");
+  if (value >= threshold) {
+    Serial.println("明（光あり）");
   } else {
-    Serial.println("  => 検知NG：値が変化しません（配線/光源の向きを確認）");
+    Serial.println("暗（遮光中）");
   }
 
-  // 消灯に戻して次の測定まで待機
-  digitalWrite(LED_PIN, LOW);
-  delay(1000);
+  delay(200);
 }
 
-// CdS セルの値を複数回読み取り，平均値を返す（ノイズ低減）
-int readCdsAverage() {
+// 指定サンプル数・間隔で A0 を読み取り，平均値を返す
+int measureAverage(int samples, int intervalMs) {
   long sum = 0;
-  for (int i = 0; i < MEASURE_SAMPLES; i++) {
+  for (int i = 0; i < samples; i++) {
     sum += analogRead(CDS_PIN);
-    delay(2);
+    delay(intervalMs);
   }
-  return (int)(sum / MEASURE_SAMPLES);
+  return (int)(sum / samples);
 }
