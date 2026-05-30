@@ -3,10 +3,12 @@
 
 #include <Arduino.h>
 #include "Arduino_LED_Matrix.h"  // Arduino UNO R4 WiFi 内蔵LEDマトリクス用ライブラリ
+#include <WiFiS3.h>              // Arduino UNO R4 WiFi 用無線通信ライブラリ（UDP受信用）
 
 // -------------------------
 // BPM定数定義
 // スライド式可変抵抗器による五段階設定値（単位：BPM）
+// 計画書 表3.27「各段階に対応するBPM設定値」に準拠
 // -------------------------
 #define BPM_STEP_1  60
 #define BPM_STEP_2  90
@@ -14,14 +16,26 @@
 #define BPM_STEP_4  150
 #define BPM_STEP_5  180
 
+// 通信定数（計画書 表3.23 / 表3.28 に準拠）
+#define LOCAL_PORT     2390   // UDP受信に利用するポート番号
+#define HEADER_BPM     'B'    // BPMデータの識別ヘッダ（ASCII 0x42）
+
+// 文字フォントの寸法（計画書 3.5.7.1「1文字を縦5横3で再定義」に準拠）
+#define FONT_WIDTH   3   // 1文字の横ドット数
+#define FONT_HEIGHT  5   // 1文字の縦ドット数
+
+// LEDマトリクスの寸法（Arduino UNO R4 WiFi 内蔵：8行×12列）
+#define MATRIX_ROWS  8
+#define MATRIX_COLS  12
+
 // -------------------------
-// 関数宣言
+// 関数宣言（計画書 表3.32）
 // -------------------------
 
-// 中継機からのUDPパケット確認，BPM値の受信処理（通信実装予定）
+// 中継機からのUDPパケット確認，BPM値の受信処理（引数・返り値なし）
 void checkUDP();
 
-// 受信したBPM値をLEDマトリクスに数値表示する
+// 受信したBPM値をLEDマトリクスに数値表示する（引数：int bpm）
 void displayBPM(int bpm);
 
 // 指定された1桁の数字を，共有フレームバッファの x_offset 列から描画する
@@ -31,10 +45,13 @@ void drawDigit(int digit, int x_offset);
 // 外部参照
 // -------------------------
 
-// 3×5ピクセルの独自数字フォント（0〜9）
+// 3×5（横3×縦5）の独自数字フォント（0〜9）
 extern const uint8_t font3x5[10][15];
 
-// LEDマトリクスインスタンス（Display.cpp で定義，.ino の setup() から begin() を呼ぶ）
+// LEDマトリクスインスタンス（Display.cpp で定義，.ino の setup() で begin() を呼ぶ）
 extern ArduinoLEDMatrix matrix;
+
+// UDP通信オブジェクト（Display.ino で定義・初期化，checkUDP() から参照）
+extern WiFiUDP Udp;
 
 #endif
