@@ -25,24 +25,30 @@ void setup() {
   // LEDマトリクスの初期化
   matrix.begin();
 
+  // ===== 動作確認用：全LED点灯テスト =====
+  // マトリクス自体が光るかを確認する．起動直後に全点灯し，1秒後に消える．
+  // ここが光らない場合はボード設定（Arduino UNO R4 WiFi）や配線側の問題．
+  uint32_t allOn[3] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
+  matrix.loadFrame(allOn);
+  delay(1000);
+
   // ===== 通信部の初期化（未実装のためコメントアウト） =====
   /*
-  // Wi-Fi接続（SSID/PASS設定時のみ接続を試行）
   if (SSID[0] != '\0') {
     while (WiFi.begin(SSID, PASS) != WL_CONNECTED) {
       delay(1000);  // 接続確立まで待機
     }
   }
-  // UDP受信開始（計画書 表3.23 の LOCAL_PORT で待ち受け）
-  Udp.begin(LOCAL_PORT);
+  Udp.begin(LOCAL_PORT);  // UDP受信開始
   */
-
-  // 与えられたBPM値をLEDマトリクスに描画する
-  displayBPM(DISPLAY_BPM);
 }
 
 // loop() : メインループ
+// 与えられたBPM値を継続的に描画し，表示を確実に保持する．
 void loop() {
+  displayBPM(DISPLAY_BPM);
+  delay(200);
+
   // ===== 通信部（未実装のためコメントアウト） =====
   // checkUDP();   // 本来は中継機からのBPMパケットを監視して描画を更新する
 }

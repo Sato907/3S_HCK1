@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include "Arduino_LED_Matrix.h"  // Arduino UNO R4 WiFi 内蔵LEDマトリクス用ライブラリ
-#include <WiFiS3.h>              // Arduino UNO R4 WiFi 用無線通信ライブラリ（UDP受信用）
+// #include <WiFiS3.h>           // 通信有効化時に取り込む（UDP受信用）
 
 // -------------------------
 // BPM定数定義
@@ -51,7 +51,7 @@ extern const uint8_t font3x5[10][15];
 // LEDマトリクスインスタンス（Display.cpp で定義，.ino の setup() で begin() を呼ぶ）
 extern ArduinoLEDMatrix matrix;
 
-// UDP通信オブジェクト（Display.ino で定義・初期化，checkUDP() から参照）
-extern WiFiUDP Udp;
+// UDP通信オブジェクト（通信有効化時に Display.ino で定義・宣言する）
+// extern WiFiUDP Udp;
 
 #endif
