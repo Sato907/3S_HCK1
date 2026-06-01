@@ -2,37 +2,47 @@
 
 // -------------------------
 // Display.ino（計画書 3.5.7.1）
-// ※現在は無表示問題の切り分け用に，診断シーケンスを実行している．
-//   通信部はコメントアウト中．
+// 本来は中継機からの通信管理（UDP受信）を担当するが，
+// 現段階では通信部をコメントアウトし，与えたBPM値をLEDマトリクスに
+// 描画する動作確認用のプログラムのみを残している．
 // -------------------------
 
+// ===== 通信部（未実装のためコメントアウト） =====
+/*
+// UDP通信オブジェクト（Display.h で extern 宣言，checkUDP() から参照される）
+WiFiUDP Udp;
+
+// Wi-Fi接続情報（実機運用時に中継機と同一ネットワークの値を設定すること）
+const char SSID[] = "";   // Wi-Fiネットワーク名
+const char PASS[] = "";   // Wi-Fiパスワード
+*/
+
+// 描画するBPM値（60 / 90 / 120 / 150 / 180 のいずれかを指定）
 const int DISPLAY_BPM = 120;
 
-// 計算済みの「120」フレーム（displayBPMと同じフォント・同じパック方式で生成）
-const uint32_t FRAME_120[3] = {0x0004eec2, 0xa4ea48ae, 0xee000000};
-
+// setup() : 起動時に1回だけ実行される初期化処理
 void setup() {
-  Serial.begin(115200);
+  // LEDマトリクスの初期化
   matrix.begin();
+  // begin() 直後は描画が反映されないことがあるため，安定するまで待機する
+  delay(200);
 
-  // --- テスト1：全点灯（1.5秒） ---
-  Serial.println("TEST1: all on");
-  uint32_t allOn[3] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
-  matrix.loadFrame(allOn);
-  delay(1500);
+  // ===== 通信部の初期化（未実装のためコメントアウト） =====
+  /*
+  if (SSID[0] != '\0') {
+    while (WiFi.begin(SSID, PASS) != WL_CONNECTED) {
+      delay(1000);  // 接続確立まで待機
+    }
+  }
+  Udp.begin(LOCAL_PORT);  // UDP受信開始
+  */
 
-  // --- テスト2：計算済み「120」フレームを直接描画（1.5秒） ---
-  // ここで「120」が出れば，2回目以降のloadFrameは正常に動作している．
-  Serial.println("TEST2: hardcoded 120");
-  matrix.loadFrame(FRAME_120);
-  delay(1500);
-
-  // --- テスト3：displayBPM() 経由で描画（以降保持） ---
-  // ここで「120」が出れば displayBPM も正常．テスト2と変われば displayBPM 側の問題．
-  Serial.println("TEST3: displayBPM(120)");
+  // 与えられたBPM値をLEDマトリクスに描画する（loadFrameは描画後も表示を保持する）
   displayBPM(DISPLAY_BPM);
 }
 
+// loop() : メインループ
 void loop() {
-  // 診断中は何もしない（テスト3の表示を保持）
+  // ===== 通信部（未実装のためコメントアウト） =====
+  // checkUDP();   // 本来は中継機からのBPMパケットを監視して描画を更新する
 }
