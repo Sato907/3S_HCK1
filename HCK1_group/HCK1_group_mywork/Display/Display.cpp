@@ -173,8 +173,21 @@ void displayBPM(int bpm) {
     drawDigit(digits[i], startX + i * (FONT_WIDTH + 1));
   }
 
-  // フレームバッファをLEDマトリクスに描画（8行×12列）
-  matrix.renderBitmap(frameBuffer, MATRIX_ROWS, MATRIX_COLS);
+  // フレームバッファ(8×12=96ドット)を uint32_t[3] 形式へパックする．
+  // ドット番号 n = row*12 + col（0〜95）を，MSB側から順に詰める
+  // （Arduino_LED_Matrix の loadFrame が要求するビット配置）．
+  uint32_t bitmap[3] = {0, 0, 0};
+  for (int row = 0; row < MATRIX_ROWS; row++) {
+    for (int col = 0; col < MATRIX_COLS; col++) {
+      if (frameBuffer[row][col]) {
+        int n = row * MATRIX_COLS + col;
+        bitmap[n / 32] |= (1UL << (31 - (n % 32)));
+      }
+    }
+  }
+
+  // LEDマトリクスへ描画
+  matrix.loadFrame(bitmap);
 }
 
 // -------------------------
