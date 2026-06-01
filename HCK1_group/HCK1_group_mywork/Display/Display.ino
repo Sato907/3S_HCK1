@@ -18,14 +18,19 @@ const char PASS[] = "";   // Wi-Fiパスワード
 */
 
 // 描画するBPM値（60 / 90 / 120 / 150 / 180 のいずれかを指定）
-const int DISPLAY_BPM = 120;
+const int DISPLAY_BPM = 150;
 
 // setup() : 起動時に1回だけ実行される初期化処理
 void setup() {
   // LEDマトリクスの初期化
   matrix.begin();
-  // begin() 直後は描画が反映されないことがあるため，安定するまで待機する
-  delay(200);
+
+  // begin() 後の最初の loadFrame は反映されない場合があるため，
+  // ウォームアップとして全点灯フレームを一度描画してから待機する．
+  // （起動時に一瞬だけ全LEDが点灯する）
+  uint32_t warmUp[3] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
+  matrix.loadFrame(warmUp);
+  delay(300);
 
   // ===== 通信部の初期化（未実装のためコメントアウト） =====
   /*
@@ -37,12 +42,16 @@ void setup() {
   Udp.begin(LOCAL_PORT);  // UDP受信開始
   */
 
-  // 与えられたBPM値をLEDマトリクスに描画する（loadFrameは描画後も表示を保持する）
+  // 与えられたBPM値をLEDマトリクスに描画する
   displayBPM(DISPLAY_BPM);
 }
 
 // loop() : メインループ
+// 表示を確実に保持するため，与えられたBPM値を継続的に再描画する．
 void loop() {
+  displayBPM(DISPLAY_BPM);
+  delay(500);
+
   // ===== 通信部（未実装のためコメントアウト） =====
   // checkUDP();   // 本来は中継機からのBPMパケットを監視して描画を更新する
 }
