@@ -32,6 +32,9 @@
 // 関数宣言（計画書 表3.32）
 // -------------------------
 
+// LEDマトリクスの初期化（matrix.begin()を本関数経由で呼ぶ。理由はDisplay.cpp参照）
+void displaySetup();
+
 // 中継機からのUDPパケット確認，BPM値の受信処理（引数・返り値なし）
 void checkUDP();
 

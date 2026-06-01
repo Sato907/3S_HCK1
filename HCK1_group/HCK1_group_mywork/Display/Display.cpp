@@ -81,8 +81,25 @@ static const int bpmTable[5] = {
 };
 
 // LEDマトリクスのインスタンス（8行×12列）
-// Display.h で extern 宣言し，.ino の setup() で matrix.begin() を呼ぶこと
 ArduinoLEDMatrix matrix;
+
+// -------------------------
+// displaySetup（LEDマトリクスの初期化）
+// 重要：Arduino_LED_Matrix の表示バッファ(framebuffer)はヘッダ内で static 定義
+// されており，include する翻訳単位(.ino / .cpp)ごとに別実体となる．そのため
+// 表示を駆動する割り込みを登録する begin() と，描画を行う loadFrame() は
+// 必ず同一ファイル(本 Display.cpp)から呼び出し，同じ framebuffer を共有させる．
+// .ino からは matrix を直接触らず，本関数と displayBPM() を呼ぶこと．
+// -------------------------
+void displaySetup() {
+  matrix.begin();
+
+  // begin() 直後の最初の loadFrame は反映されない場合があるため，
+  // 消灯フレームを一度描画(ウォームアップ)してから安定するまで待機する．
+  uint32_t warmUp[3] = {0, 0, 0};
+  matrix.loadFrame(warmUp);
+  delay(200);
+}
 
 // 描画用共有フレームバッファ（MATRIX_ROWS行 × MATRIX_COLS列，1=点灯 / 0=消灯）
 // drawDigit() がここに書き込み，displayBPM() がまとめてレンダリングする
