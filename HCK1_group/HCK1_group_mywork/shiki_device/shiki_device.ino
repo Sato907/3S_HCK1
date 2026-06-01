@@ -5,10 +5,14 @@
  *
  * 概要:
  *   楽器演奏システムの「指揮棒」として動作する。指揮者の操作・動作を検知し，
- *   演奏の開始/終了・BPM・音量を WiFi 経由の UDP で他デバイスへ送信する。
- *     - BPM           → 観覧車（中継機 / 表示デバイス）へ送信
- *     - 音量          → 楽器デバイス用 Arduino へ送信
- *     - 演奏開始/終了 → 観覧車（中継機 / 表示デバイス）へ送信
+ *   演奏の開始/終了・BPM・音量を他デバイスへ送信する。
+ *
+ *   ★現段階の実装状況★
+ *     通信部（WiFi / UDP 送信）はコメントアウトしている。
+ *     まずは「可変抵抗器の値を移動平均→5段階へ写像する」部分を，
+ *     シリアルモニタ(115200 bps)で確認できるようにしている。
+ *     本来 UDP 送信するタイミングでは，送る内容をシリアルに出力して代替する。
+ *     通信を有効化する際は、各所の「通信部」コメントを外すこと。
  *
  * ハードウェア構成:
  *   - 加速度センサ GY-291(ADXL345): I2C 接続, アドレス 0x53,
@@ -17,13 +21,13 @@
  *   - スライド式可変抵抗器 2 本(10kΩ): BPM 変更用 / 音量変更用
  *
  * 使用ライブラリ:
- *   - WiFiS3.h : UNO R4 WiFi の WiFi / UDP 通信（WiFiUDP クラスを使用）
  *   - Wire.h   : I2C 通信。ADXL345 はレジスタを直接読み書きするため外部ライブラリ不要。
- *               （代替として Adafruit_ADXL345 / SparkFun_ADXL345 ライブラリでも実装可能）
+ *   - WiFiS3.h : UNO R4 WiFi の WiFi / UDP 通信（※通信部実装時に有効化）
  */
 
-#include <WiFiS3.h>   // UNO R4 WiFi 用 WiFi / UDP ライブラリ
-#include <WiFiUdp.h>  // WiFiUDP クラス
+// ===== 通信部（未実装のためコメントアウト） =====
+// #include <WiFiS3.h>   // UNO R4 WiFi 用 WiFi / UDP ライブラリ
+// #include <WiFiUdp.h>  // WiFiUDP クラス
 #include <Wire.h>     // I2C（ADXL345 用）
 #include <math.h>     // sqrt()
 
@@ -32,6 +36,8 @@
 //   ★印 と TODO が付いた箇所は実環境に合わせてユーザが設定すること
 // =====================================================================
 
+// ===== 通信部の設定（未実装のためコメントアウト） =====
+/*
 // ----- WiFi 接続情報 -----
 // TODO(ユーザ設定): 中継機・楽器デバイスと同一ネットワークの SSID / パスワードを入力する
 const char WIFI_SSID[] = "YOUR_SSID";      // ★仮値: WiFi ネットワーク名
@@ -47,6 +53,7 @@ IPAddress      INSTRUMENT_IP(192, 168, 1, 51);  // ★仮値: 楽器デバイス
 const uint16_t INSTRUMENT_PORT = 2390;          // ★仮値: 楽器デバイスの UDP 受信ポート（TODO 確認）
 // 本機（指揮デバイス）が UDP 送受信に使うローカルポート
 const uint16_t LOCAL_UDP_PORT  = 2391;          // ★仮値（TODO 確認）
+*/
 
 // ----- ピン定義 -----
 // TODO(ユーザ設定): bpmPin / volPin は計画書で未指定のため A0 / A1 を仮採用。確定後に変更する
@@ -74,11 +81,14 @@ const uint8_t ADXL345_REG_FORMAT  = 0x31;  // DATA_FORMAT
 const uint8_t ADXL345_REG_DATAX0  = 0x32;  // X/Y/Z データ先頭（0x32〜0x37 の 6 バイト）
 const uint8_t ADXL345_REG_DEVID   = 0x00;  // DEVID（接続確認用, 期待値 0xE5）
 
+// ===== 通信部の識別ヘッダ（未実装のためコメントアウト） =====
+/*
 // ----- UDP 識別ヘッダ（パケット先頭 1 バイト） -----
 const char HEADER_BPM   = 'B';  // 0x42: BPM データ
 const char HEADER_VOL   = 'V';  // 0x56: 音量データ
 const char HEADER_START = 'S';  // 0x53: 演奏開始
 const char HEADER_END   = 'E';  // 0x45: 演奏終了
+*/
 
 // ----- 段階→設定値の変換テーブル（計画書 表3.27 ほか） -----
 // 段階 1〜5 を配列添字 0〜4 に対応させる
@@ -92,7 +102,8 @@ const bool DEBUG = true;  // true でシリアルに状態を出力（115200 bps
 // グローバル状態変数
 // =====================================================================
 
-WiFiUDP Udp;  // UDP 通信オブジェクト
+// ===== 通信部（未実装のためコメントアウト） =====
+// WiFiUDP Udp;  // UDP 通信オブジェクト
 
 // 移動平均用リングバッファ（仕様で指定された変数名）
 int bpmSamples[sampleSize];  // BPM 用可変抵抗器のサンプル
@@ -105,7 +116,7 @@ int averageVolVal = 0;       // 音量用の移動平均値（0〜1023）
 int currentBpmStep = 0;      // 現在の BPM 段階（1〜5, 0 は未確定）
 int currentVolStep = 0;      // 現在の音量段階（1〜5, 0 は未確定）
 
-// 送信済みの段階（段階が変化したときだけ送信するための記録, 0 は未送信）
+// 直近に確定した段階（段階が変化したときだけ処理するための記録, 0 は未処理）
 int lastSentBpmStep = 0;
 int lastSentVolStep = 0;
 
@@ -130,7 +141,8 @@ void setup() {
     // シリアル接続を待ちすぎないよう一定時間で打ち切る（USB 未接続でも動作させる）
     unsigned long t0 = millis();
     while (!Serial && (millis() - t0 < 2000)) {}
-    Serial.println(F("=== 指揮デバイス 起動 ==="));
+    Serial.println(F("=== 指揮デバイス 起動（可変抵抗器→5段階 写像テスト） ==="));
+    Serial.println(F("可変抵抗器を動かすと、段階(1〜5)と設定値が表示されます。"));
   }
 
   // ピンモード設定
@@ -144,9 +156,9 @@ void setup() {
   // 可変抵抗器の移動平均バッファを初期値で満たす（起動直後から有効な平均を得るため）
   initPots();
 
-  // WiFi 接続・UDP 開始
-  connectWiFi();
-  Udp.begin(LOCAL_UDP_PORT);
+  // ===== 通信部の初期化（未実装のためコメントアウト） =====
+  // connectWiFi();
+  // Udp.begin(LOCAL_UDP_PORT);
 
   if (DEBUG) Serial.println(F("初期化完了"));
 }
@@ -159,23 +171,26 @@ void loop() {
   // 1. ボタン入力判定（演奏開始/終了）
   checkButton();
 
-  // 2. 可変抵抗器の読み取り（移動平均→5段階化）。音量段階が変化したら送信
+  // 2. 可変抵抗器の読み取り（移動平均→5段階化）。段階が変化したら表示
   readPots();
 
-  // 3. 加速度センサの振り動作検知。振ったタイミングで最新 BPM 段階を送信
+  // 3. 加速度センサの振り動作検知。振ったタイミングで最新 BPM 段階を表示
   if (checkShake()) {
-    // 段階が変化したときだけ送信（無駄な通信を避ける）
+    // 段階が変化したときだけ処理（無駄を避ける）
     if (currentBpmStep != lastSentBpmStep) {
-      sendPacket(RELAY_IP, RELAY_PORT, HEADER_BPM, (uint8_t)bpmStepValues[currentBpmStep - 1]);
+      // ===== 通信部（未実装のためコメントアウト） =====
+      // sendPacket(RELAY_IP, RELAY_PORT, HEADER_BPM, (uint8_t)bpmStepValues[currentBpmStep - 1]);
       lastSentBpmStep = currentBpmStep;
       if (DEBUG) {
-        Serial.print(F("[送信] BPM 段階="));
+        Serial.print(F("[BPM確定/送信予定] 段階="));
         Serial.print(currentBpmStep);
         Serial.print(F(" 値="));
         Serial.println(bpmStepValues[currentBpmStep - 1]);
       }
     }
   }
+
+  delay(20);  // サンプリング間隔の確保とシリアル出力過多の抑制（テスト用）
 }
 
 // =====================================================================
@@ -201,13 +216,13 @@ void checkButton() {
         isPlaying = !isPlaying;  // 演奏状態をトグル
 
         if (isPlaying) {
-          // 演奏開始を中継機へ送信
-          sendPacket(RELAY_IP, RELAY_PORT, HEADER_START, 0);
-          if (DEBUG) Serial.println(F("[送信] 演奏開始 'S'"));
+          // ===== 通信部（未実装のためコメントアウト） =====
+          // sendPacket(RELAY_IP, RELAY_PORT, HEADER_START, 0);
+          if (DEBUG) Serial.println(F("[演奏開始/送信予定] 'S'"));
         } else {
-          // 演奏終了を中継機へ送信
-          sendPacket(RELAY_IP, RELAY_PORT, HEADER_END, 0);
-          if (DEBUG) Serial.println(F("[送信] 演奏終了 'E'"));
+          // ===== 通信部（未実装のためコメントアウト） =====
+          // sendPacket(RELAY_IP, RELAY_PORT, HEADER_END, 0);
+          if (DEBUG) Serial.println(F("[演奏終了/送信予定] 'E'"));
         }
       }
     }
@@ -217,10 +232,10 @@ void checkButton() {
 }
 
 // =====================================================================
-// 可変抵抗器の読み取り（機能3・メイン機能）
+// 可変抵抗器の読み取り（機能3・メイン機能）★現段階の主目的★
 //   (a) サンプリングと移動平均: リングバッファに sampleSize 個ためて平均
 //   (b) 5段階化: 平均値を 5 段階へ量子化
-//   (c) 音量段階が変化したら楽量デバイスへ送信（BPM は振り動作時に別途送信）
+//   (c) 段階が変化したらシリアルに表示（通信実装時はここで UDP 送信する）
 // =====================================================================
 void readPots() {
   // (a) リングバッファ更新（readIndex の位置の最古要素を上書きして合計を更新）
@@ -243,14 +258,36 @@ void readPots() {
   currentBpmStep = valueToStep(averageBpmVal);
   currentVolStep = valueToStep(averageVolVal);
 
-  // (c) 音量は段階が変化したら即座に楽器デバイスへ送信（無駄な通信を避ける）
+  // (c) 段階が変化したときだけ表示（無駄な出力を避ける）
+  //     ※通信実装時:
+  //        ・BPM  は「振り動作検知時」に中継機へ UDP 送信する（loop() 側で処理）
+  //        ・音量 は「段階変化時」に楽器デバイスへ UDP 送信する（下記で sendPacket を呼ぶ）
+
+  // BPM 段階の変化を表示（可変抵抗器を回すと段階が変わることを確認するため）
+  if (currentBpmStep != lastSentBpmStep) {
+    if (DEBUG) {
+      Serial.print(F("BPM  : 平均="));
+      Serial.print(averageBpmVal);
+      Serial.print(F(" → 段階="));
+      Serial.print(currentBpmStep);
+      Serial.print(F(" → "));
+      Serial.print(bpmStepValues[currentBpmStep - 1]);
+      Serial.println(F(" BPM"));
+    }
+    // 注: BPM の確定（lastSentBpmStep の更新）は振り動作検知時に行うため、ここでは更新しない
+  }
+
+  // 音量 段階の変化を表示（通信実装時はここで楽器デバイスへ送信）
   if (currentVolStep != lastSentVolStep) {
-    sendPacket(INSTRUMENT_IP, INSTRUMENT_PORT, HEADER_VOL, (uint8_t)volStepValues[currentVolStep - 1]);
+    // ===== 通信部（未実装のためコメントアウト） =====
+    // sendPacket(INSTRUMENT_IP, INSTRUMENT_PORT, HEADER_VOL, (uint8_t)volStepValues[currentVolStep - 1]);
     lastSentVolStep = currentVolStep;
     if (DEBUG) {
-      Serial.print(F("[送信] 音量 段階="));
+      Serial.print(F("音量 : 平均="));
+      Serial.print(averageVolVal);
+      Serial.print(F(" → 段階="));
       Serial.print(currentVolStep);
-      Serial.print(F(" 値="));
+      Serial.print(F(" → 値="));
       Serial.println(volStepValues[currentVolStep - 1]);
     }
   }
@@ -283,7 +320,7 @@ void initPots() {
   readIndex = 0;
   averageBpmVal = bpmTotal / sampleSize;
   averageVolVal = volTotal / sampleSize;
-  // 初期段階を算出（lastSent* は 0 のままにして，最初のループで現在値を 1 回送信させる）
+  // 初期段階を算出（lastSent* は 0 のままにして，最初のループで現在値を 1 回表示させる）
   currentBpmStep = valueToStep(averageBpmVal);
   currentVolStep = valueToStep(averageVolVal);
 }
@@ -396,6 +433,8 @@ uint8_t readRegister(uint8_t reg) {
   return 0;
 }
 
+// ===== 通信部（未実装のためコメントアウト） =====
+/*
 // =====================================================================
 // WiFi 接続
 // =====================================================================
@@ -426,3 +465,4 @@ void sendPacket(IPAddress ip, uint16_t port, char header, uint8_t value) {
   Udp.write(value);
   Udp.endPacket();
 }
+*/
