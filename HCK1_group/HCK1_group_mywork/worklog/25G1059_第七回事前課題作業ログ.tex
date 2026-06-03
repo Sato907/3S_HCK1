@@ -221,16 +221,16 @@ LEDマトリクスの表示確認 &
 
     5/30 & 2231 & LEDマトリクス制御 & 2h &
     進行中 &
-    完了 &
-    100\% &
-    無表示の根本原因（framebufferの翻訳単位不一致）を特定し，matrix操作をDisplay.cppに集約して表示を確定させた． \\
+    進行中 &
+    80\% &
+    無表示の根本原因（framebufferの翻訳単位不一致）を特定し，matrix操作をDisplay.cppに集約してBPM表示を確定させた（通信部は未完）． \\
     \hline
 
     5/30 & 2134 & 受信側回路実装 & 1.5h &
     進行中 &
     進行中 &
-    50\% &
-    CdS検証を手による遮光方式に変更し，A0値による明暗判定を実機で確認した（実機確認済）． \\
+    60\% &
+    CdS検証を手による遮光方式に変更し，A0値による明暗判定を実機で確認した． \\
     \hline
 
     5/31 & 2113 & BPM・音量変化機構の実装 & 2h &
@@ -240,25 +240,32 @@ LEDマトリクスの表示確認 &
     指揮デバイスのファームウェアを新規作成し，可変抵抗器2本の移動平均→5段階化→BPM/音量送信を実装した． \\
     \hline
 
+    5/31 & 2134 & 受信側回路実装 & 1h &
+    進行中 &
+    進行中 &
+    90\% &
+    CdSセルの動作検証を実機で確認した（実機確認済）． \\
+    \hline
+
     6/1 & 2112 & 本体・センサの実装 & 2h &
     未着手 &
     進行中 &
-    30\% &
-    ADXL345による振り動作検知を実装したが，可変抵抗器をブレッドボードに上手く接続できず実装が停滞した． \\
+    50\% &
+    ADXL345による振り動作検知を実装．可変抵抗器をブレッドボードに上手く接続できず停滞．筐体は段ボールで制作する予定． \\
     \hline
 
     〃 & 2113 & BPM・音量変化機構の実装 & 1.5h &
     進行中 &
     進行中 &
     40\% &
-    通信部を一旦コメントアウトし，可変抵抗器の5段階写像をシリアルで確認可能にした． \\
+    通信部を一旦コメントアウトし，可変抵抗器の5段階写像をシリアルで確認可能にした（機構は未検証）． \\
     \hline
 
     6/2 & 3131 & LEDマトリクスの表示確認 & 1h &
     未着手 &
-    進行中 &
-    40\% &
-    実機でBPM数値の表示確認に着手した． \\
+    完了 &
+    100\% &
+    実機でBPM数値が表示されることを確認した． \\
     \hline
 
     6/2 & - & 作業ログの記入 & 2h &
@@ -273,25 +280,30 @@ LEDマトリクスの表示確認 &
 
 \section{計画時のGCと現在のGC}
 
-% TODO: ガントチャートの図（gant1.png：計画時 / gant2.png：現在）は別途用意して挿入する．
+最終計画書に記載された計画段階のガントチャート(GC)を図\ref{fig:gant1}に示す．
 
-最終計画書に記載されたガントチャート(GC)を図\ref{fig:gant1}に示す．
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+    \centering % 中央揃え
+    \includegraphics[width=0.8\columnwidth]{gant1.png} % 横幅を列幅の80%に指定
+    \caption{計画段階のガントチャート} % 図の説明
+    \label{fig:gant1} % 本文中で参照するためのラベル
+\end{figure}
 
-%\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
-%    \centering % 中央揃え
-%    \includegraphics[width=0.8\columnwidth]{gant1.png} % 横幅を列幅の80%に指定
-%    \caption{計画時のガントチャート} % 図の説明
-%    \label{fig:gant1} % 本文中で参照するためのラベル
-%\end{figure}
+次に，現在のGCを図\ref{fig:gant3}（実装フェーズ）および図\ref{fig:gant4}（テストフェーズ）に示す．達成した項目は緑色で塗られている．
 
-次に，現在のGCについて図\ref{fig:gant2}に示す．達成した項目は緑色で塗られている．
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+    \centering % 中央揃え
+    \includegraphics[width=0.9\columnwidth]{gant3.png} % 横幅を列幅の90%に指定
+    \caption{現在のガントチャート（実装フェーズ）} % 図の説明
+    \label{fig:gant3} % 本文中で参照するためのラベル
+\end{figure}
 
-%\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
-%    \centering % 中央揃え
-%    \includegraphics[width=0.8\columnwidth]{gant2.png} % 横幅を列幅の80%に指定
-%    \caption{現在のガントチャート} % 図の説明
-%    \label{fig:gant2} % 本文中で参照するためのラベル
-%\end{figure}
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+    \centering % 中央揃え
+    \includegraphics[width=0.9\columnwidth]{gant4.png} % 横幅を列幅の90%に指定
+    \caption{現在のガントチャート（テストフェーズ）} % 図の説明
+    \label{fig:gant4} % 本文中で参照するためのラベル
+\end{figure}
 
 
 \sectionrule
