@@ -88,7 +88,9 @@ const int bpmStepValues[5] = { 60, 90, 120, 150, 180 };  // 段階→BPM
 const int volStepValues[5] = { 0, 64, 128, 192, 255 };   // 段階→音量(0〜255)
 
 // ----- デバッグ出力 -----
-const bool DEBUG = true;  // true でシリアルに状態を出力（115200 bps）
+const bool DEBUG     = true;   // true でシリアルに状態を出力（115200 bps）
+const bool DEBUG_POT = false;  // true で可変抵抗器の値を毎ループ出力（ボタン検証時は false 推奨）
+const bool DEBUG_BTN = true;   // true でボタンの生レベル変化（押下/離し）を出力
 
 // グローバル状態変数
 
@@ -185,12 +187,23 @@ void checkButton() {
   // 入力が変化したらタイマをリセット（チャタリング除去の起点）
   if (reading != lastButtonReading) {
     lastDebounceTime = millis();
+    // 検証用: 生レベルの変化を表示（配線確認。離し=HIGH / 押下=LOW が正常）
+    if (DEBUG && DEBUG_BTN) {
+      Serial.print(F("[BTN] 生レベル変化 -> "));
+      Serial.println(reading == LOW ? F("LOW(押下)") : F("HIGH(離し)"));
+    }
   }
 
   // 一定時間変化がなければ，その値を確定状態として採用
   if ((millis() - lastDebounceTime) > debounceDelay) {
     if (reading != buttonState) {
       buttonState = reading;
+
+      // 検証用: チャタリング除去後に確定した状態を表示
+      if (DEBUG && DEBUG_BTN) {
+        Serial.print(F("[BTN] 確定状態 -> "));
+        Serial.println(buttonState == LOW ? F("LOW(押下)") : F("HIGH(離し)"));
+      }
 
       // 確定状態が「押下（LOW）」に変化した瞬間だけトリガーする
       if (buttonState == LOW) {
@@ -234,8 +247,8 @@ void readPots() {
   currentBpmStep = valueToStep(averageBpmVal);
   currentVolStep = valueToStep(averageVolVal);
 
-  //検証用
-  if (DEBUG) {
+  //検証用（可変抵抗器の毎ループ出力。ボタン検証時は DEBUG_POT=false で抑制）
+  if (DEBUG && DEBUG_POT) {
     Serial.print(F("A0(bpm)="));
     Serial.print(analogRead(bpmPin));
     Serial.print(F(" avg="));
