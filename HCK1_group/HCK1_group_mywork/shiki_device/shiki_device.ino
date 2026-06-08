@@ -1,9 +1,5 @@
 /*
  * 指揮デバイス 
- *
- *
- 
- 
  *   ★現段階の実装状況★
  *     通信部（WiFi / UDP 送信）はコメントアウトしている。
  *     まずは「可変抵抗器の値を移動平均→5段階へ写像する」部分を，
@@ -28,10 +24,7 @@
 #include <Wire.h>     // I2C（ADXL345 用）
 #include <math.h>     // sqrt()
 
-// =====================================================================
 // 設定値（ピン番号・閾値・送信先・WiFi情報）
-//   ★印 と TODO が付いた箇所は実環境に合わせてユーザが設定すること
-// =====================================================================
 
 // ===== 通信部の設定（未実装のためコメントアウト） =====
 /*
@@ -56,19 +49,19 @@ const uint16_t LOCAL_UDP_PORT  = 2391;          // ★仮値（TODO 確認）
 
 // ----- ピン定義 -----
 // TODO(ユーザ設定): bpmPin / volPin は計画書で未指定のため A0 / A1 を仮採用。確定後に変更する
-const int bpmPin       = A0;  // ★仮値: BPM 変更用 可変抵抗器（アナログ）
-const int volPin       = A5;  // ★仮値: 音量変更用 可変抵抗器（アナログ）
+const int bpmPin       = A0;  //  BPM 変更用 可変抵抗器（アナログ）
+const int volPin       = A1;  //  音量変更用 可変抵抗器（アナログ）
 const int BUTTON_PIN   = 3;   // ボタン: D3（外部 10kΩ プルアップ, 押下で LOW）
 const int ACC_INT_PIN  = 2;   // ADXL345 INT1 → D2（本実装はポーリング方式。割り込み化する場合に使用）
 
 // ----- 移動平均（ノイズ対策） -----
 // TODO(ユーザ設定): sampleSize は計画書で未指定のため 10 を仮採用。応答性とノイズ除去のバランスで調整する
-const int sampleSize = 10;    // ★仮値: 移動平均のサンプル数
+const int sampleSize = 10;    //  移動平均のサンプル数
 
 // ----- 加速度センサ（振り動作検知） -----
 // TODO(ユーザ設定): accThreshold / shakeInterval は実機で振って調整する
-const int          accThreshold  = 120;   // ★仮値: 「振った」と判定する加速度変化量[LSB]
-const unsigned long shakeInterval = 400;  // ★仮値: 連続検知防止のための最小間隔[ms]
+const int          accThreshold  = 120;   //  「振った」と判定する加速度変化量[LSB]
+const unsigned long shakeInterval = 400;  //  連続検知防止のための最小間隔[ms]
 
 // ----- ボタンのチャタリング除去 -----
 const unsigned long debounceDelay = 50;   // ボタン状態確定までの待ち[ms]
@@ -97,9 +90,7 @@ const int volStepValues[5] = { 0, 64, 128, 192, 255 };   // 段階→音量(0〜
 // ----- デバッグ出力 -----
 const bool DEBUG = true;  // true でシリアルに状態を出力（115200 bps）
 
-// =====================================================================
 // グローバル状態変数
-// =====================================================================
 
 // ===== 通信部（未実装のためコメントアウト） =====
 // WiFiUDP Udp;  // UDP 通信オブジェクト
@@ -243,10 +234,7 @@ void readPots() {
   currentBpmStep = valueToStep(averageBpmVal);
   currentVolStep = valueToStep(averageVolVal);
 
-  // ===== 一時デバッグ: 生値・移動平均・段階を毎ループ表示（検証用） =====
-  //   BPM(A0) と 音量(A5) の双方を毎ループ表示するので、可変抵抗器を回すと
-  //   段階(1〜5)がその場で変化するのを確認できる。
-  //   検証が済んだら、この DEBUG ブロックは削除してよい。
+  //検証用
   if (DEBUG) {
     Serial.print(F("A0(bpm)="));
     Serial.print(analogRead(bpmPin));
@@ -263,11 +251,6 @@ void readPots() {
     Serial.print(F(" 値="));
     Serial.println(volStepValues[currentVolStep - 1]);
   }
-
-  // (c) 段階が変化したときだけ表示（無駄な出力を避ける）
-  //     ※通信実装時:
-  //        ・BPM  は「振り動作検知時」に中継機へ UDP 送信する（loop() 側で処理）
-  //        ・音量 は「段階変化時」に楽器デバイスへ UDP 送信する（下記で sendPacket を呼ぶ）
 
   // BPM 段階の変化を表示（可変抵抗器を回すと段階が変わることを確認するため）
   if (currentBpmStep != lastSentBpmStep) {
