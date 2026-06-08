@@ -239,23 +239,30 @@ void readPots() {
   averageBpmVal = bpmTotal / sampleSize;
   averageVolVal = volTotal / sampleSize;
 
-  // ===== 一時デバッグ: 生値と移動平均を毎ループ表示（切り分け用） =====
-  //   slider_test と同様に raw 値を確認するための出力。
-  //   原因切り分けが済んだら、この DEBUG_RAW ブロックは削除してよい。
-  if (DEBUG) {
-    Serial.print(F("RAW A0(bpm)="));
-    Serial.print(analogRead(bpmPin));
-    Serial.print(F(" avg="));
-    Serial.print(averageBpmVal);
-    Serial.print(F("  |  A1(vol)="));
-    Serial.print(analogRead(volPin));
-    Serial.print(F(" avg="));
-    Serial.println(averageVolVal);
-  }
-
   // (b) 5段階化
   currentBpmStep = valueToStep(averageBpmVal);
   currentVolStep = valueToStep(averageVolVal);
+
+  // ===== 一時デバッグ: 生値・移動平均・段階を毎ループ表示（検証用） =====
+  //   BPM(A0) と 音量(A5) の双方を毎ループ表示するので、可変抵抗器を回すと
+  //   段階(1〜5)がその場で変化するのを確認できる。
+  //   検証が済んだら、この DEBUG ブロックは削除してよい。
+  if (DEBUG) {
+    Serial.print(F("A0(bpm)="));
+    Serial.print(analogRead(bpmPin));
+    Serial.print(F(" avg="));
+    Serial.print(averageBpmVal);
+    Serial.print(F(" 段階="));
+    Serial.print(currentBpmStep);
+    Serial.print(F("  |  A5(vol)="));
+    Serial.print(analogRead(volPin));
+    Serial.print(F(" avg="));
+    Serial.print(averageVolVal);
+    Serial.print(F(" 段階="));
+    Serial.print(currentVolStep);
+    Serial.print(F(" 値="));
+    Serial.println(volStepValues[currentVolStep - 1]);
+  }
 
   // (c) 段階が変化したときだけ表示（無駄な出力を避ける）
   //     ※通信実装時:
