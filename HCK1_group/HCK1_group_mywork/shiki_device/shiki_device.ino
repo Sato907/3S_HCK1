@@ -1,12 +1,9 @@
 /*
- * 指揮デバイス ファームウェア（HCK1「指揮デバイス」）
+ * 指揮デバイス 
  *
- * 対象ボード: Arduino UNO R4 WiFi
  *
- * 概要:
- *   楽器演奏システムの「指揮棒」として動作する。指揮者の操作・動作を検知し，
- *   演奏の開始/終了・BPM・音量を他デバイスへ送信する。
- *
+ 
+ 
  *   ★現段階の実装状況★
  *     通信部（WiFi / UDP 送信）はコメントアウトしている。
  *     まずは「可変抵抗器の値を移動平均→5段階へ写像する」部分を，
@@ -54,6 +51,8 @@ const uint16_t INSTRUMENT_PORT = 2390;          // ★仮値: 楽器デバイス
 // 本機（指揮デバイス）が UDP 送受信に使うローカルポート
 const uint16_t LOCAL_UDP_PORT  = 2391;          // ★仮値（TODO 確認）
 */
+
+
 
 // ----- ピン定義 -----
 // TODO(ユーザ設定): bpmPin / volPin は計画書で未指定のため A0 / A1 を仮採用。確定後に変更する
@@ -253,6 +252,20 @@ void readPots() {
   // 移動平均値を算出
   averageBpmVal = bpmTotal / sampleSize;
   averageVolVal = volTotal / sampleSize;
+
+  // ===== 一時デバッグ: 生値と移動平均を毎ループ表示（切り分け用） =====
+  //   slider_test と同様に raw 値を確認するための出力。
+  //   原因切り分けが済んだら、この DEBUG_RAW ブロックは削除してよい。
+  if (DEBUG) {
+    Serial.print(F("RAW A0(bpm)="));
+    Serial.print(analogRead(bpmPin));
+    Serial.print(F(" avg="));
+    Serial.print(averageBpmVal);
+    Serial.print(F("  |  A1(vol)="));
+    Serial.print(analogRead(volPin));
+    Serial.print(F(" avg="));
+    Serial.println(averageVolVal);
+  }
 
   // (b) 5段階化
   currentBpmStep = valueToStep(averageBpmVal);
