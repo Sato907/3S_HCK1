@@ -1,4 +1,4 @@
-This is e-upTeX, Version 3.141592653-p4.1.2-u2.00-250202-2.6 (utf8.uptex) (TeX Live 2025) (preloaded format=uplatex 2025.4.24)  9 JUN 2026 14:49
+This is e-upTeX, Version 3.141592653-p4.1.2-u2.00-250202-2.6 (utf8.uptex) (TeX Live 2025) (preloaded format=uplatex 2025.4.24)  9 JUN 2026 18:11
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -427,40 +427,37 @@ LaTeX Font Info:    Font shape `JY2/mc/m/n' will be
 ] [2]
 File: gant1.png Graphic file (type bmp)
 <gant1.png>
+File: gant5.png Graphic file (type bmp)
+<gant5.png>
+File: gant6.png Graphic file (type bmp)
+<gant6.png>
 
 
 [3]
-File: gant3.png Graphic file (type bmp)
-<gant3.png>
-File: gant4.png Graphic file (type bmp)
-<gant4.png>
-
 
 [4]
 LaTeX Font Info:    Font shape `JT2/gt/m/n' will be
-(Font)              scaled to size 8.32214pt on input line 463.
+(Font)              scaled to size 8.32214pt on input line 450.
 LaTeX Font Info:    Font shape `JY2/gt/m/n' will be
-(Font)              scaled to size 8.32214pt on input line 463.
+(Font)              scaled to size 8.32214pt on input line 450.
 
 
 [5]
-Underfull \hbox (badness 2334) in paragraph at lines 577--578
+Underfull \hbox (badness 2334) in paragraph at lines 564--565
 []\OT1/cmr/m/n/9 No.3131 \JY2/mc/m/n/9 のプログラム ： []$\OT1/cmtt/m/n/
 9 https : / / github . com / Sato907 / 3S _ HCK1 / tree / main / HCK1 _ group /
  HCK1 _ group _
  []
 
 
-Underfull \hbox (badness 2334) in paragraph at lines 578--579
+Underfull \hbox (badness 2334) in paragraph at lines 565--566
 []\OT1/cmr/m/n/9 No.2113 \JY2/mc/m/n/9 のプログラム ： []$\OT1/cmtt/m/n/
 9 https : / / github . com / Sato907 / 3S _ HCK1 / tree / main / HCK1 _ group /
  HCK1 _ group _
  []
 
 
-
-[6]
-Underfull \hbox (badness 2334) in paragraph at lines 579--580
+Underfull \hbox (badness 2334) in paragraph at lines 566--567
 []\OT1/cmr/m/n/9 No.2134 \JY2/mc/m/n/9 のプログラム ： []$\OT1/cmtt/m/n/
 9 https : / / github . com / Sato907 / 3S _ HCK1 / tree / main / HCK1 _ group /
  HCK1 _ group _
@@ -468,7 +465,7 @@ Underfull \hbox (badness 2334) in paragraph at lines 579--580
 
 
 
-[7] (./25G1059_第七回事前課題作業ログ.aux)
+[6] (./25G1059_第七回事前課題作業ログ.aux)
  ***********
 pLaTeX2e <2023-02-14u04>+1, based on
 LaTeX2e <2024-11-01> patch level 2
@@ -481,11 +478,11 @@ t' has not changed.
 Here is how much of TeX's memory you used:
  9695 strings out of 470271
  150786 string characters out of 5486374
- 596053 words of memory out of 5000000
+ 593053 words of memory out of 5000000
  36423 multiletter control sequences out of 15000+600000
  637302 words of font info for 95 fonts, out of 8000000 for 9000
  934 hyphenation exceptions out of 8191
- 72i,8n,79p,363b,694s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 72i,8n,79p,363b,674s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on 25G1059_第七回事前課題作業ログ.dvi (7 pages, 30652
+Output written on 25G1059_第七回事前課題作業ログ.dvi (6 pages, 29408
  bytes).
