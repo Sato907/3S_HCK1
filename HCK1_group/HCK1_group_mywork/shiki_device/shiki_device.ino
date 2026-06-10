@@ -1,24 +1,22 @@
 /*
  * 指揮デバイス 
- *   ★現段階の実装状況★
- *     通信部（WiFi / UDP 送信）はコメントアウトしている。
+
  *     まずは「可変抵抗器の値を移動平均→5段階へ写像する」部分を，
- *     シリアルモニタ(115200 bps)で確認できるようにしている。
+ *     シリアルモニタ(115200 bps)で確認
  *     本来 UDP 送信するタイミングでは，送る内容をシリアルに出力して代替する。
  *     通信を有効化する際は、各所の「通信部」コメントを外すこと。
- *
+ * 
  * ハードウェア構成:
  *   - 加速度センサ GY-291(ADXL345): I2C 接続, アドレス 0x53,
  *       SDA=A4 / SCL=A5（UNO R4 WiFi の既定 I2C ピン）, INT1 → D2
  *   - ボタン: D3, 外部 10kΩ プルアップ, 押下時 LOW（演奏開始/終了トリガー）
- *   - スライド式可変抵抗器 2 本(10kΩ): BPM 変更用 / 音量変更用
  *
  * 使用ライブラリ:
  *   - Wire.h   : I2C 通信。ADXL345 はレジスタを直接読み書きするため外部ライブラリ不要。
  *   - WiFiS3.h : UNO R4 WiFi の WiFi / UDP 通信（※通信部実装時に有効化）
  */
 
-// ===== 通信部（未実装のためコメントアウト） =====
+//　通信部
 // #include <WiFiS3.h>   // UNO R4 WiFi 用 WiFi / UDP ライブラリ
 // #include <WiFiUdp.h>  // WiFiUDP クラス
 #include <Wire.h>     // I2C（ADXL345 用）
@@ -26,54 +24,51 @@
 
 // 設定値（ピン番号・閾値・送信先・WiFi情報）
 
-// ===== 通信部の設定（未実装のためコメントアウト） =====
+// 通信部の設定
 /*
 // ----- WiFi 接続情報 -----
-// TODO(ユーザ設定): 中継機・楽器デバイスと同一ネットワークの SSID / パスワードを入力する
-const char WIFI_SSID[] = "YOUR_SSID";      // ★仮値: WiFi ネットワーク名
-const char WIFI_PASS[] = "YOUR_PASSWORD";  // ★仮値: WiFi パスワード
+// 中継機・楽器デバイスと同一ネットワークの SSID / パスワードを入力する
+const char WIFI_SSID[] = "YOUR_SSID";      // WiFi ネットワーク名
+const char WIFI_PASS[] = "YOUR_PASSWORD";  // WiFi パスワード
 
-// ----- 送信先（UDP） -----
+// 送信先（UDP)
 // TODO(ユーザ設定): 各デバイスの実 IP アドレスとポート番号を確定して設定する
 // 観覧車（中継機 / 表示デバイス）: BPM と 演奏開始/終了 の送信先
-IPAddress      RELAY_IP(192, 168, 1, 50);      // ★仮値: 中継機の IP アドレス
-const uint16_t RELAY_PORT      = 2390;          // 中継機の UDP 受信ポート（計画書 表3.23）
+IPAddress      RELAY_IP(192, 168, 1, 50);      // 中継機の IP アドレス
+const uint16_t RELAY_PORT      = 2390;          // 中継機の UDP 受信ポート
 // 楽器デバイス用 Arduino: 音量データの送信先
-IPAddress      INSTRUMENT_IP(192, 168, 1, 51);  // ★仮値: 楽器デバイスの IP アドレス
-const uint16_t INSTRUMENT_PORT = 2390;          // ★仮値: 楽器デバイスの UDP 受信ポート（TODO 確認）
+IPAddress      INSTRUMENT_IP(192, 168, 1, 51);  // 楽器デバイスの IP アドレス
+const uint16_t INSTRUMENT_PORT = 2390;          // 楽器デバイスの UDP 受信ポート（TODO 確認）
 // 本機（指揮デバイス）が UDP 送受信に使うローカルポート
-const uint16_t LOCAL_UDP_PORT  = 2391;          // ★仮値（TODO 確認）
+const uint16_t LOCAL_UDP_PORT  = 2391;          // （TODO 確認）
 */
 
 
 
-// ----- ピン定義 -----
-// TODO(ユーザ設定): bpmPin / volPin は計画書で未指定のため A0 / A1 を仮採用。確定後に変更する
+// ピン定義
 const int bpmPin       = A0;  //  BPM 変更用 可変抵抗器（アナログ）
 const int volPin       = A1;  //  音量変更用 可変抵抗器（アナログ）
 const int BUTTON_PIN   = 3;   // ボタン: D3（外部 10kΩ プルアップ, 押下で LOW）
 const int ACC_INT_PIN  = 2;   // ADXL345 INT1 → D2（本実装はポーリング方式。割り込み化する場合に使用）
 
-// ----- 移動平均（ノイズ対策） -----
-// TODO(ユーザ設定): sampleSize は計画書で未指定のため 10 を仮採用。応答性とノイズ除去のバランスで調整する
+// 移動平均（ノイズ対策
 const int sampleSize = 10;    //  移動平均のサンプル数
 
-// ----- 加速度センサ（振り動作検知） -----
-// TODO(ユーザ設定): accThreshold / shakeInterval は実機で振って調整する
+// 加速度センサ（振り動作検知）
 const int          accThreshold  = 120;   //  「振った」と判定する加速度変化量[LSB]
 const unsigned long shakeInterval = 400;  //  連続検知防止のための最小間隔[ms]
 
-// ----- ボタンのチャタリング除去 -----
+// ボタンのチャタリング除去
 const unsigned long debounceDelay = 50;   // ボタン状態確定までの待ち[ms]
 
-// ----- ADXL345 レジスタ定義 -----
+// ADXL345 レジスタ定義 
 const uint8_t ADXL345_ADDR        = 0x53;  // I2C アドレス（SDO=GND のとき 0x53）
 const uint8_t ADXL345_REG_POWER   = 0x2D;  // POWER_CTL
 const uint8_t ADXL345_REG_FORMAT  = 0x31;  // DATA_FORMAT
 const uint8_t ADXL345_REG_DATAX0  = 0x32;  // X/Y/Z データ先頭（0x32〜0x37 の 6 バイト）
 const uint8_t ADXL345_REG_DEVID   = 0x00;  // DEVID（接続確認用, 期待値 0xE5）
 
-// ===== 通信部の識別ヘッダ（未実装のためコメントアウト） =====
+// 通信部の識別ヘッダ
 /*
 // ----- UDP 識別ヘッダ（パケット先頭 1 バイト） -----
 const char HEADER_BPM   = 'B';  // 0x42: BPM データ
@@ -82,22 +77,21 @@ const char HEADER_START = 'S';  // 0x53: 演奏開始
 const char HEADER_END   = 'E';  // 0x45: 演奏終了
 */
 
-// ----- 段階→設定値の変換テーブル（計画書 表3.27 ほか） -----
-// 段階 1〜5 を配列添字 0〜4 に対応させる
+// 段階→設定値の変換テーブル
 const int bpmStepValues[5] = { 60, 90, 120, 150, 180 };  // 段階→BPM
 const int volStepValues[5] = { 0, 64, 128, 192, 255 };   // 段階→音量(0〜255)
 
-// ----- デバッグ出力 -----
+// デバッグ出力
 const bool DEBUG     = true;   // true でシリアルに状態を出力（115200 bps）
 const bool DEBUG_POT = false;  // true で可変抵抗器の値を毎ループ出力（ボタン検証時は false 推奨）
 const bool DEBUG_BTN = true;   // true でボタンの生レベル変化（押下/離し）を出力
 
 // グローバル状態変数
 
-// ===== 通信部（未実装のためコメントアウト） =====
+// 通信部
 // WiFiUDP Udp;  // UDP 通信オブジェクト
 
-// 移動平均用リングバッファ（仕様で指定された変数名）
+// 移動平均用リングバッファ
 int bpmSamples[sampleSize];  // BPM 用可変抵抗器のサンプル
 int volSamples[sampleSize];  // 音量用可変抵抗器のサンプル
 int readIndex = 0;           // リングバッファの書き込み位置（最古要素を上書き）
@@ -146,7 +140,7 @@ void setup() {
   // 可変抵抗器の移動平均バッファを初期値で満たす（起動直後から有効な平均を得るため）
   initPots();
 
-  // ===== 通信部の初期化（未実装のためコメントアウト） =====
+  // 通信部の初期化
   // connectWiFi();
   // Udp.begin(LOCAL_UDP_PORT);
 
@@ -155,17 +149,17 @@ void setup() {
 
 
 void loop() {
-  // 1. ボタン入力判定（演奏開始/終了）
+  // ボタン入力判定（演奏開始/終了）
   checkButton();
 
-  // 2. 可変抵抗器の読み取り（移動平均→5段階化）。段階が変化したら表示
+  // 可変抵抗器の読み取り（移動平均→5段階化）。段階が変化したら表示
   readPots();
 
-  // 3. 加速度センサの振り動作検知。振ったタイミングで最新 BPM 段階を表示
+  // 加速度センサの振り動作検知。振ったタイミングで最新 BPM 段階を表示
   if (checkShake()) {
     // 段階が変化したときだけ処理（無駄を避ける）
     if (currentBpmStep != lastSentBpmStep) {
-      // ===== 通信部（未実装のためコメントアウト） =====
+      // 通信部
       // sendPacket(RELAY_IP, RELAY_PORT, HEADER_BPM, (uint8_t)bpmStepValues[currentBpmStep - 1]);
       lastSentBpmStep = currentBpmStep;
       if (DEBUG) {
@@ -276,12 +270,12 @@ void readPots() {
       Serial.print(bpmStepValues[currentBpmStep - 1]);
       Serial.println(F(" BPM"));
     }
-    // 注: BPM の確定（lastSentBpmStep の更新）は振り動作検知時に行うため、ここでは更新しない
+    //BPM の確定（lastSentBpmStep の更新）は振り動作検知時に行うため、ここでは更新しない
   }
 
   // 音量 段階の変化を表示（通信実装時はここで楽器デバイスへ送信）
   if (currentVolStep != lastSentVolStep) {
-    // ===== 通信部（未実装のためコメントアウト） =====
+    // 通信部
     // sendPacket(INSTRUMENT_IP, INSTRUMENT_PORT, HEADER_VOL, (uint8_t)volStepValues[currentVolStep - 1]);
     lastSentVolStep = currentVolStep;
     if (DEBUG) {
@@ -322,13 +316,12 @@ void initPots() {
   currentVolStep = valueToStep(averageVolVal);
 }
 
-// =====================================================================
-// 加速度センサ制御（機能2）
+// 加速度センサ制御
 //   上下の振り動作を検知する。加速度ベクトルの大きさの変化量が accThreshold を
 //   超えたら「振った」と判定し true を返す。shakeInterval で連続検知を防止する。
 //   （注: 大きさの変化で検知するため取り付け向きに依存しない。厳密に上下のみを
 //     見たい場合は，読み取った Z 軸の変化量だけで判定するよう変更する → TODO）
-// =====================================================================
+
 bool checkShake() {
   int16_t x, y, z;
   if (!readAccel(x, y, z)) {
@@ -362,9 +355,8 @@ bool checkShake() {
   return false;
 }
 
-// ---------------------------------------------------------------------
 // ADXL345 を測定モードで初期化する
-// ---------------------------------------------------------------------
+
 void initAccelerometer() {
   // 接続確認（DEVID = 0xE5 が期待値）
   uint8_t devid = readRegister(ADXL345_REG_DEVID);
@@ -382,10 +374,9 @@ void initAccelerometer() {
   writeRegister(ADXL345_REG_POWER, 0x08);
 }
 
-// ---------------------------------------------------------------------
 // ADXL345 から X/Y/Z の加速度を読み取る（成功で true）
 //   データは 0x32〜0x37 の 6 バイト，各軸リトルエンディアンの符号付き16bit
-// ---------------------------------------------------------------------
+
 bool readAccel(int16_t &x, int16_t &y, int16_t &z) {
   Wire.beginTransmission(ADXL345_ADDR);
   Wire.write(ADXL345_REG_DATAX0);
@@ -406,9 +397,8 @@ bool readAccel(int16_t &x, int16_t &y, int16_t &z) {
   return true;
 }
 
-// ---------------------------------------------------------------------
 // ADXL345 レジスタ書き込み
-// ---------------------------------------------------------------------
+
 void writeRegister(uint8_t reg, uint8_t value) {
   Wire.beginTransmission(ADXL345_ADDR);
   Wire.write(reg);
@@ -416,9 +406,8 @@ void writeRegister(uint8_t reg, uint8_t value) {
   Wire.endTransmission();
 }
 
-// ---------------------------------------------------------------------
 // ADXL345 レジスタ読み出し（1 バイト）
-// ---------------------------------------------------------------------
+
 uint8_t readRegister(uint8_t reg) {
   Wire.beginTransmission(ADXL345_ADDR);
   Wire.write(reg);
@@ -430,7 +419,7 @@ uint8_t readRegister(uint8_t reg) {
   return 0;
 }
 
-// ===== 通信部（未実装のためコメントアウト） =====
+// 通信部
 /*
 // =====================================================================
 // WiFi 接続
@@ -452,10 +441,9 @@ void connectWiFi() {
   }
 }
 
-// =====================================================================
 // UDP 送信
 //   パケット = [識別ヘッダ 1byte][値 1byte(uint8_t)]
-// =====================================================================
+
 void sendPacket(IPAddress ip, uint16_t port, char header, uint8_t value) {
   Udp.beginPacket(ip, port);
   Udp.write((uint8_t)header);
