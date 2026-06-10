@@ -1,12 +1,11 @@
 #include "Display.h"
 #include "Arduino_LED_Matrix.h"
 
-// -------------------------
-// 独自フォント定義（計画書 3.5.7.1）
+// 独自フォント定義
 // 「1文字を縦5横3で再定義」する仕様に基づき，1文字 = 横3×縦5 = 15要素で表現する．
 // font3x5[digit][row*FONT_WIDTH + col] : 1=点灯, 0=消灯
 // 計画書に示された数字0の例と同一のレイアウトを採用している．
-// -------------------------
+
 const uint8_t font3x5[10][15] = {
   // 0
   {1, 1, 1,
@@ -83,14 +82,13 @@ static const int bpmTable[5] = {
 // LEDマトリクスのインスタンス（8行×12列）
 ArduinoLEDMatrix matrix;
 
-// -------------------------
 // displaySetup（LEDマトリクスの初期化）
-// 重要：Arduino_LED_Matrix の表示バッファ(framebuffer)はヘッダ内で static 定義
+// Arduino_LED_Matrix の表示バッファ(framebuffer)はヘッダ内で static 定義
 // されており，include する翻訳単位(.ino / .cpp)ごとに別実体となる．そのため
 // 表示を駆動する割り込みを登録する begin() と，描画を行う loadFrame() は
 // 必ず同一ファイル(本 Display.cpp)から呼び出し，同じ framebuffer を共有させる．
 // .ino からは matrix を直接触らず，本関数と displayBPM() を呼ぶこと．
-// -------------------------
+
 void displaySetup() {
   matrix.begin();
 
@@ -108,8 +106,7 @@ static uint8_t frameBuffer[MATRIX_ROWS][MATRIX_COLS];
 // 直近に表示中のBPM値（更新検知用：値が変化した時だけ再描画する）
 static int currentBPM = -1;
 
-// -------------------------
-// checkUDP（計画書 3.5.7.3）
+// checkUDP
 // 中継機からのパケット確認とBPM値確認を行う．引数・返り値なし．
 // 処理概要：
 //   1. Udp.parsePacket() でパケット到達を監視
@@ -117,9 +114,9 @@ static int currentBPM = -1;
 //   3. ヘッダが規定の 'B'(BPMデータ) であるかを確認
 //   4. 段階番号(1〜5)を bpmTable で BPM設定値へ変換し数値として保持
 //   5. 値が更新されていれば displayBPM() で描画更新する
-// -------------------------
+
 void checkUDP() {
-  // ※通信部は未実装のためコメントアウト（描画動作の確認用にBPMは直接 displayBPM() へ与える）
+  // ※通信部（描画動作の確認用にBPMは直接 displayBPM() へ与える）
   /*
   int packetSize = Udp.parsePacket();
   if (packetSize <= 0) return;  // パケット未到達
@@ -148,8 +145,7 @@ void checkUDP() {
   */
 }
 
-// -------------------------
-// displayBPM（計画書 3.5.7.3）
+// displayBPM
 // 引数 bpm : 表示するBPM値（想定範囲：60 / 90 / 120 / 150 / 180）
 // 処理概要：
 //   1. フレームバッファを0でクリアし表示をリセット
@@ -157,7 +153,7 @@ void checkUDP() {
 //   3. 全桁の合計幅から左端X座標を算出し，横方向中央寄せ
 //   4. 各桁を drawDigit() でフレームバッファに描画
 //   5. matrix.renderBitmap() でLEDマトリクスに一括描画
-// -------------------------
+
 void displayBPM(int bpm) {
   // フレームバッファをすべて消灯にリセット
   memset(frameBuffer, 0, sizeof(frameBuffer));
@@ -207,7 +203,6 @@ void displayBPM(int bpm) {
   matrix.loadFrame(bitmap);
 }
 
-// -------------------------
 // drawDigit
 // 引数 digit    : 描画する数字（0〜9）
 //      x_offset : フレームバッファ上の描画開始列（0〜11）
@@ -215,7 +210,7 @@ void displayBPM(int bpm) {
 //   font3x5[digit] の 横3×縦5 ビットマップを，frameBuffer の
 //   (y_offset〜, x_offset〜) 領域に書き込む．
 //   縦方向は (MATRIX_ROWS - FONT_HEIGHT)/2 行のオフセットで上下中央寄せ．
-// -------------------------
+
 void drawDigit(int digit, int x_offset) {
   // 範囲外の数字は無視
   if (digit < 0 || digit > 9) return;
