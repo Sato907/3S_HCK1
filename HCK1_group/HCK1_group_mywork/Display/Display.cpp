@@ -2,9 +2,7 @@
 #include "Arduino_LED_Matrix.h"
 
 // 独自フォント定義
-// 「1文字を縦5横3で再定義」する仕様に基づき，1文字 = 横3×縦5 = 15要素で表現する．
 // font3x5[digit][row*FONT_WIDTH + col] : 1=点灯, 0=消灯
-// 計画書に示された数字0の例と同一のレイアウトを採用している．
 
 const uint8_t font3x5[10][15] = {
   // 0
@@ -69,14 +67,13 @@ const uint8_t font3x5[10][15] = {
    1, 1, 1}
 };
 
-// 段階番号(1〜5)からBPM設定値へ変換するテーブル（計画書 表3.27）
 // bpmTable[stage-1] で対応するBPMを得る
 static const int bpmTable[5] = {
-  BPM_STEP_1,  // 段階1 → 60
-  BPM_STEP_2,  // 段階2 → 90
-  BPM_STEP_3,  // 段階3 → 120
-  BPM_STEP_4,  // 段階4 → 150
-  BPM_STEP_5   // 段階5 → 180
+  BPM_STEP_1,  //  60
+  BPM_STEP_2,  //  90
+  BPM_STEP_3,  //  120
+  BPM_STEP_4,  //  150
+  BPM_STEP_5   //  180
 };
 
 // LEDマトリクスのインスタンス（8行×12列）
@@ -107,13 +104,8 @@ static uint8_t frameBuffer[MATRIX_ROWS][MATRIX_COLS];
 static int currentBPM = -1;
 
 // checkUDP
-// 中継機からのパケット確認とBPM値確認を行う．引数・返り値なし．
-// 処理概要：
-//   1. Udp.parsePacket() でパケット到達を監視
-//   2. 到達していれば2バイトのペイロード（ヘッダ + 段階番号）を読み込む
-//   3. ヘッダが規定の 'B'(BPMデータ) であるかを確認
-//   4. 段階番号(1〜5)を bpmTable で BPM設定値へ変換し数値として保持
-//   5. 値が更新されていれば displayBPM() で描画更新する
+// buffer[0]はヘッダ('B'とか)
+// buffer[1]は段階番号
 
 void checkUDP() {
   int packetSize = Udp.parsePacket();
@@ -227,6 +219,7 @@ void drawDigit(int digit, int x_offset) {
   }
 }
 
+//追加　'E'を受信したら全消灯，currentBPMをリセット
 void clearDisplay() {
   currentBPM = -1;
   uint32_t blank[3] = {0, 0, 0};
