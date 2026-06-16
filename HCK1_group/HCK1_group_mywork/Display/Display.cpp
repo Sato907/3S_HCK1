@@ -188,7 +188,6 @@ void displayBPM(int bpm) {
 // drawDigit
 // 引数 digit    : 描画する数字（0〜9）
 //      x_offset : フレームバッファ上の描画開始列（0〜11）
-// 処理概要：
 //   font3x5[digit] の 横3×縦5 ビットマップを，frameBuffer の
 //   (y_offset〜, x_offset〜) 領域に書き込む．
 //   縦方向は (MATRIX_ROWS - FONT_HEIGHT)/2 行のオフセットで上下中央寄せ．
