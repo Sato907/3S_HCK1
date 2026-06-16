@@ -101,3 +101,210 @@
 
 
 
+# `matrix.begin()` 関数仕様
+
+## 概要
+
+`matrix.begin()` は Arduino UNO R4 WiFi に内蔵された 12×8 LEDマトリクスを初期化する関数である．
+この関数を `setup()` 内で1回呼び出すことで，以降の描画関数が使用可能になる．
+
+## 基本仕様
+
+| 項目 | 内容 |
+|---|---|
+| ライブラリ | `Arduino_LED_Matrix.h` |
+| クラス | `ArduinoLEDMatrix` |
+| 関数名 | `begin()` |
+| 引数 | なし |
+| 戻り値 | なし（`void`） |
+| 呼び出し場所 | `setup()` 内で1回のみ |
+| 対応ボード | Arduino UNO R4 WiFi（12×8 LEDマトリクス内蔵） |
+
+## 最小構成コード
+
+```cpp
+#include "Arduino_LED_Matrix.h"
+
+ArduinoLEDMatrix matrix;
+
+void setup() {
+    matrix.begin();  // LEDマトリクスの初期化（必須）
+}
+
+void loop() {
+    // ここで描画処理を行う
+}
+```
+
+## `begin()` の後に使用可能な主な関数
+
+| 関数 | 引数 | 用途 |
+|---|---|---|
+| `loadFrame(data)` | `uint32_t[3]` | 16進数形式のフレームデータを表示 |
+| `renderBitmap(frame, rows, cols)` | `byte[8][12]`, `int`, `int` | 2次元配列形式のフレームデータを表示 |
+| `play()` | なし | アニメーションを再生 |
+| `beginDraw()` / `endDraw()` | なし | ArduinoGraphicsライブラリと組み合わせた描画 |
+
+## フレームデータの形式
+
+### 形式1：2次元配列（直感的）
+
+8行×12列の `byte` 配列で，各要素が `1` ならLED点灯，`0` なら消灯を表す．
+
+```cpp
+byte frame[8][12] = {
+    { 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0 },
+    { 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0 },
+    { 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0 },
+    { 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+    { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+};
+matrix.renderBitmap(frame, 8, 12);
+```
+
+### 形式2：16進数配列（省メモリ）
+
+96ビット分のデータを `uint32_t` × 3個に圧縮した形式．Arduino公式のLED Matrix Editorで自動生成できる．
+
+```cpp
+const uint32_t heart[] = { 0x3184a444, 0x44042081, 0x100a0040 };
+matrix.loadFrame(heart);
+```
+
+### 形式の比較
+
+| 比較項目 | 2次元配列（`byte[8][12]`） | 16進数配列（`uint32_t[3]`） |
+|---|---|---|
+| 可読性 |  高い（0と1で直感的） | △ 低い（16進数） |
+| メモリ使用量 | △ 96バイト |  12バイト |
+| 編集のしやすさ |  手作業で編集可能 | △ エディタ推奨 |
+| 使用関数 | `renderBitmap()` | `loadFrame()` |
+
+
+
+
+# `UDP.parsePacket()` 関数仕様
+
+## 概要
+
+`UDP.parsePacket()` は受信バッファ内の次に利用可能なUDPパケットの存在を確認し，
+パケットが存在する場合はそのサイズ（バイト数）を返す関数である．
+`UDP.read()` でパケットの内容を読み取る前に，必ずこの関数を呼び出す必要がある．
+
+## 基本仕様
+
+| 項目 | 内容 |
+|---|---|
+| ライブラリ | `WiFi.h` / `WiFiNINA.h` / `WiFiS3.h`（ボードにより異なる） |
+| クラス | `WiFiUDP` |
+| 関数名 | `parsePacket()` |
+| 引数 | なし |
+| 戻り値 | `int`（パケットサイズ：バイト数） |
+| パケットなしの場合 | `0` を返す |
+
+## 戻り値の意味
+
+| 戻り値 | 意味 |
+|---|---|
+| `0` | 受信パケットなし |
+| `1以上` | 受信したパケットのサイズ（バイト数） |
+
+## 呼び出し順序
+
+`parsePacket()` はUDP通信の受信処理において以下の順序で使用する．
+
+1. `Udp.begin(port)` — 指定ポートでUDP通信を開始
+2. `Udp.parsePacket()` — 受信パケットの有無を確認
+3. `Udp.read()` — パケットの内容を読み取る
+4. `Udp.remoteIP()` — 送信元のIPアドレスを取得
+5. `Udp.remotePort()` — 送信元のポート番号を取得
+
+**重要：** `parsePacket()` を呼ばずに `read()` を呼んでもデータは読み取れない．
+
+## 最小構成コード
+
+```cpp
+#include <WiFiS3.h>  // Arduino UNO R4 WiFi の場合
+
+WiFiUDP Udp;
+unsigned int localPort = 4210;
+char incomingPacket[256];
+
+void setup() {
+    Serial.begin(115200);
+
+    // Wi-Fi接続処理（省略）
+
+    Udp.begin(localPort);  // UDPの受信開始
+}
+
+void loop() {
+    int packetSize = Udp.parsePacket();  // パケットの有無を確認
+
+    if (packetSize) {
+        // パケットが存在する場合
+        Serial.print("受信サイズ: ");
+        Serial.print(packetSize);
+        Serial.print(" bytes, 送信元: ");
+        Serial.print(Udp.remoteIP());
+        Serial.print(":");
+        Serial.println(Udp.remotePort());
+
+        // パケットの内容を読み取る
+        int len = Udp.read(incomingPacket, 255);
+        if (len > 0) {
+            incomingPacket[len] = '\0';  // 文字列終端
+        }
+        Serial.print("内容: ");
+        Serial.println(incomingPacket);
+    }
+}
+```
+
+## `parsePacket()` の後に使用可能な主な関数
+
+| 関数 | 引数 | 戻り値 | 用途 |
+|---|---|---|---|
+| `read()` | なし | `int`（1バイト） | 1文字ずつ読み取る |
+| `read(buffer, len)` | `char*`, `int` | `int`（読み取りバイト数） | バッファに一括読み取り |
+| `remoteIP()` | なし | `IPAddress` | 送信元のIPアドレスを取得 |
+| `remotePort()` | なし | `int` | 送信元のポート番号を取得 |
+| `available()` | なし | `int` | バッファ内の残りバイト数を取得 |
+| `peek()` | なし | `int`（1バイト） | 次の1バイトを消費せずに確認 |
+
+## 今回のシステムでの使用例
+
+観覧車デバイス（中継機）がBPM・音量データをUDPで送信し，
+楽器デバイスが受信する場合の例を示す．
+
+```cpp
+void loop() {
+    int packetSize = Udp.parsePacket();
+
+    if (packetSize) {
+        char buffer[64];
+        int len = Udp.read(buffer, 63);
+        buffer[len] = '\0';
+
+        // 受信データの解析（例："BPM:120" や "VOL:80"）
+        if (strncmp(buffer, "BPM:", 4) == 0) {
+            int bpm = atoi(buffer + 4);
+            // BPMの反映処理
+        } else if (strncmp(buffer, "VOL:", 4) == 0) {
+            int volume = atoi(buffer + 4);
+            // 音量の反映処理
+        }
+    }
+}
+```
+
+## 注意事項
+
+- `parsePacket()` は**ノンブロッキング**であり，パケットがなくても処理を止めずに `0` を返す
+- UDPは**コネクションレス型**の通信であるため，パケットの到達は保証されない
+- `read()` は `parsePacket()` が `0` より大きい値を返した場合にのみ有効である
+- 複数パケットが蓄積している場合，`parsePacket()` は1回の呼び出しにつき1パケットのみ処理する
+
