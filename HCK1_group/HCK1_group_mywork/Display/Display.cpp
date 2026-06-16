@@ -116,39 +116,30 @@ static int currentBPM = -1;
 //   5. 値が更新されていれば displayBPM() で描画更新する
 
 void checkUDP() {
-  // ※通信部（描画動作の確認用にBPMは直接 displayBPM() へ与える）
-  /*
   int packetSize = Udp.parsePacket();
-  if (packetSize <= 0) return;  // パケット未到達
+  if (packetSize <= 0) return;
 
-  // ペイロードを読み込む（計画書 表3.28/3.29：ヘッダ1byte + データ1byte の固定長）
   uint8_t buffer[2] = {0};
   int len = Udp.read(buffer, sizeof(buffer));
-  if (len < 2) return;  // 規定長に満たないパケットは破棄
+  if (len < 2) return;
 
   char header = (char)buffer[0];
   uint8_t stage = buffer[1];
 
-  // 演奏終了ヘッダの場合はLEDマトリクスを消灯
   if (header == HEADER_END) {
     clearDisplay();
     return;
   }
 
-  // 規定のBPMヘッダか確認
   if (header != HEADER_BPM) return;
-  // 段階番号の範囲チェック（1〜5）
   if (stage < 1 || stage > 5) return;
 
-  // 段階番号 → BPM設定値へ変換
   int bpm = bpmTable[stage - 1];
 
-  // 値が更新された時だけ再描画（帯域・描画処理の無駄を抑制）
   if (bpm != currentBPM) {
     currentBPM = bpm;
     displayBPM(bpm);
   }
-  */
 }
 
 // displayBPM
