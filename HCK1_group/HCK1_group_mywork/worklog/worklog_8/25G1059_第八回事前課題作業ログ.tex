@@ -50,13 +50,14 @@
 \section{進捗サマリー（要約）}
 
 \begin{itemize}
-  \item 全体進捗率：60[％]
-  \item マイルストーン達成状況：一部未達（指揮デバイスの筐体実装が最終段階）
+  \item 全体進捗率：80[％]
+  \item マイルストーン達成状況：おおよそ達成（指揮デバイスの筐体実装が最終段階）
   \item 主要成果：
     \begin{itemize}
       \item {指揮デバイスの筐体（段ボール製）の制作がほぼ完成（No.2112）}
       \item {基盤に設置したスライド式可変抵抗器・ボタン・センサ類を筐体へ配置（No.2112）}
       \item {タクトスイッチの動作確認用プログラム（button\_test）の作成・検証（No.2112）}
+      \item {音量の実装フェーズの達成を確認（No.2113）}
     \end{itemize}
   \item 重大課題（影響度：高）：
     \begin{itemize}
@@ -110,9 +111,9 @@ BPM・音量変化機構の実装 &
 5/29 &
 6/16 &
 進行中 &
-85\% &
+95\% &
 通信部の結合待ち &
-可変抵抗器から読み取った値を5段階にして出力する処理は実装・検証済．残りはUDP送信（通信部）の結合． \\
+6/10の授業にて音量の実装フェーズの達成を確認．残りはUDP送信（通信部）の結合のみ． \\
 \hline
 
 - &
@@ -262,106 +263,7 @@ BPM・音量変化機構の実装 &
 
 \section{AI利用状況と検証（再現性重視）}
 
-\subsection{利用内容}
-
-\begin{itemize}
-  \item 利用目的：設計・実装支援・レビュー
-
-  \item 入力（プロンプト要旨）：
-    \begin{itemize}
-      \item タクトスイッチ（ボタン）の動作確認用プログラム（button\_test）の
-      作成方法について質問した．
-
-      \item 段ボール筐体へ基盤・センサ類を固定する際の，
-      配線整理や配置の方針について質問した．
-    \end{itemize}
-
-  \item 出力概要：
-    \begin{itemize}
-      \item タクトスイッチの押下をデバッグ出力で確認する
-      検証用プログラムの実装方法の説明が得られた．
-
-      \item センサ・基盤を筐体内に固定する際の，
-      配線取り回しと操作部配置の方針が得られた．
-    \end{itemize}
-\end{itemize}
-
-
-\sectionrule
-
-\subsection{検証方法}
-
-\begin{itemize}
-
-    \item 検証手法：
-      \begin{itemize}
-        \item AIが生成したタクトスイッチ動作確認プログラムをArduino IDE上で
-        コンパイル・実行し，押下に応じてシリアルモニタの出力が変化するか確認した．
-
-        \item AIの出力内容とArduino公式ドキュメントを比較し，
-        使用関数や実装方法に誤りがないか確認した．
-      \end{itemize}
-
-      \item 参照資料：
-      \begin{itemize}
-        \item Arduino公式ドキュメント：
-        \url{https://docs.arduino.cc/}
-
-        \item Arduino Tutorials：
-        \url{https://docs.arduino.cc/tutorials/}
-      \end{itemize}
-
-      \item 検証手順：
-    \begin{enumerate}
-      \item AIへタクトスイッチの動作確認方法について質問した．
-
-      \item AIが生成した内容をもとに検証用プログラムを作成した．
-
-      \item Arduinoへプログラムを書き込み，
-      シリアルモニタおよび実機で動作を確認した．
-
-      \item AIの出力内容をArduino公式ドキュメントと比較し，
-      実装内容に誤りがないことを確認した．
-    \end{enumerate}
-
-\end{itemize}
-
-
-\sectionrule
-
-\subsection{ファクトチェック結果}
-
-
-\begin{itemize}
-
-    \item 一致点：
-      \begin{itemize}
-        \item AIが提示したタクトスイッチの読み取り処理は，
-        Arduino公式ドキュメントの内容と一致していた．
-      \end{itemize}
-
-      \item 不一致・疑義：
-    \begin{itemize}
-      \item 一部のサンプルコードにおいて，
-      プルアップ／プルダウンの設定が実際の配線と異なる場合があり，
-      修正が必要であった．
-    \end{itemize}
-
-  \item 最終判断：
-    \begin{itemize}
-      \item 一部採用
-    \end{itemize}
-
-    \item 根拠：
-    \begin{itemize}
-      \item Arduino公式ドキュメントとの比較により，
-      AIの出力内容がおおむね正確であることを確認したため．
-
-      \item 実際に検証用プログラムを動作させ，
-      正常に動作することを確認したため．
-    \end{itemize}
-
-\end{itemize}
+今回はAIの利用なし．
 
 
 \sectionrule
@@ -372,19 +274,33 @@ BPM・音量変化機構の実装 &
 
 \begin{itemize}
 
-  \item 目標：指揮デバイスの完成（筐体の最終固定），観覧車型中継機の製作着手
+  \item 目標：指揮デバイスの最終固定およびテストフェーズへの移行
     \begin{itemize}
       \item 指揮デバイスの筐体を最終固定し，
-      本体・センサの実装を完了する．
+      本体・センサの実装（No.2112）を完了する．
 
-      \item 観覧車型中継機の部品用意および本体製作に着手する．
+      \item テストフェーズに移行し，以下の検証を実施する（図\ref{fig:gant8}参照）．
+        \begin{itemize}
+          \item 音量の再調整確認（No.3111）
+          \item 音量機能の検証（No.3112）
+          \item 複数人での音量変化の確認（No.3121）
+          \item 音量変化と楽器の音の同期確認（No.3122）
+          \item LEDマトリクスの音の確認（No.3131）
+          \item 楽曲情報の検証（No.3141）
+          \item 楽曲観覧データの確認（No.3151）
+          \item 開始信号の受信確認（No.3211）
+          \item 開始信号データの確認（No.3212）
+          \item 合奏の音のバランスの確認（No.3221）
+          \item LEDマトリクスの反映確認（No.3241）
+          \item 観覧車によるBPM変更確認（No.3242）
+        \end{itemize}
     \end{itemize}
 
   \item 達成基準：
     \begin{itemize}
       \item 指揮デバイスの筐体が完成し，各操作部が正しく動作すること．
 
-      \item 観覧車型中継機の部品が用意され，製作に着手できていること．
+      \item テストフェーズの各検証項目に着手できていること．
     \end{itemize}
 
   \item 期限：
