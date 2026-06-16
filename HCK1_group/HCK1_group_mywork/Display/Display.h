@@ -6,7 +6,6 @@
 #include <WiFiS3.h> //UDP通信
 
 // BPM定数定義
-// スライド式可変抵抗器による五段階設定値（単位：BPM）
 #define BPM_STEP_1  60
 #define BPM_STEP_2  90
 #define BPM_STEP_3  120
@@ -28,7 +27,7 @@
 
 // 関数宣言
 
-// LEDマトリクスの初期化（matrix.begin()を本関数経由で呼ぶ。理由はDisplay.cpp参照）
+// LEDマトリクスの初期化（matrix.begin()を本関数経由で呼ぶ。
 void displaySetup();
 
 // 中継機からのUDPパケット確認，BPM値の受信処理

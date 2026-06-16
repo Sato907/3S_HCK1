@@ -84,7 +84,7 @@ ArduinoLEDMatrix matrix;
 // されており，include する翻訳単位(.ino / .cpp)ごとに別実体となる．そのため
 // 表示を駆動する割り込みを登録する begin() と，描画を行う loadFrame() は
 // 必ず同一ファイル(本 Display.cpp)から呼び出し，同じ framebuffer を共有させる．
-// .ino からは matrix を直接触らず，本関数と displayBPM() を呼ぶこと．
+// .ino からは matrix を直接触らず，本関数と displayBPM() を呼ぶ
 
 void displaySetup() {
   matrix.begin();
@@ -135,13 +135,6 @@ void checkUDP() {
 }
 
 // displayBPM
-// 引数 bpm : 表示するBPM値（想定範囲：60 / 90 / 120 / 150 / 180）
-// 処理概要：
-//   1. フレームバッファを0でクリアし表示をリセット
-//   2. BPM値を各桁に分解（1〜3桁対応）
-//   3. 全桁の合計幅から左端X座標を算出し，横方向中央寄せ
-//   4. 各桁を drawDigit() でフレームバッファに描画
-//   5. matrix.renderBitmap() でLEDマトリクスに一括描画
 
 void displayBPM(int bpm) {
   // フレームバッファをすべて消灯にリセット
