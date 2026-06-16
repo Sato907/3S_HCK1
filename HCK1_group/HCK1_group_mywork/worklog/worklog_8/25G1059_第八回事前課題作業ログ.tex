@@ -279,7 +279,92 @@ BPM・音量変化機構の実装 &
 
 \section{AI利用状況と検証（再現性重視）}
 
-今回はAIの利用なし．
+\subsection{利用内容}
+
+\begin{itemize}
+  \item 利用目的：実装支援
+
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item Display.cppにおいて，演奏終了ヘッダ（'E'）を受信した際に
+      LEDマトリクスを全消灯する処理の実装方法について質問した．
+    \end{itemize}
+
+  \item 出力概要：
+    \begin{itemize}
+      \item clearDisplay()関数の実装方法および，
+      checkUDP()内でのヘッダ判定と消灯処理の追加方針が得られた．
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\subsection{検証方法}
+
+\begin{itemize}
+
+    \item 検証手法：
+      \begin{itemize}
+        \item AIが提示した実装をDisplay.cppに追加し，
+        Arduino IDE上でコンパイルが通ることを確認した．
+
+        \item AIの出力内容とArduino公式ドキュメントを比較し，
+        使用関数や実装方法に誤りがないか確認した．
+      \end{itemize}
+
+      \item 参照資料：
+      \begin{itemize}
+        \item Arduino公式ドキュメント：
+        \url{https://docs.arduino.cc/}
+      \end{itemize}
+
+      \item 検証手順：
+    \begin{enumerate}
+      \item AIへ演奏終了時のLEDマトリクス消灯処理について質問した．
+
+      \item AIが提示した内容をもとにclearDisplay()関数を実装し，
+      checkUDP()内にヘッダ'E'の判定処理を追加した．
+
+      \item Arduino IDEでコンパイルし，エラーがないことを確認した．
+
+      \item AIの出力内容をArduino公式ドキュメントと比較し，
+      実装内容に誤りがないことを確認した．
+    \end{enumerate}
+
+\end{itemize}
+
+\sectionrule
+
+\subsection{ファクトチェック結果}
+
+\begin{itemize}
+
+    \item 一致点：
+      \begin{itemize}
+        \item AIが提示したloadFrame()による全消灯処理は，
+        Arduino公式ドキュメントの内容と一致していた．
+      \end{itemize}
+
+      \item 不一致・疑義：
+    \begin{itemize}
+      \item 特になし．
+    \end{itemize}
+
+  \item 最終判断：
+    \begin{itemize}
+      \item 採用
+    \end{itemize}
+
+    \item 根拠：
+    \begin{itemize}
+      \item Arduino公式ドキュメントとの比較により，
+      AIの出力内容が正確であることを確認したため．
+
+      \item Arduino IDEでコンパイルが通り，
+      実装に問題がないことを確認したため．
+    \end{itemize}
+
+\end{itemize}
 
 
 \sectionrule
