@@ -1,13 +1,10 @@
 \documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
 
-%url
 \usepackage{url}
 \usepackage[dvipdfmx]{hyperref}
 
-% --- 余白 ---
 \usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
 
-% --- 表・箇条書き・図 ---
 \usepackage{array}
 \usepackage{tabularx}
 \usepackage{booktabs}
@@ -15,11 +12,9 @@
 \usepackage{graphicx}
 \usepackage{longtable}
 
-% --- 段落間隔（Wordのような見た目に寄せる）---
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.6em}
 
-% --- セクション見出しを「番号. 太字」+ 章末に水平線を入れる ---
 \usepackage{titlesec}
 \titleformat{\section}
   {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
@@ -28,16 +23,13 @@
 \titlespacing*{\section}{0pt}{1.2em}{0.6em}
 \titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
 
-% --- 章末水平線（手で \sectionrule と書いて区切る）---
 \newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
 
-% --- 箇条書きの記号を Word 風（・→○→数字）に揃える ---
 \renewcommand{\labelitemi}{\textbullet}
 \renewcommand{\labelitemii}{\textopenbullet}
 \setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
 \setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
 
-% \textopenbullet が無い環境向けのフォールバック（jsarticle標準では○が出る）
 \providecommand{\textopenbullet}{\ensuremath{\circ}}
 
 
@@ -231,27 +223,27 @@ BPM値表示は確定済．残りはUDP受信（通信部）の結合． \\
 
 最終計画書に記載された計画段階のガントチャート(GC)を図\ref{fig:gant1}に示す．
 
-\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
-    \centering % 中央揃え
-    \includegraphics[width=0.8\columnwidth]{gant1.png} % 横幅を列幅の80%に指定
-    \caption{計画段階のガントチャート} % 図の説明
-    \label{fig:gant1} % 本文中で参照するためのラベル
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\columnwidth]{gant1.png}
+    \caption{計画段階のガントチャート}
+    \label{fig:gant1}
 \end{figure}
 
 次に，現在のGCを図\ref{fig:gant7}（実装フェーズ）および図\ref{fig:gant8}（テストフェーズ）に示す．達成した項目は緑色で塗られている．
 
-\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
-    \centering % 中央揃え
-    \includegraphics[width=0.9\columnwidth]{gant7.png} % 横幅を列幅の90%に指定
-    \caption{現在のガントチャート（実装フェーズ）} % 図の説明
-    \label{fig:gant7} % 本文中で参照するためのラベル
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\columnwidth]{gant7.png}
+    \caption{現在のガントチャート（実装フェーズ）}
+    \label{fig:gant7}
 \end{figure}
 
-\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
-    \centering % 中央揃え
-    \includegraphics[width=0.9\columnwidth]{gant8.png} % 横幅を列幅の90%に指定
-    \caption{現在のガントチャート（テストフェーズ）} % 図の説明
-    \label{fig:gant8} % 本文中で参照するためのラベル
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\columnwidth]{gant8.png}
+    \caption{現在のガントチャート（テストフェーズ）}
+    \label{fig:gant8}
 \end{figure}
 
 
