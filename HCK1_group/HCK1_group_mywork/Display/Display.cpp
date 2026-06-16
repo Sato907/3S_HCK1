@@ -129,6 +129,12 @@ void checkUDP() {
   char header = (char)buffer[0];
   uint8_t stage = buffer[1];
 
+  // 演奏終了ヘッダの場合はLEDマトリクスを消灯
+  if (header == HEADER_END) {
+    clearDisplay();
+    return;
+  }
+
   // 規定のBPMヘッダか確認
   if (header != HEADER_BPM) return;
   // 段階番号の範囲チェック（1〜5）
@@ -228,4 +234,10 @@ void drawDigit(int digit, int x_offset) {
       }
     }
   }
+}
+
+void clearDisplay() {
+  currentBPM = -1;
+  uint32_t blank[3] = {0, 0, 0};
+  matrix.loadFrame(blank);
 }

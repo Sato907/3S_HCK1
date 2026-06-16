@@ -16,6 +16,7 @@
 // 通信定数
 #define LOCAL_PORT     2390   // UDP受信に利用するポート番号
 #define HEADER_BPM     'B'    // BPMデータの識別ヘッダ（ASCII 0x42）
+#define HEADER_END     'E'    // 演奏終了の識別ヘッダ（LEDマトリクス消灯）
 
 // 文字フォントの寸法
 #define FONT_WIDTH   3   // 1文字の横ドット数
@@ -35,6 +36,9 @@ void checkUDP();
 
 // 受信したBPM値をLEDマトリクスに数値表示する（引数：int bpm）
 void displayBPM(int bpm);
+
+// LEDマトリクスを全消灯する（演奏終了時に使用）
+void clearDisplay();
 
 // 指定された1桁の数字を，共有フレームバッファの x_offset 列から描画する
 void drawDigit(int digit, int x_offset);
