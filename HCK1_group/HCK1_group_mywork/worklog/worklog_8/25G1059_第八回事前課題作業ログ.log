@@ -1,4 +1,4 @@
-This is e-upTeX, Version 3.141592653-p4.1.2-u2.00-250202-2.6 (utf8.uptex) (TeX Live 2025) (preloaded format=uplatex 2025.4.24)  16 JUN 2026 12:26
+This is e-upTeX, Version 3.141592653-p4.1.2-u2.00-250202-2.6 (utf8.uptex) (TeX Live 2025) (preloaded format=uplatex 2025.4.24)  16 JUN 2026 12:32
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -437,9 +437,9 @@ File: gant8.png Graphic file (type bmp)
 
 [3]
 LaTeX Font Info:    Font shape `JT2/gt/m/n' will be
-(Font)              scaled to size 8.32214pt on input line 316.
+(Font)              scaled to size 8.32214pt on input line 307.
 LaTeX Font Info:    Font shape `JY2/gt/m/n' will be
-(Font)              scaled to size 8.32214pt on input line 316.
+(Font)              scaled to size 8.32214pt on input line 307.
 
 
 [4] (./25G1059_第八回事前課題作業ログ.aux)
@@ -450,16 +450,16 @@ L3 programming layer <2025-03-26>
  ***********
 Package rerunfilecheck Info: File `25G1059_第八回事前課題作業ログ.ou
 t' has not changed.
-(rerunfilecheck)             Checksum: D13ABD0062CB6AA3D7E5C6E1433BC13F;1057.
+(rerunfilecheck)             Checksum: 4AC42EA4EA385D3854EE810F512C5B21;989.
  ) 
 Here is how much of TeX's memory you used:
  9689 strings out of 470271
  150649 string characters out of 5486374
- 578711 words of memory out of 5000000
+ 578626 words of memory out of 5000000
  36417 multiletter control sequences out of 15000+600000
  637302 words of font info for 95 fonts, out of 8000000 for 9000
  934 hyphenation exceptions out of 8191
  72i,8n,79p,358b,677s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on 25G1059_第八回事前課題作業ログ.dvi (4 pages, 15384
+Output written on 25G1059_第八回事前課題作業ログ.dvi (4 pages, 14884
  bytes).
