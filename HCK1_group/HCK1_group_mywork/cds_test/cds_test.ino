@@ -1,6 +1,4 @@
-const int CDS_PIN = A0; 
-
-//3.3kΩに変更
+const int CDS_PIN = A0;   
 
 void setup() {
   Serial.begin(9600);       
@@ -9,5 +7,5 @@ void setup() {
 
 void loop() {
   Serial.println(analogRead(CDS_PIN));  
-  delay(100);
+  delay(1000);
 }
