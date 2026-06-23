@@ -1,0 +1,417 @@
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+\usepackage{url}
+\usepackage[dvipdfmx]{hyperref}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{longtable}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+
+
+\begin{document}
+
+
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：佐藤涼菜
+
+報告日：6月23日
+
+プロジェクト名：マジカル☆観覧車
+
+\sectionrule
+
+
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 全体進捗率：85[％]
+  \item マイルストーン達成状況：おおよそ達成（テストフェーズは結合待ち）
+  \item 主要成果：
+    \begin{itemize}
+      \item {指揮デバイスの筐体改修を完了し，本体・センサの実装（No.2112）を完了}
+      \item {Display.inoに静的IP設定を追加し，UDP受信の通信設定を修正（No.2231）}
+    \end{itemize}
+  \item 重大課題（影響度：高）：
+    \begin{itemize}
+      \item {テストフェーズ（No.3241）が通信系との結合待ちのため未着手}
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+
+\section{作業ログ（詳細トラッキング）}
+
+\subsection{作業ログ}
+
+\renewcommand{\arraystretch}{1.2}
+
+\small
+
+\begin{longtable}{|c|p{2.2cm}|c|c|c|c|p{2.4cm}|p{3.1cm}|}
+\caption{作業ログ} \\
+\hline
+No. & 作業項目 & 開始日 & 予定完了日 & 状態 & 進捗率 & 依存関係・ブロッカー & コメント \\
+\hline
+\endfirsthead
+
+\hline
+No. & 作業項目 & 開始日 & 予定完了日 & 状態 & 進捗率 & 依存関係・ブロッカー & コメント \\
+\hline
+\endhead
+
+\hline
+\multicolumn{8}{r}{次ページへ続く} \\
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+2112 &
+本体・センサの実装 &
+5/24 &
+6/17 &
+完了 &
+100\% &
+無 &
+筐体の改修を完了．スライド式可変抵抗器とタクトスイッチのみを露出させ，ユーザの利便性を向上させた．\\
+\hline
+
+2231 &
+LEDマトリクス制御 &
+5/23 &
+6/12 &
+完了 &
+100\% &
+無 &
+Display.inoに静的IP設定（WiFi.config）を追加し，指揮デバイスからのUDP受信設定を修正した．\\
+\hline
+
+2113 &
+BPM・音量変化機構の実装 &
+5/29 &
+6/1 &
+完了 &
+100\% &
+無 &
+スライド式可変抵抗器の動作確認を実施し完了．\\
+\hline
+
+3241 &
+LEDマトリクスの反映確認 &
+6/17 &
+6/30 &
+未着手 &
+0\% &
+通信系との結合待ち &
+結合テストの実施待ち．\\
+\hline
+
+- &
+作業ログの記入 &
+6/17 &
+6/23 &
+完了 &
+100\% &
+無 &
+特になし．\\
+\hline
+
+
+
+\end{longtable}
+
+
+\subsection{日ごとの作業ログ}
+
+
+    \renewcommand{\arraystretch}{1.2}
+
+    \small
+
+    \begin{longtable}{|c|c|p{2.4cm}|c|c|c|c|p{3.8cm}|}
+    \caption{日ごとの作業ログ} \\
+    \hline
+    日付 & No. & 作業項目 & 時間 & 開始時の状態 & 終了時の状態 & 進捗率 & コメント \\
+    \hline
+    \endfirsthead
+
+    \hline
+    日付 & No. & 作業項目 & 時間 & 開始時の状態 & 終了時の状態 & 進捗率 & コメント \\
+    \hline
+    \endhead
+
+    \hline
+    \multicolumn{8}{r}{次ページへ続く} \\
+    \hline
+    \endfoot
+
+    \hline
+    \endlastfoot
+
+    6/17 & 2112 & 本体・センサの実装 & 2h &
+    進行中 &
+    進行中 &
+    95\% &
+    スライド式可変抵抗器の再はんだ付けが完了し動作を確認．筐体の改修に着手し，スライド式可変抵抗器とタクトスイッチのみを露出させる加工を開始．\\
+    \hline
+
+    〃 & 2113 & BPM・音量変化機構の実装 & 0.5h &
+    おおよそ完了 &
+    完了 &
+    100\% &
+    スライド式可変抵抗器の動作確認を実施し完了．\\
+    \hline
+
+    6/19 & 2112 & 本体・センサの実装 & 1.5h &
+    進行中 &
+    進行中 &
+    98\% &
+    筐体の改修作業を継続．操作部の露出加工と内部配線の整理を実施．\\
+    \hline
+
+    6/20 & 2112 & 本体・センサの実装 & 1h &
+    進行中 &
+    完了 &
+    100\% &
+    筐体の最終仕上げを行い，本体・センサの実装を完了．\\
+    \hline
+
+    6/23 & 2231 & LEDマトリクス制御 & 1h &
+    完了 &
+    完了 &
+    100\% &
+    Display.inoに静的IP設定（WiFi.config）を追加．指揮デバイスの送信先IPアドレスと一致させるよう修正した．\\
+    \hline
+
+    〃 & - & 作業ログの記入 & 1h &
+    未着手 &
+    完了 &
+    100\% &
+    特になし．\\
+
+    \end{longtable}
+
+\sectionrule
+
+\section{計画時のGCと現在のGC}
+
+計画段階のガントチャート(GC)を図\ref{fig:gant7}（実装フェーズ）および図\ref{fig:gant8}（テストフェーズ）に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\columnwidth]{gant7.png}
+    \caption{計画段階のガントチャート（実装フェーズ）}
+    \label{fig:gant7}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\columnwidth]{gant8.png}
+    \caption{計画段階のガントチャート（テストフェーズ）}
+    \label{fig:gant8}
+\end{figure}
+
+次に，現在のGCを図\ref{fig:gant9}に示す．達成した項目は緑色で塗られている．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\columnwidth]{gant9.png}
+    \caption{現在のガントチャート}
+    \label{fig:gant9}
+\end{figure}
+
+
+\sectionrule
+
+
+\section{課題管理}
+
+\begin{tabularx}{\linewidth}{@{}p{3cm}Xllp{3.2cm}ll@{}}
+\toprule
+課題 & 発生原因 & 影響度 & 優先度 & 対策 & 期限 & 状態 \\
+\midrule
+可変抵抗器がブレッドボード上で安定接続できない（No.2112/2113に影響） & スライド式可変抵抗器の端子形状がブレッドボードに適合しないため． & 高 & 高 & スライド式可変抵抗器を基盤に設置し，筐体へ固定した． & 6/12 & 対応済 \\
+\midrule
+1機のスライド式可変抵抗器のはんだ付け設置不良（No.2112に影響） & 基盤へのはんだ付け時に接触不良が発生したため． & 中 & 高 & 6/17に再はんだ付けを実施し，動作を確認した． & 6/17 & 対応済 \\
+\midrule
+テストフェーズが結合待ち（No.3241に影響） & 通信系との結合が完了していないため，LEDマトリクスの反映確認テストが実施できない． & 高 & 中 & 通信系の準備完了を待ち，結合テストを実施する． & 6/30 & 対応中 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+※影響度＝プロジェクトへのインパクト
+
+※優先度＝対応の緊急性
+
+\sectionrule
+
+
+\section{AI利用状況と検証（再現性重視）}
+
+\subsection{利用内容}
+
+\begin{itemize}
+  \item 利用目的：実装支援
+
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item Display.inoにおいて，指揮デバイスからのUDP受信に必要な
+      静的IP設定（WiFi.config）の追加方法について質問した．
+    \end{itemize}
+
+  \item 出力概要：
+    \begin{itemize}
+      \item IPAddress定数（localIP, gateway, subnet）の定義方法および，
+      setup()内でWiFi.begin()の前にWiFi.config()を呼び出す修正方針が得られた．
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\subsection{検証方法}
+
+\begin{itemize}
+
+    \item 検証手法：
+      \begin{itemize}
+        \item AIが提示した実装をDisplay.inoに追加し，
+        Arduino IDE上でコンパイルが通ることを確認した．
+
+        \item AIの出力内容とArduino公式ドキュメントを比較し，
+        WiFi.config()の引数仕様に誤りがないか確認した．
+      \end{itemize}
+
+      \item 参照資料：
+      \begin{itemize}
+        \item Arduino公式ドキュメント：
+        \url{https://docs.arduino.cc/}
+      \end{itemize}
+
+      \item 検証手順：
+    \begin{enumerate}
+      \item AIへ静的IP設定の追加方法について質問した．
+
+      \item AIが提示した内容をもとにIPAddress定数を定義し，
+      setup()内にWiFi.config()の呼び出しを追加した．
+
+      \item Arduino IDEでコンパイルし，エラーがないことを確認した．
+
+      \item AIの出力内容をArduino公式ドキュメントと比較し，
+      WiFi.config()の使用方法に誤りがないことを確認した．
+    \end{enumerate}
+
+\end{itemize}
+
+\sectionrule
+
+\subsection{ファクトチェック結果}
+
+\begin{itemize}
+
+    \item 一致点：
+      \begin{itemize}
+        \item AIが提示したWiFi.config(ip, gateway, subnet)の引数順序および
+        IPAddressの定義方法は，Arduino公式ドキュメントの内容と一致していた．
+      \end{itemize}
+
+      \item 不一致・疑義：
+    \begin{itemize}
+      \item 特になし．
+    \end{itemize}
+
+  \item 最終判断：
+    \begin{itemize}
+      \item 採用
+    \end{itemize}
+
+    \item 根拠：
+    \begin{itemize}
+      \item Arduino公式ドキュメントとの比較により，
+      AIの出力内容が正確であることを確認したため．
+
+      \item Arduino IDEでコンパイルが通り，
+      実装に問題がないことを確認したため．
+    \end{itemize}
+
+\end{itemize}
+
+
+\sectionrule
+
+
+\section{次回計画}
+
+
+\begin{itemize}
+
+  \item 目標：通信系との結合テストの実施
+    \begin{itemize}
+      \item 通信系の準備が完了次第，
+      LEDマトリクスの反映確認テスト（No.3241）を実施する．
+
+      \item 指揮デバイスからのUDP送信によりBPM値がLEDマトリクスに
+      正しく表示されることを確認する．
+    \end{itemize}
+
+  \item 達成基準：
+    \begin{itemize}
+      \item 指揮デバイスからBPM値を送信し，
+      表示デバイスのLEDマトリクスに正しく反映されること．
+
+      \item 演奏終了ヘッダ（'E'）の受信時にLEDマトリクスが消灯すること．
+    \end{itemize}
+
+  \item 期限：
+    \begin{itemize}
+      \item 2026/6/30
+    \end{itemize}
+
+\end{itemize}
+
+
+\sectionrule
+
+
+\section{付録}
+
+\begin{itemize}
+  \item 添付資料：
+    \begin{itemize}
+      \item No.2231(LEDマトリクス制御)のプログラム：\url{https://github.com/Sato907/3S_HCK1/tree/main/HCK1_group/HCK1_group_mywork/Display}
+      \item No.2113(可変抵抗器から読み取った値を5段階にして出力するプログラム)のプログラム：\url{https://github.com/Sato907/3S_HCK1/tree/main/HCK1_group/HCK1_group_mywork/shiki_device}
+
+    \end{itemize}
+
+\end{itemize}
+
+\sectionrule
+
+\end{document}
