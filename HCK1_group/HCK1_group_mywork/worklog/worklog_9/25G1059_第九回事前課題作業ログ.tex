@@ -11,6 +11,17 @@
 \usepackage{enumitem}
 \usepackage{graphicx}
 \usepackage{longtable}
+\usepackage{listings}
+
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny,
+  tabsize=2,
+  showstringspaces=false
+}
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.6em}
@@ -402,15 +413,206 @@ LEDマトリクスの反映確認 &
 
 \section{付録}
 
-\begin{itemize}
-  \item 添付資料：
-    \begin{itemize}
-      \item No.2231(LEDマトリクス制御)のプログラム：\url{https://github.com/Sato907/3S_HCK1/tree/main/HCK1_group/HCK1_group_mywork/Display}
-      \item No.2113(可変抵抗器から読み取った値を5段階にして出力するプログラム)のプログラム：\url{https://github.com/Sato907/3S_HCK1/tree/main/HCK1_group/HCK1_group_mywork/shiki_device}
+No.2231（LEDマトリクス制御）のプログラムを以下に示す．
 
-    \end{itemize}
+\subsection{Display.h}
+\begin{lstlisting}
+#ifndef DISPLAY_H
+#define DISPLAY_H
 
-\end{itemize}
+#include <Arduino.h>
+#include "Arduino_LED_Matrix.h"
+#include <WiFiS3.h>
+
+#define BPM_STEP_1  60
+#define BPM_STEP_2  90
+#define BPM_STEP_3  120
+#define BPM_STEP_4  150
+#define BPM_STEP_5  180
+
+#define LOCAL_PORT     2390
+#define HEADER_BPM     'B'
+#define HEADER_END     'E'
+
+#define FONT_WIDTH   3
+#define FONT_HEIGHT  5
+
+#define MATRIX_ROWS  8
+#define MATRIX_COLS  12
+
+void displaySetup();
+void checkUDP();
+void displayBPM(int bpm);
+void clearDisplay();
+void drawDigit(int digit, int x_offset);
+
+extern const uint8_t font3x5[10][15];
+extern ArduinoLEDMatrix matrix;
+extern WiFiUDP Udp;
+
+#endif
+\end{lstlisting}
+
+\subsection{Display.ino}
+\begin{lstlisting}
+#include "Display.h"
+
+WiFiUDP Udp;
+
+const char SSID[] = "";
+const char PASS[] = "";
+
+IPAddress localIP(192, 168, 11, 10);
+IPAddress gateway(192, 168, 11, 1);
+IPAddress subnet(255, 255, 255, 0);
+
+void setup() {
+  displaySetup();
+
+  if (SSID[0] != '\0') {
+    WiFi.config(localIP, gateway, subnet);
+    while (WiFi.begin(SSID, PASS) != WL_CONNECTED) {
+      delay(1000);
+    }
+  }
+  Udp.begin(LOCAL_PORT);
+}
+
+void loop() {
+  checkUDP();
+}
+\end{lstlisting}
+
+\subsection{Display.cpp}
+\begin{lstlisting}
+#include "Display.h"
+#include "Arduino_LED_Matrix.h"
+
+const uint8_t font3x5[10][15] = {
+  {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,1,1},  // 0
+  {0,1,0, 1,1,0, 0,1,0, 0,1,0, 1,1,1},  // 1
+  {1,1,1, 0,0,1, 1,1,1, 1,0,0, 1,1,1},  // 2
+  {1,1,1, 0,0,1, 0,1,1, 0,0,1, 1,1,1},  // 3
+  {1,0,1, 1,0,1, 1,1,1, 0,0,1, 0,0,1},  // 4
+  {1,1,1, 1,0,0, 1,1,1, 0,0,1, 1,1,1},  // 5
+  {1,1,1, 1,0,0, 1,1,1, 1,0,1, 1,1,1},  // 6
+  {1,1,1, 0,0,1, 0,0,1, 0,0,1, 0,0,1},  // 7
+  {1,1,1, 1,0,1, 1,1,1, 1,0,1, 1,1,1},  // 8
+  {1,1,1, 1,0,1, 1,1,1, 0,0,1, 1,1,1}   // 9
+};
+
+static const int bpmTable[5] = {
+  BPM_STEP_1, BPM_STEP_2, BPM_STEP_3,
+  BPM_STEP_4, BPM_STEP_5
+};
+
+ArduinoLEDMatrix matrix;
+
+void displaySetup() {
+  matrix.begin();
+  uint32_t warmUp[3] = {0, 0, 0};
+  matrix.loadFrame(warmUp);
+  delay(200);
+}
+
+static uint8_t frameBuffer[MATRIX_ROWS][MATRIX_COLS];
+static int currentBPM = -1;
+
+void checkUDP() {
+  int packetSize = Udp.parsePacket();
+  if (packetSize <= 0) return;
+
+  uint8_t buffer[2] = {0};
+  int len = Udp.read(buffer, sizeof(buffer));
+  if (len < 2) return;
+
+  char header = (char)buffer[0];
+  uint8_t stage = buffer[1];
+
+  if (header == HEADER_END) {
+    clearDisplay();
+    return;
+  }
+
+  if (header != HEADER_BPM) return;
+  if (stage < 1 || stage > 5) return;
+
+  int bpm = bpmTable[stage - 1];
+
+  if (bpm != currentBPM) {
+    currentBPM = bpm;
+    displayBPM(bpm);
+  }
+}
+
+void displayBPM(int bpm) {
+  memset(frameBuffer, 0, sizeof(frameBuffer));
+
+  int digits[3];
+  int numDigits;
+
+  if (bpm >= 100) {
+    numDigits = 3;
+    digits[0] = bpm / 100;
+    digits[1] = (bpm / 10) % 10;
+    digits[2] = bpm % 10;
+  } else if (bpm >= 10) {
+    numDigits = 2;
+    digits[0] = bpm / 10;
+    digits[1] = bpm % 10;
+  } else {
+    numDigits = 1;
+    digits[0] = bpm;
+  }
+
+  int totalWidth = numDigits * FONT_WIDTH
+                   + (numDigits - 1) * 1;
+  int startX = (MATRIX_COLS - totalWidth) / 2;
+
+  for (int i = 0; i < numDigits; i++) {
+    drawDigit(digits[i],
+              startX + i * (FONT_WIDTH + 1));
+  }
+
+  uint32_t bitmap[3] = {0, 0, 0};
+  for (int row = 0; row < MATRIX_ROWS; row++) {
+    for (int col = 0; col < MATRIX_COLS; col++) {
+      if (frameBuffer[row][col]) {
+        int n = row * MATRIX_COLS + col;
+        bitmap[n / 32] |=
+          (1UL << (31 - (n % 32)));
+      }
+    }
+  }
+
+  matrix.loadFrame(bitmap);
+}
+
+void drawDigit(int digit, int x_offset) {
+  if (digit < 0 || digit > 9) return;
+
+  const int y_offset =
+    (MATRIX_ROWS - FONT_HEIGHT) / 2;
+
+  for (int y = 0; y < FONT_HEIGHT; y++) {
+    for (int x = 0; x < FONT_WIDTH; x++) {
+      int col = x_offset + x;
+      int row = y_offset + y;
+      if (col >= 0 && col < MATRIX_COLS
+          && row >= 0 && row < MATRIX_ROWS) {
+        frameBuffer[row][col] =
+          font3x5[digit][y * FONT_WIDTH + x];
+      }
+    }
+  }
+}
+
+void clearDisplay() {
+  currentBPM = -1;
+  uint32_t blank[3] = {0, 0, 0};
+  matrix.loadFrame(blank);
+}
+\end{lstlisting}
 
 \sectionrule
 
