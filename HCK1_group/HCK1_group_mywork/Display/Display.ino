@@ -5,7 +5,7 @@ WiFiUDP Udp;
 const char SSID[] = "hackathon001-WPA2";
 const char PASS[] = "hackathon001";
 
-// 静的IP設定（指揮デバイスの送信先 ferrisWheelIP2 と一致させる）
+// 静的IP設定（指揮デバイスの送信先 ferrisWheelIP2 と一致）
 IPAddress localIP(192, 168, 11, 10);
 IPAddress gateway(192, 168, 11, 1);
 IPAddress subnet(255, 255, 255, 0);
