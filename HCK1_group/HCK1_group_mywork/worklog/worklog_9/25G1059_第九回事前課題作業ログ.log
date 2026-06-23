@@ -1,4 +1,4 @@
-This is e-upTeX, Version 3.141592653-p4.1.2-u2.00-250202-2.6 (utf8.uptex) (TeX Live 2025) (preloaded format=uplatex 2025.4.24)  24 JUN 2026 00:08
+This is e-upTeX, Version 3.141592653-p4.1.2-u2.00-250202-2.6 (utf8.uptex) (TeX Live 2025) (preloaded format=uplatex 2025.4.24)  24 JUN 2026 00:41
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -434,21 +434,21 @@ LaTeX Font Info:    Font shape `JY2/mc/bx/n' in size <14.4> not available
 LaTeX Font Info:    Font shape `JY2/gt/m/n' will be
 (Font)              scaled to size 13.31541pt on input line 61.
 LaTeX Font Info:    Font shape `JT2/mc/m/n' will be
-(Font)              scaled to size 11.09619pt on input line 82.
+(Font)              scaled to size 11.09619pt on input line 83.
 LaTeX Font Info:    Font shape `JY2/mc/m/n' will be
-(Font)              scaled to size 11.09619pt on input line 82.
+(Font)              scaled to size 11.09619pt on input line 83.
 LaTeX Font Info:    Font shape `JT2/mc/bx/n' in size <12> not available
-(Font)              Font shape `JT2/gt/m/n' tried instead on input line 82.
+(Font)              Font shape `JT2/gt/m/n' tried instead on input line 83.
 LaTeX Font Info:    Font shape `JT2/gt/m/n' will be
-(Font)              scaled to size 11.09619pt on input line 82.
+(Font)              scaled to size 11.09619pt on input line 83.
 LaTeX Font Info:    Font shape `JY2/mc/bx/n' in size <12> not available
-(Font)              Font shape `JY2/gt/m/n' tried instead on input line 82.
+(Font)              Font shape `JY2/gt/m/n' tried instead on input line 83.
 LaTeX Font Info:    Font shape `JY2/gt/m/n' will be
-(Font)              scaled to size 11.09619pt on input line 82.
+(Font)              scaled to size 11.09619pt on input line 83.
 LaTeX Font Info:    Font shape `JT2/mc/m/n' will be
-(Font)              scaled to size 8.32214pt on input line 86.
+(Font)              scaled to size 8.32214pt on input line 87.
 LaTeX Font Info:    Font shape `JY2/mc/m/n' will be
-(Font)              scaled to size 8.32214pt on input line 86.
+(Font)              scaled to size 8.32214pt on input line 87.
 
 
 [1
@@ -463,25 +463,26 @@ File: gant10.png Graphic file (type bmp)
 
 
 [2]
+LaTeX Font Info:    Font shape `JT2/gt/m/n' will be
+(Font)              scaled to size 8.32214pt on input line 303.
+LaTeX Font Info:    Font shape `JY2/gt/m/n' will be
+(Font)              scaled to size 8.32214pt on input line 303.
+
 
 [3]
-LaTeX Font Info:    Font shape `JT2/gt/m/n' will be
-(Font)              scaled to size 8.32214pt on input line 318.
-LaTeX Font Info:    Font shape `JY2/gt/m/n' will be
-(Font)              scaled to size 8.32214pt on input line 318.
-LaTeX Font Info:    Font shape `JT2/gt/m/n' will be
-(Font)              scaled to size 6.47278pt on input line 411.
-LaTeX Font Info:    Font shape `JY2/gt/m/n' will be
-(Font)              scaled to size 6.47278pt on input line 411.
-LaTeX Font Info:    Font shape `JT2/mc/m/n' will be
-(Font)              scaled to size 6.47278pt on input line 412.
-LaTeX Font Info:    Font shape `JY2/mc/m/n' will be
-(Font)              scaled to size 6.47278pt on input line 412.
-LaTeX Font Info:    Font shape `JT2/mc/m/n' will be
-(Font)              scaled to size 4.62341pt on input line 412.
-
 
 [4]
+LaTeX Font Info:    Font shape `JT2/gt/m/n' will be
+(Font)              scaled to size 6.47278pt on input line 393.
+LaTeX Font Info:    Font shape `JY2/gt/m/n' will be
+(Font)              scaled to size 6.47278pt on input line 393.
+LaTeX Font Info:    Font shape `JT2/mc/m/n' will be
+(Font)              scaled to size 6.47278pt on input line 394.
+LaTeX Font Info:    Font shape `JY2/mc/m/n' will be
+(Font)              scaled to size 6.47278pt on input line 394.
+LaTeX Font Info:    Font shape `JT2/mc/m/n' will be
+(Font)              scaled to size 4.62341pt on input line 394.
+
 
 [5]
 
@@ -495,16 +496,16 @@ L3 programming layer <2025-03-26>
  ***********
 Package rerunfilecheck Info: File `25G1059_第九回事前課題作業ログ.ou
 t' has not changed.
-(rerunfilecheck)             Checksum: 65968B68C5EC718B8445E3EA37D35ECA;1636.
+(rerunfilecheck)             Checksum: 3062AF04CC2CB1C3795544686003F5C3;2175.
  ) 
 Here is how much of TeX's memory you used:
- 11323 strings out of 470271
- 172672 string characters out of 5486374
- 1027740 words of memory out of 5000000
- 38038 multiletter control sequences out of 15000+600000
+ 11320 strings out of 470271
+ 172582 string characters out of 5486374
+ 1046309 words of memory out of 5000000
+ 38035 multiletter control sequences out of 15000+600000
  638153 words of font info for 101 fonts, out of 8000000 for 9000
  934 hyphenation exceptions out of 8191
  72i,8n,79p,358b,1985s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on 25G1059_第九回事前課題作業ログ.dvi (7 pages, 59084
+Output written on 25G1059_第九回事前課題作業ログ.dvi (7 pages, 61632
  bytes).

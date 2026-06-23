@@ -66,6 +66,7 @@
   \item 主要成果：
     \begin{itemize}
       \item {指揮デバイスの最終固定および加工をし，本体・センサの実装（No.2112）を完了}
+      \item {BPM・音量変化機構の実装（No.2113）を完了}
       \item {計画書との変更点の記述（No.2231）}
     \end{itemize}
   \item 重大課題（影響度：高）：
@@ -179,42 +180,49 @@ LEDマトリクスの反映確認 &
     \hline
     \endlastfoot
 
-    6/17 & 2112 & 本体・センサの実装 & 2h &
-    進行中 &
-    進行中 &
-    95\% &
-    スライド式可変抵抗器の再はんだ付けが完了し動作を確認．筐体の改修に着手し，スライド式可変抵抗器とタクトスイッチのみを露出させる加工を開始．\\
-    \hline
-
-    〃 & 2113 & BPM・音量変化機構の実装 & 0.5h &
+    6/17 & 2113 & BPM・音量変化機構の実装 & 1.5h &
     おおよそ完了 &
     完了 &
     100\% &
-    スライド式可変抵抗器の動作確認を実施し完了．\\
+    スライド式可変抵抗器の再はんだ付けおよび動作確認を実施し完了．\\
     \hline
 
-    6/19 & 2112 & 本体・センサの実装 & 1.5h &
+    6/18 & 2112 & 本体・センサの実装 & 2h &
+    進行中 &
+    進行中 &
+    93\% &
+    筐体の改修に着手．スライド式可変抵抗器とタクトスイッチのみを露出させる加工を開始．\\
+    \hline
+
+    6/19 & 2112 & 本体・センサの実装 & 2h &
+    進行中 &
+    進行中 &
+    96\% &
+    操作部の露出加工を継続．内部配線の整理を実施．\\
+    \hline
+
+    6/20 & 2112 & 本体・センサの実装 & 1.5h &
     進行中 &
     進行中 &
     98\% &
-    筐体の改修作業を継続．操作部の露出加工と内部配線の整理を実施．\\
+    回路の最終固定と筐体内部の配線固定を実施．\\
     \hline
 
-    6/20 & 2112 & 本体・センサの実装 & 1h &
+    6/21 & 2112 & 本体・センサの実装 & 1.5h &
     進行中 &
     完了 &
     100\% &
     筐体の最終仕上げを行い，本体・センサの実装を完了．\\
     \hline
 
-    6/23 & 2231 & LEDマトリクス制御 & 1h &
+    6/22 & 2231 & LEDマトリクス制御 & 1h &
     完了 &
     完了 &
     100\% &
-    Display.inoに静的IP設定（WiFi.config）を追加．指揮デバイスの送信先IPアドレスと一致させるよう修正した．\\
+    計画書（Version 1.3）と実装の変更点を整理し記述した．\\
     \hline
 
-    〃 & - & 作業ログの記入 & 1h &
+    6/23 & - & 作業ログの記入 & 1h &
     未着手 &
     完了 &
     100\% &
@@ -279,93 +287,67 @@ LEDマトリクスの反映確認 &
 
 \section{AI利用状況と検証（再現性重視）}
 
-\subsection{利用内容}
-
-\begin{itemize}
-  \item 利用目的：実装支援
-
-  \item 入力（プロンプト要旨）：
-    \begin{itemize}
-      \item Display.inoにおいて，指揮デバイスからのUDP受信に必要な
-      静的IP設定（WiFi.config）の追加方法について質問した．
-    \end{itemize}
-
-  \item 出力概要：
-    \begin{itemize}
-      \item IPAddress定数（localIP, gateway, subnet）の定義方法および，
-      setup()内でWiFi.begin()の前にWiFi.config()を呼び出す修正方針が得られた．
-    \end{itemize}
-\end{itemize}
+今回はAIを利用していない．
 
 \sectionrule
 
-\subsection{検証方法}
+
+\section{No.2231 LEDマトリクス制御：計画書との変更点}
+
+計画書（2026年06月12日版 Version 1.3）のセクション3.5.8および変更履歴（2026年06月19日版 Version 1.4）を参照し，
+Display（LEDマトリクス制御）の実装における計画書からの変更点を以下に示す．
+
+\subsection{描画APIの変更}
+
+計画書（3.5.8.3）では，フレームバッファの描画に
+\texttt{matrix.renderBitmap()}を使用すると記述されている．
+\texttt{renderBitmap()}は\texttt{uint8\_t[8][12]}形式の配列を引数に取る関数である．
+実装では\texttt{uint32\_t[3]}形式にビットパックし，
+\texttt{matrix.loadFrame()}で描画する方式に変更した．
+これは，\texttt{loadFrame()}の方がフレームバッファのメモリ効率が高く，
+96ビット（8行$\times$12列）を3つの32ビット整数で表現できるためである．
+
+\subsection{関数の追加}
+
+計画書の表3.33には\texttt{checkUDP}と\texttt{displayBPM}の2関数のみ記載されている．
+実装では以下の3関数を追加した．
 
 \begin{itemize}
+  \item \texttt{clearDisplay()}: 演奏終了ヘッダ（'E'）受信時にLEDマトリクスを全消灯する関数．
+  計画書の通信プロトコル（表3.29, 3.30）にはヘッダ'E'が定義されているが，
+  Display側の関数一覧にはこの処理への言及がなかったため追加した．
 
-    \item 検証手法：
-      \begin{itemize}
-        \item AIが提示した実装をDisplay.inoに追加し，
-        Arduino IDE上でコンパイルが通ることを確認した．
+  \item \texttt{drawDigit()}: 1桁の数字を独自フォント（\texttt{font3x5[]}）を参照して
+  フレームバッファに描画する内部関数．
+  \texttt{displayBPM()}から桁ごとに呼び出される．
 
-        \item AIの出力内容とArduino公式ドキュメントを比較し，
-        WiFi.config()の引数仕様に誤りがないか確認した．
-      \end{itemize}
-
-      \item 参照資料：
-      \begin{itemize}
-        \item Arduino公式ドキュメント：
-        \url{https://docs.arduino.cc/}
-      \end{itemize}
-
-      \item 検証手順：
-    \begin{enumerate}
-      \item AIへ静的IP設定の追加方法について質問した．
-
-      \item AIが提示した内容をもとにIPAddress定数を定義し，
-      setup()内にWiFi.config()の呼び出しを追加した．
-
-      \item Arduino IDEでコンパイルし，エラーがないことを確認した．
-
-      \item AIの出力内容をArduino公式ドキュメントと比較し，
-      WiFi.config()の使用方法に誤りがないことを確認した．
-    \end{enumerate}
-
+  \item \texttt{displaySetup()}: \texttt{matrix.begin()}をDisplay.cpp側で呼ぶための
+  初期化関数．\texttt{Arduino\_LED\_Matrix}の表示バッファはヘッダ内でstatic定義されており，
+  includeする翻訳単位ごとに別実体となる．そのため，描画を行う\texttt{loadFrame()}と
+  同一ファイルから\texttt{begin()}を呼び出す必要があり，本関数を追加した．
 \end{itemize}
 
-\sectionrule
+\subsection{モジュール構成の変更}
 
-\subsection{ファクトチェック結果}
+計画書の図3.16では\texttt{checkUDP()}はDisplay.ino側に配置されている．
+実装ではDisplay.cppに移動した．
+\texttt{checkUDP()}内で\texttt{currentBPM}（Display.cppの静的変数）を参照する必要があるためである．
+これにより，Display.inoには\texttt{setup()}と\texttt{loop()}のみが残る構成となった．
 
-\begin{itemize}
+\subsection{受信データの読み込み形式}
 
-    \item 一致点：
-      \begin{itemize}
-        \item AIが提示したWiFi.config(ip, gateway, subnet)の引数順序および
-        IPAddressの定義方法は，Arduino公式ドキュメントの内容と一致していた．
-      \end{itemize}
+計画書（3.5.8.3）では「ペイロードを文字列として読み込む」と記述されている．
+実装では\texttt{uint8\_t buffer[2]}としてバイナリ形式で読み取り，
+\texttt{buffer[0]}をヘッダ文字（char），\texttt{buffer[1]}を段階番号（uint8\_t）として処理している．
+通信プロトコル仕様（表3.29, 3.30）自体は固定長2バイトのバイナリ形式で定義されており，
+実装側がプロトコル仕様に忠実な形式を採用した．
 
-      \item 不一致・疑義：
-    \begin{itemize}
-      \item 特になし．
-    \end{itemize}
+\subsection{静的IP設定の追加}
 
-  \item 最終判断：
-    \begin{itemize}
-      \item 採用
-    \end{itemize}
-
-    \item 根拠：
-    \begin{itemize}
-      \item Arduino公式ドキュメントとの比較により，
-      AIの出力内容が正確であることを確認したため．
-
-      \item Arduino IDEでコンパイルが通り，
-      実装に問題がないことを確認したため．
-    \end{itemize}
-
-\end{itemize}
-
+計画書の表3.24にはDisplay側の定数として\texttt{localIP}（観覧車デバイス自身の静的IPアドレス）が
+定義されている．実装では\texttt{WiFi.config(localIP, gateway, subnet)}を
+\texttt{WiFi.begin()}の前に呼び出すことで，
+指揮デバイスの送信先IPアドレス（192.168.11.10）と一致する固定IPを設定した．
 
 \sectionrule
 
