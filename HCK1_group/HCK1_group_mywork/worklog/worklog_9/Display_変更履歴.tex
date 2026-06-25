@@ -1,0 +1,55 @@
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+
+\usepackage{enumitem}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+
+
+\begin{document}
+
+\section{Display（LEDマトリクス制御）変更履歴}
+
+中継機のArduinoに搭載されているLEDMatrix制御を行うDisplayにおける計画書との変更点について説明する．まず，今回変更をした箇所以下の通りである．
+
+\begin{itemize}
+\item 描画APIの変更
+\item 関数の追加
+\item モジュール構成の変更
+\item 静的IPの設定
+\end{itemize}
+
+まず，LEDを発光させる関数として，\texttt{matrix.renderBitmap()}から\texttt{matrix.loadFrame()}に変更した．この変更理由は，\texttt{matrix.renderBitmap()} は\texttt{uint8\_t[8][12]} 形式のビットマップ配列を入力として，ライブラリ内部で表示用フレーム形式に変換する必要があるのに対し，
+\texttt{matrix.loadFrame()}事前にビットパックを行い，ライブラリ内部のフレーム形式である\texttt{uint32\_t[3]}形式で直接受け取るため，表示するデータの変換処理を明示的に制御できるためである．\par
+
+次に，演奏終了に対応しLEDを消灯させる関数\texttt{clearDisplay()}と，\texttt{matrix.begin()}をDisplay.cpp側で呼ぶための初期化関数\texttt{diaplaySetup()}を追加した．
+\texttt{clearDisplay()}の追加理由は，通信プロトコルにて演奏を終了させるヘッダ'E'が定義されているが，Display側の関数一覧には対応する処理への言及がされておらず，演奏終了後にLEDを消灯させる必要があったためである．
+\texttt{diaplaySetup()}の追加理由は， \texttt{Arduino\_LED\_Matrix}の表示バッファはヘッダ内でstatic定義されており，includeする翻訳単位ごとに別実体となるため，
+描画を行う\texttt{matrix.loadFrame()}と同一ファイルから\texttt{matrix.begin()}を呼び出す必要があったためである．\par
+次に，\texttt{checkUDP()}をDisplay.inoからDisplay.cppに移動した．この変更理由は，\texttt{checkUDP()}内で\texttt{currentBPM}を参照する必要があったためである．\par
+次に，\texttt{WiFi.config(localIP, gateway, subnet)} を\texttt{WiFi.begin()} の前に呼び出す処理を追加した．この変更理由は，
+計画書には\texttt{localIP}が定数として定義されているが，Display側で静的IPを設定する具体的な手順が記載されていなかったためある．
+
+
+
+
+
+ 
+
+\end{document}
