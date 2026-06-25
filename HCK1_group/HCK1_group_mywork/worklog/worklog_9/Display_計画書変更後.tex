@@ -17,19 +17,28 @@
 
 \section{LEDマトリクスでのBPM表示（変更後）}
 
-計画書（Version 1.3）セクション3.5.8の内容を，実装に合わせて書き直したものを以下に示す．
 
-\subsection{ファイル構成}
 
-\begin{table}[H]
+
+
+
+
+\subsubsection{ファイル構成}
+\begin{table}[h]
+    \vspace{-1em}
+    \caption{BPM表示機能のファイル構成}
     \centering
-    \caption{ファイル構成}
-    \label{table:display-files}
-    \begin{tabular}{ll} \hline
-        ファイル名 & 概要 \\ \hline
-        Display.ino & WiFi接続・UDP受信開始の管理 \\ \hline
-        Display.cpp & 独自フォント定義，LEDマトリクスへの描画処理，UDP受信処理 \\ \hline
-        Display.h & 定数定義（BPM段階・通信・フォント寸法・マトリクス寸法），関数宣言，外部参照 \\ \hline
+    \label{tab:file1}
+    \begin{tabular}{ll}
+    \hline
+    \textbf{ファイル名} & \textbf{概要}\\
+    \hline
+    Display.ino & WiFi接続・UDP受信開始の管理\\
+    \hline
+    Display.cpp & 表示文字の独自フォント定義，LEDマトリクスへの描画処理，UDP受信処理\\
+    \hline
+    Display.h & 定数定義，関数宣言，外部参照\\
+    \hline
     \end{tabular}
 \end{table}
 
@@ -38,6 +47,27 @@ Display.inoはWiFi接続とUDP受信の開始を管理する．
 これは\texttt{Arduino\_LED\_Matrix}の表示バッファがヘッダ内でstatic定義されており，
 includeする翻訳単位ごとに別実体となるため，
 \texttt{begin()}と\texttt{loadFrame()}を同一ファイルから呼び出す必要があることによる．
+
+%ここから
+ファイル構成について説明する．また，表\ref{tab:file1}にBPM表示機能のファイル構成を示している．
+はじめに，Display.inoファイルでは，表\ref{tab:file1}に示すようにWiFi接続とUDP接続を行う．
+今回，指揮機と中継機間の通信形式としては，高速通信を目的とし，UDP形式で情報を受け取る．\par
+次に，Display.cppおよび.hファイルでは，表示文字の独自フォント定義，マトリクスへの描画処理を行う．
+ここで，今回利用するArduinoのマトリクスは縦12横8の範囲で構成されている．
+この時，通常で定義されている文字列では文字の間隔が短くなることや，それに付随した可読性の低下が考えられる．
+よって，今回は1文字を縦5横3で再定義することにより文字同士の間隔を開け，可読性の担保を目指す．
+例として数字0を以下に示す．
+\begin{verbatim}
+{1,1,1,
+1,0,1,
+1,0,1,
+1,0,1,
+1,1,1}
+\end{verbatim}
+また，LEDマトリクスの描画処理は，受信したデータを文字列から整数に変換し，整数を各桁で分割，それぞれを定義した
+配列に当てはめることで行う．描画自体はマトリクスパッケージの機能を用いて，配列を表現する．
+
+
 
 \subsection{クラス図}
 
