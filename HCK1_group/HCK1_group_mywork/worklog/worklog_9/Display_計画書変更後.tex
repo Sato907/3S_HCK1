@@ -1,0 +1,107 @@
+\documentclass[lualatex,article,paper=a4paper,jafontsize=11.5pt,jafontscale=1.05]{jlreq}
+
+\usepackage{luatexja-fontspec}
+\usepackage{hack-fonts}
+
+\usepackage{hack-cover}
+
+\usepackage[hidelinks]{hyperref}
+
+\usepackage{float}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage[table]{xcolor}
+
+\begin{document}
+
+\section{LEDマトリクスでのBPM表示（変更後）}
+
+計画書（Version 1.3）セクション3.5.8の内容を，実装に合わせて書き直したものを以下に示す．
+
+\subsection{ファイル構成}
+
+\begin{table}[H]
+    \centering
+    \caption{ファイル構成}
+    \label{table:display-files}
+    \begin{tabular}{ll} \hline
+        ファイル名 & 概要 \\ \hline
+        Display.ino & WiFi接続・UDP受信開始の管理 \\ \hline
+        Display.cpp & 独自フォント定義，LEDマトリクスへの描画処理，UDP受信処理 \\ \hline
+        Display.h & 定数定義（BPM段階・通信・フォント寸法・マトリクス寸法），関数宣言，外部参照 \\ \hline
+    \end{tabular}
+\end{table}
+
+Display.inoはWiFi接続とUDP受信の開始を管理する．
+描画処理および通信処理はすべてDisplay.cppに集約する．
+これは\texttt{Arduino\_LED\_Matrix}の表示バッファがヘッダ内でstatic定義されており，
+includeする翻訳単位ごとに別実体となるため，
+\texttt{begin()}と\texttt{loadFrame()}を同一ファイルから呼び出す必要があることによる．
+
+\subsection{クラス図}
+
+変更後のモジュール構成を以下に示す．
+
+\textbf{Display.ino}
+\begin{itemize}
+  \item \texttt{setup()}: \texttt{displaySetup()}の呼び出し，WiFi接続，UDP受信開始
+  \item \texttt{loop()}: \texttt{checkUDP()}の呼び出し
+\end{itemize}
+
+\textbf{Display.cpp}
+\begin{itemize}
+  \item \texttt{displaySetup()}: \texttt{matrix.begin()}およびウォームアップ描画
+  \item \texttt{checkUDP()}: UDPパケットの確認，ヘッダ判定，BPM更新・消灯処理
+  \item \texttt{displayBPM()}: BPM値を桁分解し，中央寄せでフレームバッファに描画
+  \item \texttt{drawDigit()}: 1桁の数字を\texttt{font3x5[]}からフレームバッファに描画
+  \item \texttt{clearDisplay()}: LEDマトリクスを全消灯し\texttt{currentBPM}をリセット
+  \item \texttt{font3x5[10][15]}: 独自3$\times$5数字フォント（0〜9）
+  \item \texttt{frameBuffer[8][12]}: 描画用共有フレームバッファ
+  \item \texttt{currentBPM}: 直近に表示中のBPM値（更新検知用）
+\end{itemize}
+
+\textbf{Display.h}
+\begin{itemize}
+  \item 定数定義：\texttt{BPM\_STEP\_1}〜\texttt{5}，\texttt{LOCAL\_PORT}，
+  \texttt{HEADER\_BPM}，\texttt{HEADER\_END}，
+  \texttt{FONT\_WIDTH/HEIGHT}，\texttt{MATRIX\_ROWS/COLS}
+  \item 関数宣言：上記5関数
+  \item 外部参照：\texttt{font3x5}，\texttt{matrix}，\texttt{Udp}
+\end{itemize}
+
+\subsection{関数設計}
+
+\begin{table}[H]
+    \centering
+    \caption{関数一覧}
+    \label{table:display-functions}
+    \begin{tabular}{lll} \hline
+        関数名 & 所属 & 概要 \\ \hline
+        \texttt{displaySetup} & Display.cpp & \texttt{matrix.begin()}および初回描画のウォームアップ \\ \hline
+        \texttt{checkUDP} & Display.cpp & UDPパケットの確認，ヘッダ判定，BPM更新・消灯処理 \\ \hline
+        \texttt{displayBPM} & Display.cpp & BPM値を桁分解し，中央寄せでフレームバッファに描画 \\ \hline
+        \texttt{drawDigit} & Display.cpp & 1桁の数字を\texttt{font3x5[]}からフレームバッファに描画 \\ \hline
+        \texttt{clearDisplay} & Display.cpp & LEDマトリクスを全消灯し\texttt{currentBPM}をリセット \\ \hline
+    \end{tabular}
+\end{table}
+
+\texttt{checkUDP}関数は，\texttt{Udp.parsePacket()}でパケットの到着を監視する．
+パケットが届いている場合，\texttt{uint8\_t buffer[2]}としてバイナリ形式で読み取り，
+\texttt{buffer[0]}をヘッダ文字，\texttt{buffer[1]}を段階番号として処理する．
+ヘッダが'E'の場合は\texttt{clearDisplay()}を呼び出す．
+ヘッダが'B'の場合は\texttt{bpmTable[]}を参照してBPM値に変換し，
+値が変化した場合のみ\texttt{displayBPM()}を呼び出す．
+
+\texttt{displayBPM}関数は，BPM数値を桁ごとに分割し，
+\texttt{drawDigit()}を用いてフレームバッファに描画した後，
+\texttt{uint32\_t[3]}形式にビットパックして\texttt{matrix.loadFrame()}でLEDに反映する．
+
+\texttt{clearDisplay}関数は，\texttt{currentBPM}を初期値（$-1$）にリセットし，
+全消灯フレーム（\texttt{uint32\_t blank[3] = \{0, 0, 0\}}）を\texttt{matrix.loadFrame()}で描画する．
+
+\texttt{displaySetup}関数は，\texttt{matrix.begin()}を呼び出した後，
+消灯フレームを一度描画（ウォームアップ）してから200ms待機する．
+\texttt{begin()}直後の最初の\texttt{loadFrame()}は反映されない場合があるための対策である．
+
+\end{document}
