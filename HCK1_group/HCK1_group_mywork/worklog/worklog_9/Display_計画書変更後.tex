@@ -42,17 +42,13 @@
     \end{tabular}
 \end{table}
 
-Display.inoはWiFi接続とUDP受信の開始を管理する．
-描画処理および通信処理はすべてDisplay.cppに集約する．
-これは\texttt{Arduino\_LED\_Matrix}の表示バッファがヘッダ内でstatic定義されており，
-includeする翻訳単位ごとに別実体となるため，
-\texttt{begin()}と\texttt{loadFrame()}を同一ファイルから呼び出す必要があることによる．
 
-%ここから
+
+
 ファイル構成について説明する．また，表\ref{tab:file1}にBPM表示機能のファイル構成を示している．
 はじめに，Display.inoファイルでは，表\ref{tab:file1}に示すようにWiFi接続とUDP接続を行う．
 今回，指揮機と中継機間の通信形式としては，高速通信を目的とし，UDP形式で情報を受け取る．\par
-次に，Display.cppおよび.hファイルでは，表示文字の独自フォント定義，マトリクスへの描画処理を行う．
+次に，Display.cppファイルでは，表示文字の独自フォント定義，マトリクスへの描画処理，そして通信処理を行う．また，Display.hファイルでは定数の定義と関数宣言，独自フォント定義などを行う．
 ここで，今回利用するArduinoのマトリクスは縦12横8の範囲で構成されている．
 この時，通常で定義されている文字列では文字の間隔が短くなることや，それに付随した可読性の低下が考えられる．
 よって，今回は1文字を縦5横3で再定義することにより文字同士の間隔を開け，可読性の担保を目指す．
@@ -64,41 +60,24 @@ includeする翻訳単位ごとに別実体となるため，
 1,0,1,
 1,1,1}
 \end{verbatim}
-また，LEDマトリクスの描画処理は，受信したデータを文字列から整数に変換し，整数を各桁で分割，それぞれを定義した
-配列に当てはめることで行う．描画自体はマトリクスパッケージの機能を用いて，配列を表現する．
+また，LEDマトリクスの描画処理は，受信した段階番号からBPM値を参照し，整数を各桁に分割した後，独自定義した3×5のフォント配列を用いて
+フレームバッファに書き込むことで行う．
 
+%ここまで
 
+%3.5.8.2
+\subsubsection{オブジェクト図(クラス図)}
+LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りである．通信開始を行うDisplay.ino，通信受信処理とLEDマトリクスへの描画処理を行うDisplay.cpp，および関数宣言やフォント定義を行うDisplay.hで構成される．
+各モジュール間の関係について，Display.inoからDisplay.cppへの関係は，表示処理を利用する依存関係である．また，Display.cppからDisplay.hへの関係は，関数宣言およびフォント定義を参照する依存関係である．
 
-\subsection{クラス図}
+\begin{figure}[h]
+\centering
+ \centering
+\includegraphics[width=7cm]{figs/class_mat.png}
+\caption{LEDMatrixのクラス図}
+\label{matcla}
+\end{figure}
 
-変更後のモジュール構成を以下に示す．
-
-\textbf{Display.ino}
-\begin{itemize}
-  \item \texttt{setup()}: \texttt{displaySetup()}の呼び出し，WiFi接続，UDP受信開始
-  \item \texttt{loop()}: \texttt{checkUDP()}の呼び出し
-\end{itemize}
-
-\textbf{Display.cpp}
-\begin{itemize}
-  \item \texttt{displaySetup()}: \texttt{matrix.begin()}およびウォームアップ描画
-  \item \texttt{checkUDP()}: UDPパケットの確認，ヘッダ判定，BPM更新・消灯処理
-  \item \texttt{displayBPM()}: BPM値を桁分解し，中央寄せでフレームバッファに描画
-  \item \texttt{drawDigit()}: 1桁の数字を\texttt{font3x5[]}からフレームバッファに描画
-  \item \texttt{clearDisplay()}: LEDマトリクスを全消灯し\texttt{currentBPM}をリセット
-  \item \texttt{font3x5[10][15]}: 独自3$\times$5数字フォント（0〜9）
-  \item \texttt{frameBuffer[8][12]}: 描画用共有フレームバッファ
-  \item \texttt{currentBPM}: 直近に表示中のBPM値（更新検知用）
-\end{itemize}
-
-\textbf{Display.h}
-\begin{itemize}
-  \item 定数定義：\texttt{BPM\_STEP\_1}〜\texttt{5}，\texttt{LOCAL\_PORT}，
-  \texttt{HEADER\_BPM}，\texttt{HEADER\_END}，
-  \texttt{FONT\_WIDTH/HEIGHT}，\texttt{MATRIX\_ROWS/COLS}
-  \item 関数宣言：上記5関数
-  \item 外部参照：\texttt{font3x5}，\texttt{matrix}，\texttt{Udp}
-\end{itemize}
 
 \subsection{関数設計}
 
