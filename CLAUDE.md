@@ -80,23 +80,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status Line
 
-Claude Code のステータスラインに横棒グラフ形式でリソース使用率を表示する。
+Claude Code のチャット入力欄の下に、モデル名・エフォート・コンテキスト使用率・レート制限を4行で表示する。
 
-**表示形式:**
+**表示形式（4行）:**
 ```
-Ctx [████████░░] 80%  5h [███░░░░░░░] 30%  7d [█░░░░░░░░░] 10%
+[Opus 4.8 · M]
+ctx  45% ████░░░░░░
+5h   72% ███████░░░ (→2h00m)
+7d    9% ░░░░░░░░░░ (→4d15h)
 ```
 
-| 項目 | 内容 |
+| 行 | 内容 |
 |------|------|
-| `Ctx` | コンテキストウィンドウの使用率 |
-| `5h` | 5時間セッション制限の使用率 |
-| `7d` | 7日間制限の使用率 |
+| 1行目 | `[モデル名 · エフォート]`（エフォート: MAX/xH/H/M/L） |
+| `ctx` | コンテキストウィンドウの使用率（% + バー） |
+| `5h` | 5時間レート制限の使用率（% + バー + リセットまでの残り時間 `→h+m`） |
+| `7d` | 7日レート制限の使用率（% + バー + リセットまでの残り時間 `→d+h`） |
 
-- `█` が使用量、`░` が残量を表し、バー長は常に10文字
-- データが存在する項目のみ表示され、項目間は2スペース区切り
-- スクリプト: `~/.claude/statusline-command.sh`
-- 設定: `~/.claude/settings.json`
+- `█` が使用量、`░` が残量を表し、バー長は常に10セグメント
+- バーと文字は使用率で色分けする：緑（0〜49%）／黄（50〜79%）／赤（80〜100%）
+- レート制限はデータがない場合 `--` をグレーで表示（API 使用が少ないと未提供）
+- エフォートは stdin JSON の `.effort.level` を優先し、無ければ `settings.json` の `effortLevel` をフォールバック
+- 前提: `jq` インストール済み・Claude Code 2.1 以降（stdin JSON 対応）
+- スクリプト: `~/.claude/statusline.sh`（要 `chmod +x`）
+- 設定: `~/.claude/settings.json` の `statusLine.command` で `~/.claude/statusline.sh` を指す
+
+**JSON データソース:**
+
+| JSON パス | 内容 |
+|-----------|------|
+| `.model.display_name` | モデル名 |
+| `.effort.level` | エフォートレベル（max/xhigh/high/medium/low） |
+| `.context_window.used_percentage` | コンテキスト使用率（%） |
+| `.rate_limits.five_hour.used_percentage` / `.resets_at` | 5時間制限の使用率・リセット時刻（Unix秒） |
+| `.rate_limits.seven_day.used_percentage` / `.resets_at` | 7日制限の使用率・リセット時刻（Unix秒） |
 
 ## Important Notes
 
