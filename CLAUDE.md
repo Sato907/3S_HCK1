@@ -78,6 +78,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 出力は客観的事実のみとし、根拠のない評価や過度な称賛を含めない
 - 絵文字は使用しない
 
+## Status Line
+
+Claude Code のステータスラインに横棒グラフ形式でリソース使用率を表示する。
+
+**表示形式:**
+```
+Ctx [████████░░] 80%  5h [███░░░░░░░] 30%  7d [█░░░░░░░░░] 10%
+```
+
+| 項目 | 内容 |
+|------|------|
+| `Ctx` | コンテキストウィンドウの使用率 |
+| `5h` | 5時間セッション制限の使用率 |
+| `7d` | 7日間制限の使用率 |
+
+- `█` が使用量、`░` が残量を表し、バー長は常に10文字
+- データが存在する項目のみ表示され、項目間は2スペース区切り
+- スクリプト: `~/.claude/statusline-command.sh`
+- 設定: `~/.claude/settings.json`
+
 ## Important Notes
 
 - `Display.cpp` の `checkUDP()` 内の通信部はコメントアウト済み（描画動作確認用の状態）。UDP受信を有効化する際はコメントを外す。
