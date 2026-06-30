@@ -1,0 +1,81 @@
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+
+\usepackage{enumitem}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+
+
+\begin{document}
+
+\section{No.2231 LEDマトリクス制御：計画書との変更点}
+
+\subsection{描画APIの変更}
+
+計画書（3.5.8.3）では，フレームバッファの描画に
+\texttt{matrix.renderBitmap()}を使用すると記述されている．
+\texttt{renderBitmap()}は\texttt{uint8\_t[8][12]}形式の配列を引数に取る関数である．
+実装では\texttt{uint32\_t[3]}形式にビットパックし，
+\texttt{matrix.loadFrame()}で描画する方式に変更した．
+これは，\texttt{loadFrame()}の方がフレームバッファのメモリ効率が高く，
+96ビット（8行$\times$12列）を3つの32ビット整数で表現できるためである．
+
+\subsection{関数の追加}
+
+計画書の表3.33には\texttt{checkUDP}と\texttt{displayBPM}の2関数のみ記載されている．
+実装では以下の3関数を追加した．
+
+\begin{itemize}
+  \item \texttt{clearDisplay()}: 演奏終了ヘッダ（'E'）受信時にLEDマトリクスを全消灯する関数．
+  計画書の通信プロトコル（表3.29, 3.30）にはヘッダ'E'が定義されているが，
+  Display側の関数一覧にはこの処理への言及がなかったため追加した．
+
+  \item \texttt{drawDigit()}: 1桁の数字を独自フォント（\texttt{font3x5[]}）を参照して
+  フレームバッファに描画する内部関数．
+  \texttt{displayBPM()}から桁ごとに呼び出される．
+
+  \item \texttt{displaySetup()}: \texttt{matrix.begin()}をDisplay.cpp側で呼ぶための
+  初期化関数．\texttt{Arduino\_LED\_Matrix}の表示バッファはヘッダ内でstatic定義されており，
+  includeする翻訳単位ごとに別実体となる．そのため，描画を行う\texttt{loadFrame()}と
+  同一ファイルから\texttt{begin()}を呼び出す必要があり，本関数を追加した．
+\end{itemize}
+
+\subsection{モジュール構成の変更}
+
+計画書の図3.16では\texttt{checkUDP()}はDisplay.ino側に配置されている．
+実装ではDisplay.cppに移動した．
+\texttt{checkUDP()}内で\texttt{currentBPM}（Display.cppの静的変数）を参照する必要があるためである．
+これにより，Display.inoには\texttt{setup()}と\texttt{loop()}のみが残る構成となった．
+
+\subsection{受信データの読み込み形式}
+
+計画書（3.5.8.3）では「ペイロードを文字列として読み込む」と記述されている．
+実装では\texttt{uint8\_t buffer[2]}としてバイナリ形式で読み取り，
+\texttt{buffer[0]}をヘッダ文字（char），\texttt{buffer[1]}を段階番号（uint8\_t）として処理している．
+通信プロトコル仕様（表3.29, 3.30）自体は固定長2バイトのバイナリ形式で定義されており，
+実装側がプロトコル仕様に忠実な形式を採用した．
+
+\subsection{静的IP設定の追加}
+
+計画書の表3.24にはDisplay側の定数として\texttt{localIP}（観覧車デバイス自身の静的IPアドレス）が
+定義されている．実装では\texttt{WiFi.config(localIP, gateway, subnet)}を
+\texttt{WiFi.begin()}の前に呼び出すことで，
+指揮デバイスの送信先IPアドレス（192.168.11.10）と一致する固定IPを設定した．
+
+\end{document}
