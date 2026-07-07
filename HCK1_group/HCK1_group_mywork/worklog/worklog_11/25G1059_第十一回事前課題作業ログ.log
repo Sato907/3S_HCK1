@@ -1,4 +1,4 @@
-This is e-upTeX, Version 3.141592653-p4.1.2-u2.00-250202-2.6 (utf8.uptex) (TeX Live 2025) (preloaded format=uplatex 2025.4.24)  7 JUL 2026 11:31
+This is e-upTeX, Version 3.141592653-p4.1.2-u2.00-250202-2.6 (utf8.uptex) (TeX Live 2025) (preloaded format=uplatex 2025.4.24)  8 JUL 2026 00:54
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -454,12 +454,12 @@ LaTeX Font Info:    Font shape `JY2/mc/m/n' will be
 [1
 
 ]
-File: gant7.png Graphic file (type bmp)
-<gant7.png>
-File: gant8.png Graphic file (type bmp)
-<gant8.png>
-File: gant12.png Graphic file (type bmp)
-<gant12.png>
+File: gant13.png Graphic file (type bmp)
+<gant13.png>
+File: gant14.png Graphic file (type bmp)
+<gant14.png>
+File: gant15.png Graphic file (type bmp)
+<gant15.png>
 
 
 [2]
@@ -472,16 +472,16 @@ L3 programming layer <2025-03-26>
  ***********
 Package rerunfilecheck Info: File `25G1059_第十一回事前課題作業ログ
 .out' has not changed.
-(rerunfilecheck)             Checksum: E5756342642CCF360EC36621AA22E5F3;930.
+(rerunfilecheck)             Checksum: 4A4F63E05A9CDD88D28828143D1AF365;855.
  ) 
 Here is how much of TeX's memory you used:
- 11051 strings out of 470271
- 170542 string characters out of 5486374
- 605968 words of memory out of 5000000
- 37767 multiletter control sequences out of 15000+600000
- 637015 words of font info for 93 fonts, out of 8000000 for 9000
+ 11035 strings out of 470271
+ 170351 string characters out of 5486374
+ 611875 words of memory out of 5000000
+ 37756 multiletter control sequences out of 15000+600000
+ 635135 words of font info for 86 fonts, out of 8000000 for 9000
  934 hyphenation exceptions out of 8191
- 72i,8n,79p,662b,539s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 72i,6n,79p,667b,534s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on 25G1059_第十一回事前課題作業ログ.dvi (3 pages, 15
-000 bytes).
+Output written on 25G1059_第十一回事前課題作業ログ.dvi (3 pages, 16
+308 bytes).
