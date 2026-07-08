@@ -1,0 +1,689 @@
+\section{個人の技術的貢献}
+本節では，担当したハードウェアの詳細設計とLEDMatrixでのBPM表示を行うプログラムについて説明する．
+
+\subsection{部品一覧}
+本節では，指揮デバイスおよび中継機デバイス，楽器デバイスの受光部を構成する部品について説明する．
+指揮デバイスを構成する部品について表\ref{table:siki}に示す．
+デジタル3軸加速度センサは指揮デバイスの動きの検知に使用し，スライド式可変抵抗器は
+BPMおよび音量変更に使用される．
+% また，指揮デバイスの電力供給源として$\SI{9}{V}$の乾電池を外部電源として使用する．
+
+\begin{table}[H]
+    \centering
+    \caption{指揮デバイスに使用な機器}
+    \label{table:siki}
+    \begin{tabular}{lll} \hline
+        Arduino UNO R4 WiFi& - & 1 \\ \hline
+        スライド式可変抵抗器 10 kΩ &-& 2 \\ \hline
+        デジタル3軸加速度センサ & GY-291 & 1 \\ \hline
+        タクトスイッチ & DTS-63 & 1 \\ \hline
+        抵抗器　10k$\Omega$ & - & 1 \\ \hline
+        % 外部電源 9 V &-& 1 \\ \hline
+        ジャンパーワイヤー & - & 適宜 \\ \hline
+    \end{tabular}
+\end{table}
+
+中継機デバイスで使用する部分を表\ref{kizai}にまとめる．この内，個別で購入する必要があるものはハイパワーギヤーボックス，
+ブレッドボード用DCジャックDIP化キット，ボタン電池，ボタン電池ホルダー，QIケーブル，有極コンデンサーである．
+\begin{table}[h]
+    \caption{中継機デバイスに必要な機材}
+    \centering
+    \label{kizai}
+    \begin{tabular}{p{6cm}p{4cm}l}\hline
+    機材&品番&個数[個]\\ \hline
+    Arduino Uno R4 WiFi&-& 1\\ \hline
+    ルーター& -& 1\\ \hline
+    ブレッドボード & -&1\\ \hline
+    赤色ドットレーザーモジュール & FU650AD5-C6&8\\ \hline
+    ボタン電池基板取付用ホルダー(CR2477用) & CH031-2477LF & 4 \\ \hline
+    ボタン電池 & CR2477 & 4\\ \hline
+    スライドスイッチ & SS-12D00-G5 & 4 \\ \hline
+    % 9Vアルカリ電池 &-& 1\\ \hline
+    モータードライバーモジュール &AE-DRV8835-S& 1\\ \hline
+    ハイパワーギヤーボックス HE &72003& 1\\ \hline
+    ジャンパーワイヤー &-& 適宜\\ \hline
+    ブレッドボード用2.1mm標準DCジャックDIP化キット&AE-DC-POWER-JACK-DIP & 1 \\\hline
+    超小型スイッチングACアダプター 5 V 1 A &-& 1\\ \hline
+    QIケーブル2P-1Px2 &311-262&1\\ \hline
+    抵抗器 10 $\Omega$ &- &1\\ \hline
+    % 抵抗器 150 Ω &-& 8\\ \hline
+    コンデンサー 0.01 $\mu$F&-&  1\\ \hline
+    コンデンサー 0.047 $\mu$F& -& 1\\ \hline
+    有極性コンデンサー 100 $\mu$F &-&  1\\ \hline
+    \end{tabular}
+\end{table}
+
+
+次に，楽器デバイスが受光するための部品について表\ref{table:ota}に示す．
+光センサモジュールとしてCdSセルを使用する．
+CdSセルにレーザー光が照射された際の出力をArduinoのアナログピンへ接続することで，観覧車デバイスのレーザー光の通過を検知する．
+また，今回はドラム，ピアノ，ストリングス，フルートの4種類の楽器の音色を再現するため
+それぞれにArduinoを使用し，光センサおよびブレッドボードも4台用意する．
+\begin{table}[h]
+    \caption{楽器デバイスに必要な機器}
+    \centering
+    \label{table:ota}
+    \begin{tabular}{llr}\hline
+    機材 & 品番 & 個数 [個] \\ \hline
+    Arduino UNO R4 & -& 4 \\ \hline
+    CdSセル  &GL5516& 4 \\ \hline
+    ブレッドボード & -& 4 \\ \hline
+    ジャンパーワイヤー & - & 適宜 \\ \hline
+    \end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%
+\FloatBarrier
+
+\subsection{指揮デバイス}
+指揮デバイスの回路図を図\ref{fig:kairo_siki} に示す．
+%% 変更するかも
+電源仕様は，PCとのUSB接続から電力を供給する．また，
+Arduino内蔵の電圧レギュレータにより$\SI{5}{V}$および$\SI{3.3}{V}$ を生成し，各モジュールへ安定した電力を供給する．
+
+加速度センサにはGY-291（ADXL345）を用いており，I2C通信によりArduinoと接続する．CSピンをArduinoの3.3Vに接続することでI2Cモードに設定し，
+さらに SDOピンをGNDに接続することでI2Cアドレスを0x53に固定している．
+また，SDAピンおよびSCLピンはそれぞれデータ通信線およびクロック信号線としてArduinoのA4，A5ピンに接続している．
+加えて，加速度が内部設定した閾値を超過した場合には，INT1 ピンから Arduino の D2 ピンへ割り込み信号が出力される．
+これにより，指揮デバイスの振り動作を検知し，モータ制御用 Arduino との UDP 通信を開始する．
+
+さらに，演奏開始および終了信号の送信に用いるボタン入力判定回路を実装する．ボタンの誤判定を防止するため10kΩ のプルアップ抵抗を用いた回路を構成する．
+ボタンが押されていない状態では，入力ピン D3 はプルアップ抵抗を介して 5 V に接続されるため HIGH 状態となる．
+一方，ボタン押下時には回路が GND に短絡され，入力電位が LOW に遷移する．指揮デバイスのプログラムでは D3 ピンの状態変化を常時監視することで，
+演奏開始および終了操作を判定する．
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{figs/kairo_siki.png} % 横幅を列幅の80%に指定
+        \caption{指揮デバイスの回路図} % 図の説明
+        \label{fig:kairo_siki} % 本文中で参照するためのラベル
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%
+\FloatBarrier
+
+\subsection{観覧車型中継機デバイス}
+中継機の詳細設計について説明する．図\ref{metro}について，モータードライバーにArduino D5，D6ピンを接続し，PWM制御を行えるようにする．
+モータードライバーへの電力供給はArduinoの5Vからと，DCジャックからのACアダプター5 V 1 Aを用いる．
+モータードライバー及びDCジャックはピンヘッダーのはんだ付けが必要なため，はんだ付けを行う．
+ギアボックスは0.01 $\mu$Fのコンデンサーと直接はんだ付けを行う．
+
+次に，観覧車の設計について説明する．作成するために，3Dプリンタを用いて作成する．実際に設計に使用するモデルデータを図\ref{kanran1}から図\ref{kanran6}に示している．
+観覧車の直径は約16cmとし，ボタン電池付きレーザーを45度間隔で配置する．そして，観覧車を支える左右の支柱および土台を設計する．
+観覧車本体は，以下のパーツに分割して設計を行う．
+\begin{itemize}
+
+    \item 土台 \
+    観覧車全体を支える部分であり，
+    内部を空洞化させる．
+    また，支柱を土台に差し込み，固定する役割も持つ．
+    実際に設計する部品は図\ref{kanran1}の通りである．
+
+    \item 支柱 \
+    観覧車の回転軸を左右から支える部品である．
+    回転軸を安定して保持し，
+    観覧車が滑らかに回転できるようにする．
+    回転軸を上から挿入する形であり，
+    軸が折れないようギアボックスモータに繋ぐ側の支柱の支える穴を大きくしている．
+    実際に設計する部品は図\ref{kanran2}の通りである．
+
+    \item 回転軸 \
+    ギヤボックスモータの回転を観覧車本体へ伝達する部品である．
+    モータと接続し，観覧車全体を回転させる役割を持つ．
+    支柱に固定できるよう，支柱の位置の軸部をへこませて固定できるようにしている．
+    実際に設計する部品は図\ref{kanran3}の通りである．
+
+    \item 回転リング \
+    観覧車の円形部分であり，レーザー側とその反対側で2個作成する．
+    モータによって回転し，レーザーによる光信号送信を行う部分でもある．
+    角度45度おきにレーザーを設置する穴を用意し，そこにレーザーをはめ込み固定する．
+    もう一つの円盤に電池基板を設置し電力供給する．
+    実際に設計する部品は図\ref{kanran4}，\ref{kanran5}の通りである．
+
+    \item 受光部 \
+    レーザーの延長線上に設置する照度センサーの受光部である．
+    回転リングから平行な位置に円盤を設置し，中央にギアボックスモータを設置する台を設ける．
+    90度おきに円盤にくぼみを作り，センサーを設置できるようにした．
+    受光部の円盤によりレーザー光が後ろに漏れないという設計となっている．
+    実際に設計する部品は図\ref{kanran6}の通りである．
+\end{itemize}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=17cm]{./figs/kairo.png}
+    \caption{観覧車型中継機デバイス回路図}
+    \label{metro}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_base.png}
+    \caption{設計に使用するモデルデータ(土台部)}
+    \label{kanran1}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_pillar.png}
+    \caption{設計に使用するモデルデータ(支柱部)}
+    \label{kanran2}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_shaft.png}
+    \caption{設計に使用するモデルデータ(回転軸部)}
+    \label{kanran3}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_circle1.png}
+    \caption{設計に使用するモデルデータ(回転リング部1)}
+    \label{kanran4}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_circle2.png}
+    \caption{設計に使用するモデルデータ(回転リング部2)}
+    \label{kanran5}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_pointer.png}
+    \caption{設計に使用するモデルデータ(受光部)}
+    \label{kanran6}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%
+\FloatBarrier
+
+\subsection{レーザー光送信装置}
+レーザー光送信装置の詳細設計について説明する．図\ref{LED}について，回路図の通りにボタン電池とレーザーをはんだ付けする．これらを観覧車のリングに45度間隔に装着する．
+電源としては図\ref{LED}に示すようにボタン電池からの3V給電を行う．
+ここで，レーザーについて，データシートより定電流源回路を組み込んであるため，現在の設計であれば外部抵抗は必要とせず，素子を安全に利用することができる\cite{data_laser}．
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/LED.png}
+    \caption{レーザー回路図}
+    \label{LED}
+\end{figure}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%
+\FloatBarrier
+
+\subsection{楽器デバイス受光部装置}
+楽器デバイスの受光部の回路図を図\ref{fig:kairo_hikari}に示す．
+電源仕様は，PCとのUSB接続から電力を供給する．光センサはArduinoの$\SI{5}{V}$ピンから給電されるため，外部電源は不要である．
+また，光センサが光を受光した瞬間にA0のアナログピンにセンサ値を出力する．
+このセンサ値の変化をArduinoで処理することで光を検知する仕様である．
+
+
+\begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{figs/kairo_hikari.pdf} % 横幅を列幅の80%に指定
+        \caption{楽器デバイスの受光部の回路図} % 図の説明
+        \label{fig:kairo_hikari} % 本文中で参照するためのラベル
+\end{figure}
+\FloatBarrier
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{LEDマトリクスでのBPM表示}
+まず，LEDマトリクスにおけるBPM表示について説明する．
+今回のシステムでは表示用のマトリクスとして，Arduino Uno R4 WiFi付属のマトリクスを使用する．
+このマトリクスを用いて，中継機から受信したBPM情報を元に数値変換を行い，独自定義しフォント配列を用いて表示を行う．
+ここからは，本機能におけるファイル構成，関数設計について説明する．
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsubsection{ファイル構成}
+
+\begin{table}[h]
+    \vspace{-1em}
+    \caption{BPM表示機能のファイル構成}
+    \centering
+    \label{tab:file1}
+    \begin{tabular}{ll}
+    \hline
+    \textbf{ファイル名} & \textbf{概要}\\
+    \hline
+    Display.ino & WiFi接続・UDP受信開始の管理\\
+    \hline
+    Display.cpp & 表示文字の独自フォント定義，LEDマトリクスへの描画処理，UDP受信処理\\
+    \hline
+    Display.h & 定数定義，関数宣言，外部参照\\
+    \hline
+    \end{tabular}
+\end{table}
+
+
+ファイル構成について説明する．また，表\ref{tab:file1}にBPM表示機能のファイル構成を示している．
+はじめに，Display.inoファイルでは，表\ref{tab:file1}に示すようにWiFi接続とUDP接続を行う．
+今回，指揮機と中継機間の通信形式としては，高速通信を目的とし，UDP形式で情報を受け取る．
+また，WiFi接続の前にWiFi.config(localIP, gateway, subnet)を呼び出し，指揮デバイスの送信先IPアドレスと一致する静的IPを設定する．\par
+次に，Display.cppファイルでは，表示文字の独自フォント定義，マトリクスへの描画処理，そして通信処理を行う．また，Display.hファイルでは定数の定義と関数宣言，独自フォント定義などを行う．
+ここで，今回利用するArduinoのマトリクスは縦12横8の範囲で構成されている．
+この時，通常で定義されている文字列では文字の間隔が短くなることや，それに付随した可読性の低下が考えられる．
+よって，今回は1文字を縦5横3で再定義することにより文字同士の間隔を開け，可読性の担保を目指す．
+例として数字0を以下に示す．
+
+\begin{verbatim}
+    {1,1,1,
+    1,0,1,
+    1,0,1,
+    1,0,1,
+    1,1,1}
+\end{verbatim}
+    
+また，LEDマトリクスの描画処理は，受信した段階番号からBPM値を参照し，整数を各桁に分割した後，独自定義した3×5のフォント配列を用いて
+フレームバッファに書き込むことで行う．
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsubsection{オブジェクト図(クラス図)}
+LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りである．通信開始を行うDisplay.ino，通信受信処理とLEDマトリクスへの描画処理を行うDisplay.cpp，および関数宣言やフォント定義を行うDisplay.hで構成される．
+各モジュール間の関係について，Display.inoからDisplay.cppへの関係は，表示処理を利用する依存関係である．また，Display.cppからDisplay.hへの関係は，関数宣言およびフォント定義を参照する依存関係である．
+
+\begin{figure}[h]
+    \centering
+     \centering
+    \includegraphics[width=7cm]{figs/class_mat.png}
+    \caption{LEDMatrixのクラス図}
+    \label{matcla}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%
+
+\subsubsection{関数設計}
+
+表\ref{tab:func1}に今回用いる主な処理を行う関数を示している．以降では，各関数の具体的な動作を説明する．\par
+はじめに，displaySetup関数について説明する．この関数は，表\ref{tab:func1}に示すように，LEDMatrixの初期化を行い，引数や返り値はない．
+matrix.begin()を呼び出した後，消灯フレームを一度描画してから200 ms待機する．これは，begin()直後の最初のloadFrame()は反映されない場合があるための対策である．\par
+
+
+次に，checkUDP関数について説明する．この関数は表\ref{tab:func1}に示すように，中継機からのパケット確認とBPM情報の値確認を行い，引数や返り値はない．
+まず，中継機からのパケットをUdp.parsePacket()を用いて監視する．パケットが届いていることを確認できれば，uint8\_t buffer[2]としてバイナリ形式で2 バイトを読み取る．
+buffer[0]をヘッダ文字として判定し，ヘッダが'E'の場合はclearDisplay()を呼び出してLEDを消灯する．また，ヘッダが'B'の場合はbuffer[1]の段階番号をbpmTable[]で参照してBPM値に変換し，
+値が更新されていれば描画更新処理を行う．\par
+
+次に，displayBPM関数について説明する．この関数は表\ref{tab:func1}に示すように，BPM数値のマトリクス描画を行い，引数としては，checkUDP関数から保持した数値を用いる．
+まず，BPM値を各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．\par
+
+次に，drawDigit関数について説明する．この関数は，表\ref{tab:func1}に示すように，一桁の数字をフレームバッファに描画をし，引数としては描画する数字とフレームバッファ上の
+横方向開始位置を取る．まず，引数の数字が0から9の範囲内であるかを確認する．次に，縦方向の中央寄せオフセットを算出して配置する．その後，独自フォント配列から該当する数字のドットパターンを
+1ドットずつ読み取り，フレームバッファの指定位置に書き込む．
+
+最後に，clearDisplay関数について説明する．この関数は，表\ref{tab:func1}に示すように，LEDMatrixを全消灯させる処理を行い，引数や返り値はない．
+BPM値を初期値にリセットし，全消灯フレームをmatrix.loadFrame()で描画して表示のリセットを行う．\par
+    
+\begin{table}[h]
+    \vspace{-1em}
+    \caption{主要な処理を行う関数一覧}
+    \centering
+    \label{tab:func1}
+    \begin{tabular}{llll}
+    \hline
+    \textbf{関数名} & \textbf{概要} & \textbf{引数} & \textbf{返り値}\\
+    \hline
+    displaySetup & LEDマトリクスの初期化 & なし & なし\\
+    \hline
+    checkUDP & UDPパケットの確認，BPM更新・消灯処理 & なし & なし\\
+    \hline
+    displayBPM & BPM数値をLEDマトリクスに描画 & int bpm & なし\\
+    \hline
+    drawDigit & 1桁の数字をフレームバッファに描画 & int digit, int x\_offset & なし\\
+    \hline
+    clearDisplay & LEDマトリクスを全消灯 & なし & なし\\
+    \hline
+    \end{tabular}
+\end{table}
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% Display
+
+\subsection{Display.h}
+\begin{lstlisting}
+#ifndef DISPLAY_H
+#define DISPLAY_H
+
+#include <Arduino.h>
+#include "Arduino_LED_Matrix.h"  // Arduino UNO R4 WiFi 内蔵LEDマトリクス用ライブラリ
+#include <WiFiS3.h> //UDP通信
+
+// BPM定数定義
+#define BPM_STEP_1  60
+#define BPM_STEP_2  90
+#define BPM_STEP_3  120
+#define BPM_STEP_4  150
+#define BPM_STEP_5  180
+
+// 通信定数
+#define LOCAL_PORT     2390   // UDP受信に利用するポート番号
+#define HEADER_BPM     'B'    // BPMデータ受信の識別ヘッダ
+#define HEADER_END     'E'    // 演奏終了の識別ヘッダ（LEDマトリクス消灯）
+
+// 文字フォントの寸法
+#define FONT_WIDTH   3   // 1文字の横ドット数
+#define FONT_HEIGHT  5   // 1文字の縦ドット数
+
+// LEDマトリクスの寸法（Arduino UNO R4 WiFi 内蔵：8行×12列）
+#define MATRIX_ROWS  8
+#define MATRIX_COLS  12
+
+// 関数宣言
+
+// LEDマトリクスの初期化（matrix.begin()を本関数経由で呼ぶ。
+void displaySetup();
+
+// 中継機からのUDPパケット確認，BPM値の受信処理
+void checkUDP();
+
+// 受信したBPM値をLEDマトリクスに数値表示する（引数：int bpm）
+void displayBPM(int bpm);
+
+// LEDマトリクスを全消灯する（演奏終了時に使用）
+void clearDisplay();
+
+// 指定された1桁の数字を，共有フレームバッファの x_offset 列から描画する
+void drawDigit(int digit, int x_offset);
+
+// 外部参照
+
+// 3×5（横3×縦5）の独自数字フォント（0〜9）
+extern const uint8_t font3x5[10][15];
+
+// LEDマトリクスインスタンス（Display.cpp で定義，.ino の setup() で begin() を呼ぶ）
+extern ArduinoLEDMatrix matrix;
+
+// UDP通信オブジェクト
+extern WiFiUDP Udp;
+
+#endif
+\end{lstlisting}
+
+\subsection{Display.ino}
+\begin{lstlisting}
+#include "Display.h"
+
+WiFiUDP Udp;
+
+const char SSID[] = "hackathon001-WPA2";
+const char PASS[] = "hackathon001";
+
+// 静的IP設定（指揮デバイスの送信先 ferrisWheelIP2 と一致）
+IPAddress localIP(192, 168, 11, 10);
+IPAddress gateway(192, 168, 11, 1);
+IPAddress subnet(255, 255, 255, 0);
+
+void setup() {
+  displaySetup();
+
+  if (SSID[0] != '\0') {
+    WiFi.config(localIP, gateway, subnet);
+    while (WiFi.begin(SSID, PASS) != WL_CONNECTED) {
+      delay(1000);
+    }
+  }
+  Udp.begin(LOCAL_PORT);
+}
+
+void loop() {
+  checkUDP();
+}
+\end{lstlisting}
+
+\subsection{Display.cpp}
+\begin{lstlisting}
+#include "Display.h"
+#include "Arduino_LED_Matrix.h"
+
+// 独自フォント定義
+// font3x5[digit][row*FONT_WIDTH + col] : 1=点灯, 0=消灯
+
+const uint8_t font3x5[10][15] = {
+  // 0
+  {1, 1, 1,
+   1, 0, 1,
+   1, 0, 1,
+   1, 0, 1,
+   1, 1, 1},
+  // 1
+  {0, 1, 0,
+   1, 1, 0,
+   0, 1, 0,
+   0, 1, 0,
+   1, 1, 1},
+  // 2
+  {1, 1, 1,
+   0, 0, 1,
+   1, 1, 1,
+   1, 0, 0,
+   1, 1, 1},
+  // 3
+  {1, 1, 1,
+   0, 0, 1,
+   0, 1, 1,
+   0, 0, 1,
+   1, 1, 1},
+  // 4
+  {1, 0, 1,
+   1, 0, 1,
+   1, 1, 1,
+   0, 0, 1,
+   0, 0, 1},
+  // 5
+  {1, 1, 1,
+   1, 0, 0,
+   1, 1, 1,
+   0, 0, 1,
+   1, 1, 1},
+  // 6
+  {1, 1, 1,
+   1, 0, 0,
+   1, 1, 1,
+   1, 0, 1,
+   1, 1, 1},
+  // 7
+  {1, 1, 1,
+   0, 0, 1,
+   0, 0, 1,
+   0, 0, 1,
+   0, 0, 1},
+  // 8
+  {1, 1, 1,
+   1, 0, 1,
+   1, 1, 1,
+   1, 0, 1,
+   1, 1, 1},
+  // 9
+  {1, 1, 1,
+   1, 0, 1,
+   1, 1, 1,
+   0, 0, 1,
+   1, 1, 1}
+};
+
+// bpmTable[stage-1] で対応するBPMを得る
+static const int bpmTable[5] = {
+  BPM_STEP_1,  //  60
+  BPM_STEP_2,  //  90
+  BPM_STEP_3,  //  120
+  BPM_STEP_4,  //  150
+  BPM_STEP_5   //  180
+};
+
+// LEDマトリクスのインスタンス（8行×12列）
+ArduinoLEDMatrix matrix;
+
+// displaySetup（LEDマトリクスの初期化）
+// Arduino_LED_Matrix の表示バッファ(framebuffer)はヘッダ内で static 定義
+// されており，include する翻訳単位(.ino / .cpp)ごとに別実体となる．そのため
+// 表示を駆動する割り込みを登録する begin() と，描画を行う loadFrame() は
+// 必ず同一ファイル(本 Display.cpp)から呼び出し，同じ framebuffer を共有させる．
+// .ino からは matrix を直接触らず，本関数と displayBPM() を呼ぶ
+
+void displaySetup() {
+  matrix.begin();
+
+  // begin() 直後の最初の loadFrame は反映されない場合があるため，
+  // 消灯フレームを一度描画(ウォームアップ)してから安定するまで待機する．
+  uint32_t warmUp[3] = {0, 0, 0};
+  matrix.loadFrame(warmUp);
+  delay(200);
+}
+
+// 描画用共有フレームバッファ（MATRIX_ROWS行 × MATRIX_COLS列，1=点灯 / 0=消灯）
+// drawDigit() がここに書き込み，displayBPM() がまとめてレンダリングする
+static uint8_t frameBuffer[MATRIX_ROWS][MATRIX_COLS];
+
+// 直近に表示中のBPM値（更新検知用：値が変化した時だけ再描画する）
+static int currentBPM = -1;
+
+// checkUDP
+// buffer[0]はヘッダ('B'とか)
+// buffer[1]は段階番号
+
+void checkUDP() {
+  int packetSize = Udp.parsePacket();
+  if (packetSize <= 0) return;
+
+  uint8_t buffer[2] = {0};
+  int len = Udp.read(buffer, sizeof(buffer));
+  if (len < 2) return;
+
+  char header = (char)buffer[0];
+  uint8_t stage = buffer[1];
+
+  if (header == HEADER_END) {
+    clearDisplay();
+    return;
+  }
+
+  if (header != HEADER_BPM) return;
+  if (stage < 1 || stage > 5) return;
+
+  int bpm = bpmTable[stage - 1];
+
+  if (bpm != currentBPM) {
+    currentBPM = bpm;
+    displayBPM(bpm);
+  }
+}
+
+// displayBPM
+
+void displayBPM(int bpm) {
+  // フレームバッファをすべて消灯にリセット
+  memset(frameBuffer, 0, sizeof(frameBuffer));
+
+  // BPM値を桁配列に分解
+  int digits[3];   // 最大3桁分
+  int numDigits;
+
+  if (bpm >= 100) {
+    numDigits = 3;
+    digits[0] = bpm / 100;         // 百の位
+    digits[1] = (bpm / 10) % 10;  // 十の位
+    digits[2] = bpm % 10;          // 一の位
+  } else if (bpm >= 10) {
+    numDigits = 2;
+    digits[0] = bpm / 10;          // 十の位
+    digits[1] = bpm % 10;          // 一の位
+  } else {
+    numDigits = 1;
+    digits[0] = bpm;               // 一の位のみ
+  }
+
+  // 横方向中央寄せの計算
+  // 各桁は幅FONT_WIDTH(3)，桁間スペース1px → 合計幅 = numDigits*3 + (numDigits-1)*1
+  int totalWidth = numDigits * FONT_WIDTH + (numDigits - 1) * 1;
+  int startX = (MATRIX_COLS - totalWidth) / 2;  // 12列に対する左端オフセット
+
+  // 各桁をフレームバッファに描画（桁ピッチ = 3px + 1px間隔 = 4px）
+  for (int i = 0; i < numDigits; i++) {
+    drawDigit(digits[i], startX + i * (FONT_WIDTH + 1));
+  }
+
+  // フレームバッファ(8×12=96ドット)を uint32_t[3] 形式へパックする．
+  // ドット番号 n = row*12 + col（0〜95）を，MSB側から順に詰める
+  // （Arduino_LED_Matrix の loadFrame が要求するビット配置）．
+  uint32_t bitmap[3] = {0, 0, 0};
+  for (int row = 0; row < MATRIX_ROWS; row++) {
+    for (int col = 0; col < MATRIX_COLS; col++) {
+      if (frameBuffer[row][col]) {
+        int n = row * MATRIX_COLS + col;
+        bitmap[n / 32] |= (1UL << (31 - (n % 32)));
+      }
+    }
+  }
+
+  // LEDマトリクスへ描画
+  matrix.loadFrame(bitmap);
+}
+
+// drawDigit
+// 引数 digit    : 描画する数字（0〜9）
+//      x_offset : フレームバッファ上の描画開始列（0〜11）
+//   font3x5[digit] の 横3×縦5 ビットマップを，frameBuffer の
+//   (y_offset〜, x_offset〜) 領域に書き込む．
+//   縦方向は (MATRIX_ROWS - FONT_HEIGHT)/2 行のオフセットで上下中央寄せ．
+
+void drawDigit(int digit, int x_offset) {
+  // 範囲外の数字は無視
+  if (digit < 0 || digit > 9) return;
+
+  // 縦方向中央寄せオフセット：8行に5行フォントを配置 → (8-5)/2 = 1行余白
+  const int y_offset = (MATRIX_ROWS - FONT_HEIGHT) / 2;
+
+  for (int y = 0; y < FONT_HEIGHT; y++) {       // 縦5ドット
+    for (int x = 0; x < FONT_WIDTH; x++) {      // 横3ドット
+      int col = x_offset + x;
+      int row = y_offset + y;
+      // バッファ境界チェック（端に近い場合の範囲外アクセス防止）
+      if (col >= 0 && col < MATRIX_COLS && row >= 0 && row < MATRIX_ROWS) {
+        frameBuffer[row][col] = font3x5[digit][y * FONT_WIDTH + x];
+      }
+    }
+  }
+}
+
+//追加　'E'を受信したら全消灯，currentBPMをリセット
+void clearDisplay() {
+  currentBPM = -1;
+  uint32_t blank[3] = {0, 0, 0};
+  matrix.loadFrame(blank);
+}
+\end{lstlisting}
+
+
+
+    
+
+
+
+
+
