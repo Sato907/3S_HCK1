@@ -1,4 +1,5 @@
 import csv
+import os
 import numpy as np
 from scipy import stats
 import matplotlib
@@ -10,8 +11,10 @@ matplotlib.rcParams['font.family'] = 'Hiragino Sans'
 # チーム40 Shapiro-Wilk正規性検定
 # ============================================================
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # --- データ読み込み ---
-with open('team40_抽出.csv', encoding='utf-8-sig') as f:
+with open(os.path.join(SCRIPT_DIR, 'team40_抽出.csv'), encoding='utf-8-sig') as f:
     r = csv.reader(f)
     rows = list(r)
 
@@ -119,6 +122,6 @@ for i, (label, vals) in enumerate(col_values.items()):
 
 plt.suptitle('チーム40 Q-Qプロット（正規確率プロット）', fontsize=16)
 plt.tight_layout(rect=[0, 0, 1, 0.95])
-plt.savefig('team40_QQプロット.png', dpi=150)
+plt.savefig(os.path.join(SCRIPT_DIR, 'team40_QQプロット.png'), dpi=150)
 plt.show()
 print("\n[Q-Qプロット画像を保存しました]")
