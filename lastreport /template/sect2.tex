@@ -9,7 +9,7 @@
 \begin{figure}[h]
     \centering
      \centering
-    \includegraphics[width=15cm]{./figs/zentai.png}
+    \includegraphics[width=\textwidth]{./figs/zentai.png}
     \caption{全体の構成図}
     \label{zentai}
 \end{figure}
@@ -19,11 +19,12 @@
 \subsection{指揮デバイス}
 \subsubsection{概要}
 まず，指揮デバイスについて説明する．指揮デバイスのシステム構成図を図\ref{fig:sys_siki}に示す．本デバイスは，演奏全体を統括するデバイスであり，主に以下の３つの機能を有する．
-第一の機能は，演奏開始トリガーの送信である．ユーザが指揮デバイスに搭載されたタクトスイッチを押下すると，中継機デバイスと楽器デバイスへ演奏開始トリガーを送信する．さらに，中継機デバイスの回転が開始される．
 
-第二の機能は，楽曲のBPM変更である．ユーザがスライド式可変抵抗器を操作した後，デバイスを振ると新しい設定BPM情報が中継機デバイスへ送信される．これにより，中継機デバイスのモータ回転速度がこの値に追従して変化する．そして，その回転に伴うレーザーの通過光を介して各楽器デバイスに情報が伝達され，BPMの変更される．また，楽曲のBPMは5段階に分けて変更できる．
+第一の機能は，演奏開始トリガーの送信である．本機能の設計について図\ref{fig:inta_kaisi}に示す．ユーザが指揮デバイスに搭載されたタクトスイッチを押下すると，中継機デバイスと楽器デバイスへ演奏開始トリガーを送信する．さらに，中継機デバイスの回転が開始される．
 
-第三の機能は，楽曲の音量変更である．ユーザがスライド式可変抵抗器を操作した後，デバイスを振ると音量情報が各楽器デバイスへマルチキャスト送信されることで，音量が変更される．また，BPMと同様に音量も5段階に分けて変更できる．ここからは，外部設計と内部設計について説明をする．
+第二の機能は，楽曲のBPM変更である．本機能の設計について図\ref{fig:inta_siki}に示す．ユーザがスライド式可変抵抗器を操作した後，デバイスを振ると新しい設定BPM情報が中継機デバイスへ送信される．これにより，中継機デバイスのモータ回転速度がこの値に追従して変化する．そして，その回転に伴うレーザーの通過光を介して各楽器デバイスに情報が伝達され，BPMの変更される．また，楽曲のBPMは5段階に分けて変更できる．
+
+第三の機能は，楽曲の音量変更である．本機能の設計について図\ref{fig:inta_siki2}に示す．ユーザがスライド式可変抵抗器を操作した後，デバイスを振ると音量情報が各楽器デバイスへマルチキャスト送信されることで，音量が変更される．また，BPMと同様に音量も5段階に分けて変更できる．ここからは，外部設計と内部設計について説明をする．
 
 \begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
     \centering % 中央揃え
@@ -31,6 +32,29 @@
     \caption{指揮デバイスのシステム構成図} % 図の説明
     \label{fig:sys_siki} % 本文中で参照するためのラベル
 \end{figure}
+
+\begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
+    \centering % 中央揃え
+    \includegraphics[width=0.8\columnwidth]{figs/kaisi_inta2_cropped.pdf} % 余白をpdfcropでトリミング済み
+    \caption{演奏開始トリガー送信機能設計} % 図の説明
+    \label{fig:inta_kaisi} % 本文中で参照するためのラベル
+\end{figure}
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+    \centering % 中央揃え
+    \includegraphics[width=0.8\columnwidth]{figs/siki_inta2_cropped.pdf} % 余白をpdfcropでトリミング済み
+    \caption{BPM変更機能設計} % 図の説明
+    \label{fig:inta_siki} % 本文中で参照するためのラベル
+\end{figure}
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+    \centering % 中央揃え
+    \includegraphics[width=0.8\columnwidth]{figs/siki_inta3_cropped.pdf} % 余白をpdfcropでトリミング済み
+    \caption{音量変更機能設計} % 図の説明
+    \label{fig:inta_siki2} % 本文中で参照するためのラベル
+\end{figure}
+
+
 
 
 
@@ -103,6 +127,7 @@
 \subsection{中継機デバイス}
 \subsubsection{概要}
 次に，中継機デバイスについて説明する．中継機デバイスの構成図を図\ref{kan}に示す．本デバイスは，指揮デバイスからの情報を受け取り中継機デバイスの回転を作動させ，現在のBPMを表示するデバイスであり，主に以下の2つの機能を有する．
+
 第一の機能は，上記で述べたBPMに合わせて回転し楽曲のBPMを制御する機能である．デバイスに設置してあるレーザー受光のテンポでBPMを管理し，楽曲のテンポを視覚的にも理解できるようにする．
 
 第二の機能は，Arduino Uno R4 WiFiに付属しているLEDMatrixにBPMを表示する機能である．ここに指揮デバイスから受け取ったBPMを表示し，視覚的に現在流れている楽曲のBPMを理解できるようにする．
@@ -119,6 +144,175 @@
 \end{figure}
 
 \subsubsection{外部設計}
+本節では中継機デバイスの外部設計について説明する．まず，本デバイスを構成する部分について表\ref{kizai}に示す．この内，個別で購入する必要があるものはハイパワーギヤーボックス，
+ブレッドボード用DCジャックDIP化キット，ボタン電池，ボタン電池ホルダー，QIケーブル，有極コンデンサーである．
+%%もうすこし書きたいよね
+
+
+\begin{table}[h]
+    \caption{中継機デバイスを構成する部品}
+    \centering
+    \label{kizai}
+    \begin{tabular}{p{6cm}p{4cm}l}\hline
+    機材&品番&個数[個]\\ \hline
+    Arduino Uno R4 WiFi&-& 1\\ \hline
+    ルーター& -& 1\\ \hline
+    ブレッドボード & -&1\\ \hline
+    赤色ドットレーザーモジュール & FU650AD5-C6&8\\ \hline
+    ボタン電池基板取付用ホルダー(CR2477用) & CH031-2477LF & 4 \\ \hline
+    ボタン電池 & CR2477 & 4\\ \hline
+    スライドスイッチ & SS-12D00-G5 & 4 \\ \hline
+    % 9Vアルカリ電池 &-& 1\\ \hline
+    モータードライバーモジュール &AE-DRV8835-S& 1\\ \hline
+    ハイパワーギヤーボックス HE &72003& 1\\ \hline
+    ジャンパーワイヤー &-& 適宜\\ \hline
+    ブレッドボード用2.1mm標準DCジャックDIP化キット&AE-DC-POWER-JACK-DIP & 1 \\\hline
+    超小型スイッチングACアダプター 5 V 1 A &-& 1\\ \hline
+    QIケーブル2P-1Px2 &311-262&1\\ \hline
+    抵抗器 10 $\Omega$ &- &1\\ \hline
+    % 抵抗器 150 Ω &-& 8\\ \hline
+    コンデンサー 0.01 $\mu$F&-&  1\\ \hline
+    コンデンサー 0.047 $\mu$F& -& 1\\ \hline
+    有極性コンデンサー 100 $\mu$F &-&  1\\ \hline
+    \end{tabular}
+\end{table}
+
+また，中継機の回路図を図\ref{metro}に示す．モータードライバーにArduino D5，D6ピンを接続し，PWM制御を行えるようにする．
+モータードライバーへの電力供給は当初，外部電源として$\SI{9}{V}$のアルカリ電池を検討していたが， Arduinoの$\SI{5}{V}$からの電力供給とDCジャックからのACアダプター$\SI{5}{V}$$\SI{1}{A}$による外部給電により，アルカリ電池が不要であることが実装時に確認されたため除外した．
+また，モータードライバー及びDCジャックはピンヘッダーのはんだ付けを行う．加えて，ギアボックスは0.01 $\mu$Fのコンデンサーと直接はんだ付けを行う．
+
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=\textwidth]{./figs/kairo.png}
+    \caption{観覧車型中継機デバイス回路図}
+    \label{metro}
+\end{figure}
+
+次に，観覧車の設計について説明する．作成するために，3Dプリンタを用いて作成する．実際に設計に使用するモデルデータを図\ref{kanran1}から図\ref{kanran6}に示している．
+観覧車の直径は約16cmとし，ボタン電池付きレーザーを45度間隔で配置する．そして，観覧車を支える左右の支柱および土台を設計する．
+観覧車本体は，以下のパーツに分割して設計を行う．
+\begin{itemize}
+
+    \item 土台 \
+    観覧車全体を支える部分であり，
+    内部を空洞化させる．
+    また，支柱を土台に差し込み，固定する役割も持つ．
+    実際に設計する部品は図\ref{kanran1}の通りである．
+
+    \item 支柱 \
+    観覧車の回転軸を左右から支える部品である．
+    回転軸を安定して保持し，
+    観覧車が滑らかに回転できるようにする．
+    回転軸を上から挿入する形であり，
+    軸が折れないようギアボックスモータに繋ぐ側の支柱の支える穴を大きくしている．
+    実際に設計する部品は図\ref{kanran2}の通りである．
+
+    \item 回転軸 \
+    ギヤボックスモータの回転を観覧車本体へ伝達する部品である．
+    モータと接続し，観覧車全体を回転させる役割を持つ．
+    支柱に固定できるよう，支柱の位置の軸部をへこませて固定できるようにしている．
+    実際に設計する部品は図\ref{kanran3}の通りである．
+
+    \item 回転リング \
+    観覧車の円形部分であり，レーザー側とその反対側で2個作成する．
+    モータによって回転し，レーザーによる光信号送信を行う部分でもある．
+    角度45度おきにレーザーを設置する穴を用意し，そこにレーザーをはめ込み固定する．
+    もう一つの円盤に電池基板を設置し電力供給する．
+    実際に設計する部品は図\ref{kanran4}，\ref{kanran5}の通りである．
+
+    \item 受光部 \
+    レーザーの延長線上に設置する照度センサーの受光部である．
+    回転リングから平行な位置に円盤を設置し，中央にギアボックスモータを設置する台を設ける．
+    90度おきに円盤にくぼみを作り，センサーを設置できるようにした．
+    受光部の円盤によりレーザー光が後ろに漏れないという設計となっている．
+    実際に設計する部品は図\ref{kanran6}の通りである．
+\end{itemize}
+
+
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_base.png}
+    \caption{設計に使用するモデルデータ(土台部)}
+    \label{kanran1}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_pillar.png}
+    \caption{設計に使用するモデルデータ(支柱部)}
+    \label{kanran2}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_shaft.png}
+    \caption{設計に使用するモデルデータ(回転軸部)}
+    \label{kanran3}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_circle1.png}
+    \caption{設計に使用するモデルデータ(回転リング部1)}
+    \label{kanran4}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_circle2.png}
+    \caption{設計に使用するモデルデータ(回転リング部2)}
+    \label{kanran5}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \centering
+    \includegraphics[width=5cm]{./figs/model_pointer.png}
+    \caption{設計に使用するモデルデータ(受光部)}
+    \label{kanran6}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+図〜〜〜〜に実際に作成した中継機デバイスを示す．
+
+
+
+%%%軸のくぼみ，おもりの電池，アロンアルファ，ティッシュ，タピオカ発泡スチロール　受光の検知を高めるための工夫
+
+
+
+\subsubsection{内部設計}
+本節では中継機デバイスの内部設計について説明する．主に回転速度同期機構とLEDMatrix表示機構のプログラムについて説明する．
+
+\paragraph{回転速度同期機構の設計}
+
+まず，モータ制御の原理とBPMの変換について説明する．本デバイスのギアボックスモータの回転速度を制御するために，ArduinoのPWM(パルス幅変調)機能を用いてモータの平均印加電圧を制御する．
+PWMとは，デジタル出力ピンから出力される短形波のHIGH状態とLOW状態の時間比率(デューティー比)を変化させることで，擬似的にアナログ電圧を生成する制御方式である．Arduinoのデジタル出力ピンは$\SI{5}{V}$のHIGHか$\SI{0}{V}$のLOWのいずれかしか出力できないが，HIGHとLOWを高速に切り替えてデューティー比を調整することで，負荷に対して見かけ上の連続的な電圧を印加することが可能となる．
+
+本デバイスは，ArduinoのD5およびD6ピンをモータドライバーモジュールに接続し，PWM制御を行う構成としている．ArduinoのanalogWrite関数は，引数として0から255の整数値を受け取り，この値に応じたデューティー比の短形波を出力する．このとき引数が0のときデューティー比は常時LOWであり，255のときデューティー比は常時HIGHとなる．中間値では，引数に比例したデューティー比の短形波が生成される．
+この関係を式で表すと，供給電圧を $V_{cc}$（定数 \texttt{VCC}），プログラム上の出力値を $pwmValue$ とすると，モータに加わる平均電圧 $V_{average}$ は(\ref{eq:average})式で決定される．
+
+\begin{equation}
+    \label{eq:average}
+    V_{average} = V_{cc} \times \frac{pwmValue}{255}
+\end{equation}
+
+
+
+
+
 
 
 

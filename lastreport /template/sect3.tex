@@ -24,35 +24,6 @@
 %     \end{tabular}
 % \end{table}
 
-中継機デバイスで使用する部分を表\ref{kizai}にまとめる．この内，個別で購入する必要があるものはハイパワーギヤーボックス，
-ブレッドボード用DCジャックDIP化キット，ボタン電池，ボタン電池ホルダー，QIケーブル，有極コンデンサーである．
-\begin{table}[h]
-    \caption{中継機デバイスに必要な機材}
-    \centering
-    \label{kizai}
-    \begin{tabular}{p{6cm}p{4cm}l}\hline
-    機材&品番&個数[個]\\ \hline
-    Arduino Uno R4 WiFi&-& 1\\ \hline
-    ルーター& -& 1\\ \hline
-    ブレッドボード & -&1\\ \hline
-    赤色ドットレーザーモジュール & FU650AD5-C6&8\\ \hline
-    ボタン電池基板取付用ホルダー(CR2477用) & CH031-2477LF & 4 \\ \hline
-    ボタン電池 & CR2477 & 4\\ \hline
-    スライドスイッチ & SS-12D00-G5 & 4 \\ \hline
-    % 9Vアルカリ電池 &-& 1\\ \hline
-    モータードライバーモジュール &AE-DRV8835-S& 1\\ \hline
-    ハイパワーギヤーボックス HE &72003& 1\\ \hline
-    ジャンパーワイヤー &-& 適宜\\ \hline
-    ブレッドボード用2.1mm標準DCジャックDIP化キット&AE-DC-POWER-JACK-DIP & 1 \\\hline
-    超小型スイッチングACアダプター 5 V 1 A &-& 1\\ \hline
-    QIケーブル2P-1Px2 &311-262&1\\ \hline
-    抵抗器 10 $\Omega$ &- &1\\ \hline
-    % 抵抗器 150 Ω &-& 8\\ \hline
-    コンデンサー 0.01 $\mu$F&-&  1\\ \hline
-    コンデンサー 0.047 $\mu$F& -& 1\\ \hline
-    有極性コンデンサー 100 $\mu$F &-&  1\\ \hline
-    \end{tabular}
-\end{table}
 
 
 次に，楽器デバイスが受光するための部品について表\ref{table:ota}に示す．
@@ -107,106 +78,12 @@ CdSセルにレーザー光が照射された際の出力をArduinoのアナロ�
 \FloatBarrier
 
 \subsection{観覧車型中継機デバイス}
-中継機の詳細設計について説明する．図\ref{metro}について，モータードライバーにArduino D5，D6ピンを接続し，PWM制御を行えるようにする．
-モータードライバーへの電力供給はArduinoの5Vからと，DCジャックからのACアダプター5 V 1 Aを用いる．
-モータードライバー及びDCジャックはピンヘッダーのはんだ付けが必要なため，はんだ付けを行う．
-ギアボックスは0.01 $\mu$Fのコンデンサーと直接はんだ付けを行う．
+% 中継機の詳細設計について説明する．図\ref{metro}について，モータードライバーにArduino D5，D6ピンを接続し，PWM制御を行えるようにする．
+% モータードライバーへの電力供給はArduinoの5Vからと，DCジャックからのACアダプター5 V 1 Aを用いる．
+% モータードライバー及びDCジャックはピンヘッダーのはんだ付けが必要なため，はんだ付けを行う．
+% ギアボックスは0.01 $\mu$Fのコンデンサーと直接はんだ付けを行う．
 
-次に，観覧車の設計について説明する．作成するために，3Dプリンタを用いて作成する．実際に設計に使用するモデルデータを図\ref{kanran1}から図\ref{kanran6}に示している．
-観覧車の直径は約16cmとし，ボタン電池付きレーザーを45度間隔で配置する．そして，観覧車を支える左右の支柱および土台を設計する．
-観覧車本体は，以下のパーツに分割して設計を行う．
-\begin{itemize}
 
-    \item 土台 \
-    観覧車全体を支える部分であり，
-    内部を空洞化させる．
-    また，支柱を土台に差し込み，固定する役割も持つ．
-    実際に設計する部品は図\ref{kanran1}の通りである．
-
-    \item 支柱 \
-    観覧車の回転軸を左右から支える部品である．
-    回転軸を安定して保持し，
-    観覧車が滑らかに回転できるようにする．
-    回転軸を上から挿入する形であり，
-    軸が折れないようギアボックスモータに繋ぐ側の支柱の支える穴を大きくしている．
-    実際に設計する部品は図\ref{kanran2}の通りである．
-
-    \item 回転軸 \
-    ギヤボックスモータの回転を観覧車本体へ伝達する部品である．
-    モータと接続し，観覧車全体を回転させる役割を持つ．
-    支柱に固定できるよう，支柱の位置の軸部をへこませて固定できるようにしている．
-    実際に設計する部品は図\ref{kanran3}の通りである．
-
-    \item 回転リング \
-    観覧車の円形部分であり，レーザー側とその反対側で2個作成する．
-    モータによって回転し，レーザーによる光信号送信を行う部分でもある．
-    角度45度おきにレーザーを設置する穴を用意し，そこにレーザーをはめ込み固定する．
-    もう一つの円盤に電池基板を設置し電力供給する．
-    実際に設計する部品は図\ref{kanran4}，\ref{kanran5}の通りである．
-
-    \item 受光部 \
-    レーザーの延長線上に設置する照度センサーの受光部である．
-    回転リングから平行な位置に円盤を設置し，中央にギアボックスモータを設置する台を設ける．
-    90度おきに円盤にくぼみを作り，センサーを設置できるようにした．
-    受光部の円盤によりレーザー光が後ろに漏れないという設計となっている．
-    実際に設計する部品は図\ref{kanran6}の通りである．
-\end{itemize}
-
-\begin{figure}[h]
-    \centering
-    \centering
-    \includegraphics[width=17cm]{./figs/kairo.png}
-    \caption{観覧車型中継機デバイス回路図}
-    \label{metro}
-\end{figure}
-
-\begin{figure}[h]
-    \centering
-    \centering
-    \includegraphics[width=5cm]{./figs/model_base.png}
-    \caption{設計に使用するモデルデータ(土台部)}
-    \label{kanran1}
-\end{figure}
-
-\begin{figure}[h]
-    \centering
-    \centering
-    \includegraphics[width=5cm]{./figs/model_pillar.png}
-    \caption{設計に使用するモデルデータ(支柱部)}
-    \label{kanran2}
-\end{figure}
-
-\begin{figure}[h]
-    \centering
-    \centering
-    \includegraphics[width=5cm]{./figs/model_shaft.png}
-    \caption{設計に使用するモデルデータ(回転軸部)}
-    \label{kanran3}
-\end{figure}
-
-\begin{figure}[h]
-    \centering
-    \centering
-    \includegraphics[width=5cm]{./figs/model_circle1.png}
-    \caption{設計に使用するモデルデータ(回転リング部1)}
-    \label{kanran4}
-\end{figure}
-
-\begin{figure}[h]
-    \centering
-    \centering
-    \includegraphics[width=5cm]{./figs/model_circle2.png}
-    \caption{設計に使用するモデルデータ(回転リング部2)}
-    \label{kanran5}
-\end{figure}
-
-\begin{figure}[h]
-    \centering
-    \centering
-    \includegraphics[width=5cm]{./figs/model_pointer.png}
-    \caption{設計に使用するモデルデータ(受光部)}
-    \label{kanran6}
-\end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%
@@ -239,7 +116,7 @@ CdSセルにレーザー光が照射された際の出力をArduinoのアナロ�
 
 \begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
         \centering % 中央揃え
-        \includegraphics[width=0.8\columnwidth]{figs/kairo_hikari.pdf} % 横幅を列幅の80%に指定
+        \includegraphics[width=0.8\columnwidth]{figs/kairo_hikari_cropped.pdf} % 余白をpdfcropでトリミング済み
         \caption{楽器デバイスの受光部の回路図} % 図の説明
         \label{fig:kairo_hikari} % 本文中で参照するためのラベル
 \end{figure}
