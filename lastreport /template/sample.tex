@@ -108,23 +108,7 @@
     \caption{計画時のスケジュール}
 	\label{gantt1}
 \end{figure}
-\section{プログラムソース}
-
-ソースの書き方のサンプルです．
-
-\begin{lstlisting}
-// 光センサによる居眠り検知システム（Doze-detection system using optical sensors）
-#define USE_ARDUINO_INTERRUPTS true
-#include <PulseSensorPlayground.h>
-const int SENSOR_A = 0;//環境光(部屋の明るさ)
-const int SENSOR_B = 1;//頭の動きを検知
-const int SENSOR_Pulse = 2;//心拍を検知
-const int IN1 = 10;//モータ
-const int IN2 = 9;//モータ
-const int check_range = 50;//センサーの値をチェックする範囲，つまり配列の大きさ 5秒間
-const int A_dif = 2;//光センサAの値が一定になったと判別する際に用いる変数
-const int Night_Mode_Value = 15;//夜モードになるための閾値
-const float Judgment_Value = 4;//居眠りと判定するための変数　通常は環境光/3が頭の影（自宅環境）
-\end{lstlisting}
+\input{apndx_siki}
+\input{apndx_display}
 
 \end{document}

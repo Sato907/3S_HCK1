@@ -103,8 +103,9 @@
 
 %%%%%%%%%ソフトウェア
 \subsubsection{内部設計}
+\label{sec:siki_naibu}
 本節では，指揮デバイスの内部設計について説明する．
-まず，指揮デバイスにおけるシーケンス図を図\ref{fig:jou_siki}に示す．
+まず，指揮デバイス全体の内部動作を明確にするため，シーケンス図を図\ref{fig:jou_siki}に示す．
 ユーザが指揮デバイスを上下に振ると加速度センサが動作を検知しArduinoに送信される．この時，値が閾値を超過した場合，
 観覧車デバイスと無線通信を開始し観覧車デバイスが送信した演奏情報を基に回転する．
 また，ボタンを押下した時，各楽器デバイスへ楽曲の初期BPMおよび音量情報が送信されることで演奏が開始される．
@@ -116,7 +117,449 @@
         \label{fig:jou_siki} % 本文中で参照するためのラベル
 \end{figure}
 
-%%あとは通信？？？へけ？？？
+次に，指揮デバイスの制御プログラムのファイル構成を示す．表\ref{table:siki_files}の通り，各ファイルは機能ごとにクラス化されている．
+
+\begin{table}[h]
+    \vspace{-1em}
+    \caption{指揮デバイスのファイル構成}
+    \centering
+    \label{table:siki_files}
+    \begin{tabular}{p{5cm}p{9cm}}
+    \hline
+    \textbf{ファイル名} & \textbf{概要}\\
+    \hline
+    Controller\_simultaneous.ino & setup/loopによる全体制御，ボタン入力の判定\\
+    \hline
+    AccManager.h / AccManager.cpp & 加速度センサ(ADXL345)の初期化，振り動作の検知，I2Cバス復旧処理\\
+    \hline
+    PotManager.h / PotManager.cpp & スライド式可変抵抗器2系統の移動平均処理およびBPM・音量段階の判定\\
+    \hline
+    SyncManager.h / SyncManager.cpp & Wi-Fi/UDP通信の初期化，各デバイスへの冗長送信処理\\
+    \hline
+    \end{tabular}
+\end{table}
+
+Controller\_simultaneous.inoのloop関数は，ボタン判定を行うbutton関数，可変抵抗器を処理するPotManager，加速度センサを処理するAccManagerを毎ループ順に呼び出す構成となっている．loop関数をコード\ref{lst:siki_loop}に示す．プログラム全文は付録に示す．
+
+\begin{lstlisting}[caption={Controller\_simultaneous.inoのloop関数}, label={lst:siki_loop}]
+void loop() {
+    button();
+    pot.update();
+    acc.update(sync, pot);
+}
+\end{lstlisting}
+
+ここからは，ボタン入力の判定，加速度センサの制御，可変抵抗器を用いたBPM・音量読み取り機能の順に，使用する変数・関数の仕様と処理内容について説明する．
+
+まず，指揮デバイスにおけるボタン入力の判定処理について説明する．ボタンの誤判定を防ぐため，プルアップ抵抗を用いた回路を構成しており，ボタンが押されていない状態ではデジタルピンに5 Vが印加され，押下時には回路がGNDに短絡されることでピンの電位がLOWへ遷移する．指揮デバイスのプログラムでは，このデジタルピンの電圧状態の変化を常時監視することでボタンの押下を判定する．さらに，チャタリングによる誤判定や冗長パケットによる誤作動を防止するため，押下検知後に一定時間の待機処理を設けるとともに，演奏状態管理フラグ（isButtonPlaying）を用いたトグル制御を導入している．これにより，同一の物理ボタンのみで演奏の開始と終了を交互に切り替えることが可能となる．ボタン入力の判定で使用する変数の仕様を表\ref{table:siki_button_var}に示す．
+
+\begin{table}[H]
+    \caption{ボタン入力の判定で使用する変数の仕様一覧}
+    \centering
+    \label{table:siki_button_var}
+    \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
+    \hline
+    \textbf{変数名} & \textbf{型} & \textbf{説明}\\
+    \hline
+    input\_PIN & const uint8\_t & ボタンの状態を読み取るデジタルピン番号を定義\\
+    \hline
+    switch\_status & bool & 現在読み取ったボタンピンの状態を格納\\
+    \hline
+    before\_switch\_status & bool & 前回読み取ったボタンピンの状態を格納（立下り検知に使用）\\
+    \hline
+    isButtonPlaying & bool & 演奏状態管理フラグ．トグル制御により演奏中(true)／停止中(false)を保持\\
+    \hline
+    \end{tabular}
+\end{table}
+
+続いて，ボタン入力の判定で使用する関数の仕様を表\ref{table:siki_button_func}に示す．
+
+\begin{table}[H]
+    \caption{ボタン入力の判定で使用する関数の仕様一覧}
+    \centering
+    \label{table:siki_button_func}
+    \begin{tabular}{p{3.5cm}p{10.5cm}}
+    \hline
+    \textbf{関数名} & \textbf{説明}\\
+    \hline
+    button() & input\_PINの立下り（switch\_statusが0かつbefore\_switch\_statusが1）を検知するとisButtonPlayingをトグルし，開始時は現在のBPM段階番号を付与してSyncManagerのsendStart関数を，終了時はsendEnd関数を呼び出すことで，各楽器機・観覧車デバイスへ演奏開始・終了信号を送信する．送信後は300 msの待機によりチャタリングを防止する．\\
+    \hline
+    \end{tabular}
+\end{table}
+
+button関数はこの1関数のみで構成されるため，以下では処理の流れに沿って実際のコードを2箇所に分けて説明する．まず，立下りエッジの検知部分について説明する．switch\_statusに現在のピン状態を読み込み，前回値before\_switch\_statusと比較することで，HIGH→LOWへ変化した瞬間（ボタンが押された瞬間）のみを検知する．該当部分をコード\ref{lst:btn_edge}に示す．
+
+\begin{lstlisting}[caption={button関数（立下りエッジの検知部分）}, label={lst:btn_edge}]
+    switch_status = digitalRead(input_PIN);
+    if (switch_status == 0 && before_switch_status == 1) {
+        ...
+    }
+    before_switch_status = switch_status;
+\end{lstlisting}
+
+次に，立下りを検知した際の状態トグルと送信処理について説明する．isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出して演奏を終了し，false（停止中）であれば現在のBPM段階（pot.getBpmStep()）を引数としてsync.sendStart()を呼び出して演奏を開始する．いずれの場合もisButtonPlayingの値を反転させたうえで，delay(300)により300 ms待機することでチャタリングを防止する．該当部分をコード\ref{lst:btn_send}に示す．
+
+\begin{lstlisting}[caption={button関数（状態トグルと送信処理部分）}, label={lst:btn_send}]
+    if (isButtonPlaying) {
+        sync.sendEnd();
+        isButtonPlaying = false;
+    } else {
+        uint8_t step = pot.getBpmStep();
+        sync.sendStart(step);
+        isButtonPlaying = true;
+    }
+    delay(300); // チャタリング防止
+\end{lstlisting}
+
+なお，sendStart・sendEndの内部では，SyncManagerクラスが複数台のデバイスへラウンドロビン方式による冗長送信を行っている．この通信処理の詳細な実装は付録に示すプログラム全文を参照されたい．
+
+次に，指揮デバイスにおける加速度センサの制御処理について説明する．指揮デバイスは，加速度センサを用いてユーザが指揮棒を振ったことを検知し，演奏情報の更新を行う．センサ値の急激な変化を読み取ることで動作を判定し，誤検知防止機能を設けることで安定した動作を実現している．処理の流れは，差分算出と判定，多重検知の防止，状態の反転，事後処理の4段階に大別される．まず差分算出と判定では，現在の合成加速度currentAccValと前回値lastAccValとの差の絶対値を求める．この差分が検知閾値accThresholdを超過し，かつ前回検知からshakeInterval以上の時間が経過している場合に，指揮棒を振ったと判定する．多重検知の防止では，一度振る動作を検知するとlastDetectTimeを現在時刻に更新し，以降shakeIntervalが経過するまでは加速度の変化を無視することで，一連の動作による複数回の誤検知を防止する．状態の反転では，振る動作を検知するたびにisStartedのbool値を反転させる．事後処理として，次回の判定に備えてcurrentAccValの値をlastAccValへ代入し，前回のサンプリング時刻を更新する．また，振る動作の確定時には，可変抵抗器側で設定値の変更を検知したフラグbpmFragまたはvolFrag（\ref{sec:pot_detail}項で説明する）が有効になっている場合，SyncManagerクラスを介してその情報の送信指示を行う．さらに，I2C通信の異常を検知した場合には自動復旧を行う機能を備えている．加速度センサの制御で使用する変数の仕様を表\ref{table:siki_acc_var}に示す．
+
+\begin{table}[H]
+    \caption{加速度センサの制御で使用する変数の仕様一覧}
+    \centering
+    \label{table:siki_acc_var}
+    \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
+    \hline
+    \textbf{変数名} & \textbf{型} & \textbf{説明}\\
+    \hline
+    currentAccVal & float & 加速度センサから算出した合成加速度の値を格納\\
+    \hline
+    lastAccVal & float & 変化量算出のための直前の加速度センサ値を格納\\
+    \hline
+    accThreshold & const float & 振ったと判断するための変化量の閾値を定義\\
+    \hline
+    lastDetectTime & unsigned long & 前回振ったことを検知した時間をms単位で格納\\
+    \hline
+    shakeInterval & const unsigned long & 連続検知を防止するための待機時間を定義\\
+    \hline
+    lastSampleTime & unsigned long & 前回センサ値をサンプリングした時間をms単位で格納\\
+    \hline
+    ACC\_SAMPLE\_INTERVAL & const unsigned long & 加速度センサ値をサンプリングする周期を定義\\
+    \hline
+    isStarted & bool & 楽器の演奏状態を保持(true: 演奏中/false: 停止中)\\
+    \hline
+    ADXL345\_ADDR & const uint8\_t & 加速度センサ(ADXL345)のI2Cアドレスを定義\\
+    \hline
+    REG\_POWER\_CTL & const uint8\_t & 加速度センサの電源管理レジスタのアドレスを定義\\
+    \hline
+    REG\_DATA\_FORMAT & const uint8\_t & 測定範囲設定用レジスタのアドレスを定義\\
+    \hline
+    REG\_DATAX0 & const uint8\_t & 測定値が格納される先頭レジスタのアドレスを定義\\
+    \hline
+    lastRecoverMs & unsigned long & I2C復旧処理の連続実行を防ぐための最終復旧時刻を保持\\
+    \hline
+    \end{tabular}
+\end{table}
+
+続いて，加速度センサ制御（AccManagerクラス）で使用する関数の仕様を表\ref{table:siki_acc_func}に示す．
+
+\begin{table}[H]
+    \caption{加速度センサ制御（AccManagerクラス）で使用する関数の仕様一覧}
+    \centering
+    \label{table:siki_acc_func}
+    \begin{tabular}{p{4.5cm}p{9.5cm}}
+    \hline
+    \textbf{関数名} & \textbf{説明}\\
+    \hline
+    setupADXL345() & ADXL345の電源投入と測定レンジの設定を行い，初期の加速度値をlastAccValに格納する初期化関数\\
+    \hline
+    readAccMagnitude() & ADXL345からX/Y/Z軸の生の値を取得し，2乗和の平方根を返す．I2C通信異常を検知した場合は直前の加速度値を返す\\
+    \hline
+    recoverI2C() & I2Cバスのロックアップ異常を検出した場合に，SCL線のクロッキングによるバスクリアとSTOP条件の生成，Wireおよびセンサの再初期化によって通信を復旧する\\
+    \hline
+    update(sync, pot) & ACC\_SAMPLE\_INTERVALごとに加速度値を取得し，差分算出・多重検知防止判定・状態の反転・事後処理までの一連の振る動作検知処理を行う．loop内で毎回呼び出す\\
+    \hline
+    updateShakedInfo(sync, pot) & 振る動作の確定時に呼び出され，PotManagerのbpmFrag／volFragが立っている場合にSyncManager経由でBPM・音量の段階番号を送信する\\
+    \hline
+    \end{tabular}
+\end{table}
+
+以下では，表\ref{table:siki_acc_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，setupADXL345関数について説明する．この関数は，Wire.beginによるI2C通信の開始後，ADXL345のPOWER\_CTLレジスタにMeasureビットを書き込むことでセンサを測定モードへ移行させ，DATA\_FORMATレジスタを初期値のまま設定する．setupADXL345関数をコード\ref{lst:acc_setup}に示す．
+
+\begin{lstlisting}[caption={AccManager::setupADXL345関数}, label={lst:acc_setup}]
+void AccManager::setupADXL345() {
+  Wire.begin();
+
+  Wire.beginTransmission(ADXL345_ADDR);
+  Wire.write(REG_POWER_CTL);
+  Wire.write(0x08); // Measure bit ON
+  Wire.endTransmission();
+
+  Wire.beginTransmission(ADXL345_ADDR);
+  Wire.write(REG_DATA_FORMAT);
+  Wire.write(0x00);
+  Wire.endTransmission();
+
+  lastAccVal = readAccMagnitude();
+}
+\end{lstlisting}
+
+次に，加速度の実測値を取得するreadAccMagnitude関数について説明する．この関数は，DATAX0レジスタから連続する6バイト（X, Y, Z軸それぞれ2バイトの符号付き整数）をrequestFromで読み出し，3軸のベクトル合成値（合成加速度）を平方根の計算により求めて返り値とする．readAccMagnitude関数をコード\ref{lst:acc_read}に示す．
+
+\begin{lstlisting}[caption={AccManager::readAccMagnitude関数}, label={lst:acc_read}]
+float AccManager::readAccMagnitude() {
+  Wire.beginTransmission(ADXL345_ADDR);
+  Wire.write(REG_DATAX0);
+  if (Wire.endTransmission(false) != 0) {
+    recoverI2C();
+    return lastAccVal;
+  }
+
+  uint8_t n = Wire.requestFrom(ADXL345_ADDR, (uint8_t)6, (uint8_t)true);
+  if (n < 6) {
+    recoverI2C();
+    return lastAccVal;
+  }
+
+  int16_t rawX = (int16_t)((Wire.read()) | (Wire.read() << 8));
+  int16_t rawY = (int16_t)((Wire.read()) | (Wire.read() << 8));
+  int16_t rawZ = (int16_t)((Wire.read()) | (Wire.read() << 8));
+
+  return sqrtf((float)rawX*rawX + (float)rawY*rawY + (float)rawZ*rawZ);
+}
+\end{lstlisting}
+
+ここで，Wire.endTransmission(false)がエラーを返した場合，またはrequestFromで6バイト読み出せなかった場合には，I2Cバスがロックアップ（スレーブがSDA線を握ったまま停止する現象）していると判断し，recoverI2C関数を呼び出したうえで前回値lastAccValを返すことで，誤ったシェイク検知（ニセshake）を防いでいる．続いて，recoverI2C関数について説明する．この関数は，SCL線を9回手動でトグルさせてSDA線の握りを解放したうえでSTOP条件を生成し，Wireを再初期化してADXL345を再設定することでバスを復旧させる．lastRecoverMsは，この復旧処理およびログ出力が短時間に連続して実行されることを防ぐスロットル用の時刻管理に用いられる．recoverI2C関数をコード\ref{lst:acc_recover}に示す．
+
+\begin{lstlisting}[caption={AccManager::recoverI2C関数}, label={lst:acc_recover}]
+void AccManager::recoverI2C() {
+  unsigned long now = millis();
+  if (now - lastRecoverMs >= 1000) {   // ログのスロットル
+    lastRecoverMs = now;
+  }
+
+  Wire.end();
+
+  // バスクリア: SCLを9クロック叩いて握られたSDAを解放
+  pinMode(SDA, INPUT_PULLUP);
+  pinMode(SCL, OUTPUT);
+  for (int i = 0; i < 9; i++) {
+    digitalWrite(SCL, LOW);  delayMicroseconds(5);
+    digitalWrite(SCL, HIGH); delayMicroseconds(5);
+  }
+  // STOP条件 (SDA: LOW→HIGH while SCL HIGH)
+  pinMode(SDA, OUTPUT);
+  digitalWrite(SDA, LOW);  delayMicroseconds(5);
+  digitalWrite(SCL, HIGH); delayMicroseconds(5);
+  digitalWrite(SDA, HIGH); delayMicroseconds(5);
+
+  // Wire再初期化＆センサ再設定
+  Wire.begin();
+  Wire.beginTransmission(ADXL345_ADDR);
+  Wire.write(REG_POWER_CTL);   Wire.write(0x08);
+  Wire.endTransmission();
+  Wire.beginTransmission(ADXL345_ADDR);
+  Wire.write(REG_DATA_FORMAT); Wire.write(0x00);
+  Wire.endTransmission();
+}
+\end{lstlisting}
+
+次に，update関数について説明する．この関数はloop内で毎回呼び出され，ACC\_SAMPLE\_INTERVAL（20 ms）ごとに加速度の実測値を取得し，前回値との差diffを求める．diffが検知閾値accThresholdを超過し，かつ前回検知からshakeInterval（750 ms，多重検知防止用）が経過している場合にのみ，振り動作として検知しupdateShakedInfo関数を呼び出す．update関数をコード\ref{lst:acc_update}に示す．
+
+\begin{lstlisting}[caption={AccManager::update関数}, label={lst:acc_update}]
+void AccManager::update(SyncManager& sync, PotManager& pot) {
+  unsigned long now = millis();
+  if (now - lastSampleTime >= ACC_SAMPLE_INTERVAL) {
+    lastSampleTime = now;
+    currentAccVal = readAccMagnitude();
+    float diff = fabsf(currentAccVal - lastAccVal);
+
+    bool overThreshold  = (diff > accThreshold);
+    bool intervalPassed = ((now - lastDetectTime) >= shakeInterval);
+
+    if (overThreshold && intervalPassed) {
+      lastDetectTime = now;
+      isStarted = !isStarted;
+      updateShakedInfo(sync, pot);
+    }
+    lastAccVal = currentAccVal;
+  }
+}
+\end{lstlisting}
+
+最後に，updateShakedInfo関数について説明する．この関数は，振り動作の検知をトリガとして，PotManagerが保持するbpmFrag・volFragフラグ（可変抵抗器の値が変化した場合に立つフラグ．\ref{sec:pot_detail}項で説明する）を確認し，フラグが立っている項目についてのみSyncManager経由でBPMまたは音量の変更情報を送信する．すなわち，実際に無線送信が発生するのは，可変抵抗器を操作した後にデバイスを振った場合に限られる．updateShakedInfo関数をコード\ref{lst:acc_shaked}に示す．
+
+\begin{lstlisting}[caption={AccManager::updateShakedInfo関数}, label={lst:acc_shaked}]
+void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
+  if (pot.bpmFrag) {
+    sync.sendBPM(pot.getBpmStep());
+    pot.bpmFrag = false;
+  }
+  if (pot.volFrag) {
+    sync.sendVolume(pot.getVolStep());
+    pot.volFrag = false;
+  }
+}
+\end{lstlisting}
+
+\label{sec:pot_detail}
+最後に，指揮デバイスにおける可変抵抗器を用いたBPM・音量読み取り機能について説明する．指揮デバイスでは，演奏の要素であるBPMと音量を，ユーザが操作できるように可変抵抗器を用いて5段階で調整する．アナログ入力値の特性を考慮したデータ処理を行うことで，安定した制御環境を構築している．アルゴリズムは，サンプリングと移動平均化，範囲分割，パラメータの抽出と出力の3段階に分けられる．サンプリングと移動平均化では，SAMPLE\_INTERVALごとにBPMおよび音量変更用の可変抵抗器の電圧値を，配列bpmSamples・volSamplesにsampleSize分だけ読み取り保存する．このとき，配列の各要素は書き込み位置（bpmReadIndex・volReadIndex）が指す最も古い値から順に上書きされ，上書きの直前に該当要素の値を合計bpmTotal・volTotalからあらかじめ減算し，新たに読み取った値を加算することで，配列全体を読み直すことなく常に最新の合計値を保持する（移動合計）．配列が一巡し全要素が新しい値に更新された時点（bpmBufferFull・volBufferFullがtrueになった時点）以降，この合計値をsampleSizeで除算した移動平均値をaverageBpmVal・averageVolValに格納する．範囲分割では，移動平均化された値をSTEP\_BOUNDARIES[]で定義した4つの閾値と比較し，1〜5の段階番号をcurrentBpmStep・currentVolStepに格納する．パラメータの抽出と出力では，算出した段階が直前の段階（prevBpmStep・prevVolStep）から変化した場合にのみ，公開フラグbpmFrag・volFragを立てる．外部からはgetBpmStep()・getVolStep()を介して現在の段階を取得し，前述の加速度センサ制御における棒振り動作の確定時にこれらのフラグを参照して各楽器機への送信を行う．なお，音量用可変抵抗器は配線の都合上，回した方向とセンサ値の増減が逆になるため，getVolStep()は6-currentVolStepを返すことで表示上の段階を反転させる．BPM・音量読み取り機能で使用する変数の仕様を表\ref{table:siki_pot_var}に示す．
+
+\begin{center}
+\begin{longtable}{p{3.9cm}p{3.4cm}p{6.2cm}}
+    \caption{BPM・音量読み取り機能で使用する変数の仕様一覧}
+    \label{table:siki_pot_var}\\
+    \hline
+    \textbf{変数名} & \textbf{型} & \textbf{説明}\\
+    \hline
+    \endfirsthead
+    \multicolumn{3}{l}{\small 表\thetable\ 続き}\\
+    \hline
+    \textbf{変数名} & \textbf{型} & \textbf{説明}\\
+    \hline
+    \endhead
+    \hline
+    \multicolumn{3}{r}{\small 次ページに続く}\\
+    \endfoot
+    \hline
+    \endlastfoot
+    PIN\_BPM & const int & BPM変更用の可変抵抗器を接続するアナログ入力ピン番号を定義\\
+    \hline
+    PIN\_VOL & const int & 音量変更用の可変抵抗器を接続するアナログ入力ピン番号を定義\\
+    \hline
+    SAMPLE\_INTERVAL & const unsigned long & 可変抵抗器の値をサンプリングする周期を定義\\
+    \hline
+    sampleSize & const int & 移動平均算出のためのサンプル数を定義\\
+    \hline
+    STEP\_BOUNDARIES[] & const int & 段階判定に用いる4つの閾値を保持する配列\\
+    \hline
+    lastSampleTime & unsigned long & 前回サンプリングを行った時間を格納\\
+    \hline
+    bpmSamples[] & int & BPM用のサンプル値を保持するための配列\\
+    \hline
+    volSamples[] & int & 音量用のサンプル値を保持するための配列\\
+    \hline
+    bpmReadIndex & int & bpmSamples[]内での現在の書き込み位置を管理するインデックス\\
+    \hline
+    volReadIndex & int & volSamples[]内での現在の書き込み位置を管理するインデックス\\
+    \hline
+    bpmBufferFull & bool & bpmSamples[]が一巡し，移動平均の算出が有効になったかを保持\\
+    \hline
+    volBufferFull & bool & volSamples[]が一巡し，移動平均の算出が有効になったかを保持\\
+    \hline
+    bpmTotal & long & bpmSamples[]内の累積合計を格納\\
+    \hline
+    volTotal & long & volSamples[]内の累積合計を格納\\
+    \hline
+    averageBpmVal & float & 算出されたBPM用のアナログ入力の移動平均値を格納\\
+    \hline
+    averageVolVal & float & 算出された音量用のアナログ入力の移動平均値を格納\\
+    \hline
+    currentBpmStep & uint8\_t & 算出されたBPMの5段階のレベル(1〜5)を格納\\
+    \hline
+    currentVolStep & uint8\_t & 算出された音量の5段階のレベル(1〜5)を格納\\
+    \hline
+    prevBpmStep & int & 段階の変化検知のための直前のBPM段階を格納\\
+    \hline
+    prevVolStep & int & 段階の変化検知のための直前の音量段階を格納\\
+    \hline
+    bpmFrag & bool & BPM段階が変化したことを示す公開フラグ．シェイク確定時の連動送信に使用\\
+    \hline
+    volFrag & bool & 音量段階が変化したことを示す公開フラグ．シェイク確定時の連動送信に使用\\
+\end{longtable}
+\end{center}
+
+続いて，可変抵抗器読み取り機能（PotManagerクラス）で使用する関数の仕様を表\ref{table:siki_pot_func}に示す．
+
+\begin{table}[H]
+    \caption{可変抵抗器読み取り機能（PotManagerクラス）で使用する関数の仕様一覧}
+    \centering
+    \label{table:siki_pot_func}
+    \begin{tabular}{p{4.5cm}p{9.5cm}}
+    \hline
+    \textbf{関数名} & \textbf{説明}\\
+    \hline
+    update() & SAMPLE\_INTERVALごとにBPM・音量それぞれの可変抵抗器の値をサンプリングし，移動合計・移動平均・段階算出を行う．loop内で毎回呼び出す\\
+    \hline
+    calcStep(val) & 0〜1023の移動平均値をSTEP\_BOUNDARIES[]と比較し，1〜5のいずれかの段階を返す\\
+    \hline
+    bpmUpdatePotentiometers() & BPM用可変抵抗器の値を読み取り移動合計・移動平均を更新し，段階が変化した場合にtrueを返す\\
+    \hline
+    volUpdatePotentiometers() & 音量用可変抵抗器の値を読み取り移動合計・移動平均を更新し，段階が変化した場合にtrueを返す\\
+    \hline
+    getBpmStep() & 現在のBPM段階（currentBpmStep）を外部に返すゲッター\\
+    \hline
+    getVolStep() & 現在の音量段階を外部に返すゲッター．配線特性による値の反転を補正し，6-currentVolStepを返す\\
+    \hline
+    \end{tabular}
+\end{table}
+
+以下では，表\ref{table:siki_pot_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，update関数について説明する．この関数はloop内で毎回呼び出され，SAMPLE\_INTERVAL（20 $\mu$s）ごとにbpmUpdatePotentiometers関数とvolUpdatePotentiometers関数を呼び出す．update関数をコード\ref{lst:pot_update}に示す．
+
+\begin{lstlisting}[caption={PotManager::update関数}, label={lst:pot_update}]
+void PotManager::update() {
+  unsigned long now = micros();
+  if (now - lastSampleTime >= SAMPLE_INTERVAL) {
+    lastSampleTime = now;
+    if (bpmUpdatePotentiometers()) bpmFrag = true;
+    if (volUpdatePotentiometers()) volFrag = true;
+  }
+}
+\end{lstlisting}
+
+次に，bpmUpdatePotentiometers関数について説明する．この関数は，リングバッファ（配列bpmSamples，添字bpmReadIndex）を用いた移動平均処理により，analogReadで取得したアナログ値のノイズを平滑化する．具体的には，配列の最も古いサンプルを合計値bpmTotalから減算し，新たに取得した値を加算したうえで書き込み位置を進める．sampleSize（10サンプル）分のバッファが一巡した時点から，合計値をサンプル数で割った移動平均averageBpmValを算出し，calcStep関数で段階へ変換したうえで，前回段階から変化していればtrueを返す．bpmUpdatePotentiometers関数をコード\ref{lst:pot_bpm}に示す．
+
+\begin{lstlisting}[caption={PotManager::bpmUpdatePotentiometers関数}, label={lst:pot_bpm}]
+bool PotManager::bpmUpdatePotentiometers() {
+  bpmTotal -= bpmSamples[bpmReadIndex];
+  bpmSamples[bpmReadIndex] = analogRead(PIN_BPM);
+  bpmTotal += bpmSamples[bpmReadIndex];
+  bpmReadIndex = (bpmReadIndex + 1) % sampleSize;
+  if (bpmReadIndex == 0) bpmBufferFull = true;
+  if (!bpmBufferFull) return false;
+
+  averageBpmVal = (float)bpmTotal / sampleSize;
+  currentBpmStep = calcStep(averageBpmVal);
+
+  if (currentBpmStep != prevBpmStep) {
+    prevBpmStep = currentBpmStep;
+    return true;
+  }
+  return false;
+}
+\end{lstlisting}
+
+続いて，calcStep関数について説明する．この関数は，bpmUpdatePotentiometers関数およびvolUpdatePotentiometers関数から呼び出され，得られた移動平均値を1〜5の5段階に離散化する．STEP\_BOUNDARIES配列（300, 500, 650, 818）に対する大小比較によって段階を決定しており，境界値の間隔を均等にしていない理由は，可変抵抗器の実測特性に合わせて各段階の操作しやすさを調整しているためである．calcStep関数をコード\ref{lst:pot_calc}に示す．
+
+\begin{lstlisting}[caption={PotManager::calcStep関数}, label={lst:pot_calc}]
+int PotManager::calcStep(float val) {
+  if      (val <= STEP_BOUNDARIES[0]) return 1;
+  else if (val <= STEP_BOUNDARIES[1]) return 2;
+  else if (val <= STEP_BOUNDARIES[2]) return 3;
+  else if (val <= STEP_BOUNDARIES[3]) return 4;
+  else                                return 5;
+}
+\end{lstlisting}
+
+次に，volUpdatePotentiometers関数について説明する．この関数はbpmUpdatePotentiometers関数と同様の移動平均処理を行うが，対象のピンおよび内部変数が音量用（PIN\_VOL，volSamples等）に置き換わっている点のみが異なり，処理の骨格は共通している．volUpdatePotentiometers関数をコード\ref{lst:pot_vol}に示す．
+
+\begin{lstlisting}[caption={PotManager::volUpdatePotentiometers関数}, label={lst:pot_vol}]
+bool PotManager::volUpdatePotentiometers() {
+  volTotal -= volSamples[volReadIndex];
+  volSamples[volReadIndex] = analogRead(PIN_VOL);
+  volTotal += volSamples[volReadIndex];
+  volReadIndex = (volReadIndex + 1) % sampleSize;
+  if (volReadIndex == 0) volBufferFull = true;
+  if (!volBufferFull) return false;
+
+  averageVolVal = (float)volTotal / sampleSize;
+  currentVolStep = calcStep(averageVolVal);
+
+  if (currentVolStep != prevVolStep) {
+    prevVolStep = currentVolStep;
+    return true;
+  }
+  return false;
+}
+\end{lstlisting}
+
+最後に，getBpmStep関数およびgetVolStep関数について説明する．いずれもPotManager.h内でインライン定義されたゲッター関数であり，外部（AccManagerクラス）から現在の段階番号を取得するために用いられる．getVolStep関数では，可変抵抗器を回転させる向きと，音量として直感的に理解しやすい段階の増減方向を一致させるため，\texttt{6 - currentVolStep}という変換を行っている点がgetBpmStep関数と異なる．両関数をコード\ref{lst:pot_getters}に示す．
+
+\begin{lstlisting}[caption={PotManager::getBpmStep関数・getVolStep関数}, label={lst:pot_getters}]
+uint8_t getBpmStep() const { return currentBpmStep; }
+uint8_t getVolStep() const { return 6 - currentVolStep; }
+\end{lstlisting}
 
 
 
@@ -179,7 +622,8 @@
 
 また，中継機の回路図を図\ref{metro}に示す．モータードライバーにArduino D5，D6ピンを接続し，PWM制御を行えるようにする．
 モータードライバーへの電力供給は当初，外部電源として$\SI{9}{V}$のアルカリ電池を検討していたが， Arduinoの$\SI{5}{V}$からの電力供給とDCジャックからのACアダプター$\SI{5}{V}$$\SI{1}{A}$による外部給電により，アルカリ電池が不要であることが実装時に確認されたため除外した．
-また，モータードライバー及びDCジャックはピンヘッダーのはんだ付けを行う．加えて，ギアボックスは0.01 $\mu$Fのコンデンサーと直接はんだ付けを行う．
+また，モータードライバー及びDCジャックはピンヘッダーのはんだ付けを行う．加えて，ギアボックスは0.01 $\mu$Fのコンデンサーと直接はんだ付けを行う．ギアボックスと並列に接続された0.01 $\mu$Fのコンデンサは，モータのブラシ接点で発生する電気ノイズを吸収し，制御信号や周辺回路への影響を低減する役割を果たしている．
+
 
 
 \begin{figure}[h]
@@ -309,6 +753,151 @@ PWMとは，デジタル出力ピンから出力される短形波のHIGH状態�
     V_{average} = V_{cc} \times \frac{pwmValue}{255}
 \end{equation}
 
+このとき，モータの巻線が持つインダクタンスとギアボックスの機械的慣性が電気的・機械的なローパスフィルタとして機能するため，モータはパルスの平均値に応じた一定速度で滑らかに回転する．
+
+次に，ルックアップテーブルによる速度制御について説明する．一般的なDCモータの回転速度は供給電圧に比例する性質があるが\cite{ref:control}，実際には摩擦や機構の負荷などによる非線形な挙動を示す事が多い．
+そのため，当初検討していた「4拍で90度（1小節が90度）回転する」といった幾何学的な理論式による制御ではなく，より確実な速度追従を実現するため，幾何学的な縛りを廃止して実測値に基づくルックアップテーブル方式を採用する．
+
+本デバイスでは，表\ref{tab:pwm_lut}に示す離散的な5段階のBPM設定値とコード内の実測周期テーブル（\texttt{ROTATION\_PERIOD\_LIST}）を対応させ，受信した段階番号に応じた \texttt{pwmValue} を即座に選択・出力する構成とする．
+
+\begin{table}[H]
+    \centering
+    \caption{BPMに対する実測周期と出力PWM値}
+    \label{tab:pwm_lut}
+    \begin{tabular}{llll}
+    \hline
+    \textbf{段階} & \textbf{目標BPM} & \textbf{実測周期 [ms]} & \textbf{出力PWM値} \\ \hline
+    1 & 60  & 230 & 26 \\
+    2 & 90  & 180 & 28 \\
+    3 & 120 & 140 & 30 \\
+    4 & 150 & 110 & 32 \\
+    5 & 180 & 80  & 37 \\ \hline
+    \end{tabular}
+\end{table}
+
+ここからは実測値の測定方法について説明する．
+
+まず，レーザーを2回読み取るまでの時間差（周期）を測定する．
+得られた周期から，楽器内に定義された実測周期テーブル\texttt{ROTATION\_PERIOD\_LIST[]}（あらかじめPWM出力に対して測定・予測された値）の中で最も値が近いものをループ処理によって探索する．
+探索されたインデックスに対応するBPM（一番遅い60から一番速い180までの5段階）を読み取ることで，幾何学的な理論式に依存しない，実際の回転速度に即した確実なBPM特定を行っている．
+%%LaserIntervalTestに該当．
+
+%レーザー光読み取りは楽器デバイスへ
+
+
+
+\paragraph{LEDマトリクスでのBPM表示}
+
+まず，LEDマトリクスにおけるBPM表示について説明する．
+今回のシステムでは表示用のマトリクスとして，Arduino Uno R4 WiFi付属のマトリクスを使用する．
+このマトリクスを用いて，中継機から受信したBPM情報を元に数値変換を行い，独自定義しフォント配列を用いて表示を行う．
+ここからは，本機能におけるファイル構成，関数設計について説明する．
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\subparagraph{ファイル構成}
+
+\begin{table}[h]
+    \vspace{-1em}
+    \caption{中継機デバイスのファイル構成}
+    \centering
+    \label{tab:file1}
+    \begin{tabular}{p{4cm}p{10cm}}
+    \hline
+    \textbf{ファイル名} & \textbf{概要}\\
+    \hline
+    FerrisWheel.ino & WiFi接続・UDP受信の管理，受信ヘッダに応じたモータ制御・表示処理の呼び出し\\
+    \hline
+    Display.cpp & 表示文字の独自フォント定義，LEDマトリクスへの描画処理\\
+    \hline
+    Display.h & 定数定義，関数宣言，外部参照\\
+    \hline
+    MotorControl.cpp & PWM出力によるモータ回転制御，回転速度テーブルの生成\\
+    \hline
+    MotorControl.h & モータ制御用の定数・変数定義，関数宣言\\
+    \hline
+    \end{tabular}
+\end{table}
+
+
+ファイル構成について説明する．また，表\ref{tab:file1}に中継機デバイスのファイル構成を示している．
+はじめに，FerrisWheel.inoファイルでは，表\ref{tab:file1}に示すようにWiFi接続とUDP受信の管理，およびモータ制御用のMotorControlクラスと表示制御用のDisplay関数群の呼び出しを行う．
+今回，指揮機と中継機間の通信形式としては，高速通信を目的とし，UDP形式で情報を受け取る．
+また，WiFi接続の前にWiFi.config(localIP, gateway, subnet)を呼び出し，指揮デバイスの送信先IPアドレスと一致する静的IPを設定する．\par
+次に，Display.cppファイルでは，表示文字の独自フォント定義とマトリクスへの描画処理を行う．また，Display.hファイルでは定数の定義と関数宣言，独自フォント定義などを行う．MotorControl.cppおよびMotorControl.hファイルでは，モータのPWM制御に関する処理と定数・関数の宣言を行う．
+ここで，今回利用するArduinoのマトリクスは縦12横8の範囲で構成されている．
+この時，通常で定義されている文字列では文字の間隔が短くなることや，それに付随した可読性の低下が考えられる．
+よって，今回は1文字を縦5横3で再定義することにより文字同士の間隔を開け，可読性の担保を目指す．
+例として数字0のドットパターンをコード\ref{lst:font0}に示す．
+
+\begin{lstlisting}[caption={font3x5配列における数字0のドットパターン定義}, label={lst:font0}]
+    {1,1,1,
+    1,0,1,
+    1,0,1,
+    1,0,1,
+    1,1,1}
+\end{lstlisting}
+    
+また，LEDマトリクスの描画処理は，受信した段階番号からBPM値を参照し，整数を各桁に分割した後，独自定義した3×5のフォント配列を用いて
+フレームバッファに書き込むことで行う．
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subparagraph{オブジェクト図(クラス図)}
+LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りである．WiFi接続・UDP受信および各処理の呼び出しを行うFerrisWheel.ino，LEDマトリクスへの描画処理を行うDisplay.cpp，および関数宣言やフォント定義を行うDisplay.hで構成される．
+各モジュール間の関係について，FerrisWheel.inoからDisplay.cppへの関係は，表示処理を利用する依存関係である．また，Display.cppからDisplay.hへの関係は，関数宣言およびフォント定義を参照する依存関係である．
+
+\begin{figure}[h]
+    \centering
+     \centering
+    \includegraphics[width=7cm]{figs/class_mat.png}
+    \caption{LEDMatrixのクラス図}
+    \label{matcla}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%
+
+\subparagraph{関数設計}
+
+表\ref{tab:func1}に今回用いる主な処理を行う関数を示している．以降では，各関数の具体的な動作を説明する．\par
+はじめに，displaySetup関数について説明する．この関数は，表\ref{tab:func1}に示すように，LEDMatrixの初期化を行い，引数や返り値はない．
+matrix.begin()を呼び出した後，消灯フレームを一度描画してから200 ms待機する．これは，begin()直後の最初のloadFrame()は反映されない場合があるための対策である．\par
+
+
+次に，FerrisWheel.inoのloop関数について説明する．この関数は，Udp.parsePacket()でパケットの到着を監視し，届いていればuint8\_t packetBuffer[10]として2バイト分を読み取る．
+先頭バイトpacketBuffer[0]をヘッダ文字として判定し，ヘッダが'S'（演奏開始）の場合はmotor.startRamp()とdisplayBPM()を，'B'（BPM変更）の場合はmotor.changeBPM()とdisplayBPM()を，'E'（演奏終了）の場合はmotor.stopRamp()とclearDisplay()を，2バイト目のペイロード（BPM段階番号）を引数として呼び出す．\par
+
+次に，displayBPM関数について説明する．この関数は表\ref{tab:func1}に示すように，BPM数値のマトリクス描画を行い，引数としては，loop関数から受け取ったBPM段階番号（1〜5）を用いる．
+まず，段階番号をbpmTable[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．\par
+
+次に，drawDigit関数について説明する．この関数は，表\ref{tab:func1}に示すように，一桁の数字をフレームバッファに描画をし，引数としては描画する数字とフレームバッファ上の
+横方向開始位置を取る．まず，引数の数字が0から9の範囲内であるかを確認する．次に，縦方向の中央寄せオフセットを算出して配置する．その後，独自フォント配列から該当する数字のドットパターンを
+1ドットずつ読み取り，フレームバッファの指定位置に書き込む．
+
+最後に，clearDisplay関数について説明する．この関数は，表\ref{tab:func1}に示すように，LEDMatrixを全消灯させる処理を行い，引数や返り値はない．
+BPM値を初期値にリセットし，全消灯フレームをmatrix.loadFrame()で描画して表示のリセットを行う．\par
+
+\begin{table}[h]
+    \vspace{-1em}
+    \caption{主要な処理を行う関数一覧}
+    \centering
+    \label{tab:func1}
+    \begin{tabular}{p{3.3cm}p{6.2cm}p{3cm}p{1.3cm}}
+    \hline
+    \textbf{関数名} & \textbf{概要} & \textbf{引数} & \textbf{返り値}\\
+    \hline
+    displaySetup & LEDマトリクスの初期化 & なし & なし\\
+    \hline
+    loop（FerrisWheel.ino） & UDPパケットの確認，ヘッダに応じたモータ制御・表示処理の呼び出し & なし & なし\\
+    \hline
+    displayBPM & BPM段階番号をLEDマトリクスに描画 & uint8\_t stepNumber & なし\\
+    \hline
+    drawDigit & 1桁の数字をフレームバッファに描画 & int digit, int x\_offset & なし\\
+    \hline
+    clearDisplay & LEDマトリクスを全消灯 & なし & なし\\
+    \hline
+    \end{tabular}
+\end{table}
 
 
 

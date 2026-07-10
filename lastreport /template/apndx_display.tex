@@ -1,0 +1,335 @@
+\section{中継機デバイス（Display）のプログラムソース}
+本節では，中継機デバイスのモータ回転制御およびLEDマトリクス表示を行う制御プログラムの全文を示す．
+
+\subsection{FerrisWheel.ino}
+\begin{lstlisting}[caption={FerrisWheel.ino}, label={lst:disp_ino}]
+#include "MotorControl.h"
+#include "Display.h"
+#include <WiFiS3.h>
+#include <WiFiUdp.h>
+
+const char SSID[] = "hackathon001-WPA2";
+const char PASS[] = "hackathon001";
+
+IPAddress localIP(192, 168, 11, 10);
+IPAddress gateway(192, 168, 11, 1);
+IPAddress subnet(255, 255, 255, 0);
+
+const uint16_t LOCAL_PORT = 5005;
+
+MotorControl motor;
+
+WiFiUDP Udp;
+uint8_t packetBuffer[10];
+
+// 演奏中フラグ。'S'でtrue / 'E'でfalse。
+// 'B'(BPM変更)は演奏中のみ受け付け、開始前の不意の'B'でモーターが回り出すのを防ぐ。
+bool running = false;
+
+void setup() {
+    Serial.begin(115200);
+    delay(2000);
+
+    Serial.println("--- FerrisWheel Setup Start ---");
+
+    motor.begin();
+    motor.createRpmTable();
+
+    WiFi.config(localIP, gateway, subnet);
+    WiFi.begin(SSID, PASS);
+    Serial.print("Connecting to WiFi...");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\nWiFi Connected!");
+    Serial.print("IP: "); Serial.println(WiFi.localIP());
+
+    Udp.begin(LOCAL_PORT);
+    Serial.print("Listening on Unicast Port "); Serial.println(LOCAL_PORT);
+
+    displaySetup();
+}
+
+void loop() {
+    uint8_t packetSize = Udp.parsePacket();
+    if (packetSize <= 0) return;
+
+    if (packetSize != 2) {
+        Serial.print("想定外のパケットサイズ: "); Serial.println(packetSize);
+        while (Udp.available()) Udp.read();
+        return;
+    }
+
+    Udp.read(packetBuffer, sizeof(packetBuffer));
+    char    header  = packetBuffer[0];
+    uint8_t payload = packetBuffer[1];
+
+    switch (header) {
+        case 'S':
+            Serial.print("演奏開始 ('S') payload="); Serial.println(payload);
+            // payload に BPM 段階が入っているのでそれで起動（元コードの global 変数参照バグを修正）
+            running = true;
+            motor.startRamp(payload);
+            displayBPM(payload);
+            // 冗長送信の残りパケットを捨てる
+            while (Udp.parsePacket() > 0) {
+                while (Udp.available()) Udp.read();
+            }
+            break;
+
+        case 'B':
+            if (!running) {
+                Serial.println("演奏前の 'B' を無視");
+                break;
+            }
+            Serial.print("BPM変更 ('B') 段階="); Serial.println(payload);
+            motor.changeBPM(payload);
+            displayBPM(payload);
+            break;
+
+        case 'E':
+            Serial.println("演奏終了 ('E')");
+            running = false;
+            motor.stopRamp();
+            clearDisplay();
+            break;
+
+        default:
+            Serial.print("想定外のヘッダ: "); Serial.println(header);
+            break;
+    }
+}
+\end{lstlisting}
+
+\subsection{Display.h}
+\begin{lstlisting}[caption={Display.h}, label={lst:disp_h}]
+#ifndef DISPLAY_H
+#define DISPLAY_H
+
+#include <Arduino.h>
+#include "Arduino_LED_Matrix.h"
+
+#define BPM_STEP_1  60
+#define BPM_STEP_2  90
+#define BPM_STEP_3  120
+#define BPM_STEP_4  150
+#define BPM_STEP_5  180
+
+#define FONT_WIDTH   3
+#define FONT_HEIGHT  5
+#define MATRIX_ROWS  8
+#define MATRIX_COLS  12
+
+void displaySetup();
+void displayBPM(uint8_t stepNumber);
+void clearDisplay();
+void drawDigit(int digit, int x_offset);
+
+extern const uint8_t font3x5[10][15];
+extern ArduinoLEDMatrix matrix;
+
+#endif
+\end{lstlisting}
+
+\subsection{Display.cpp}
+\begin{lstlisting}[caption={Display.cpp}, label={lst:disp_cpp}]
+#include "Display.h"
+#include "MotorControl.h"
+#include "Arduino_LED_Matrix.h"
+
+const uint8_t font3x5[10][15] = {
+  // 0
+  {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,1,1},
+  // 1
+  {0,1,0, 1,1,0, 0,1,0, 0,1,0, 1,1,1},
+  // 2
+  {1,1,1, 0,0,1, 1,1,1, 1,0,0, 1,1,1},
+  // 3
+  {1,1,1, 0,0,1, 0,1,1, 0,0,1, 1,1,1},
+  // 4
+  {1,0,1, 1,0,1, 1,1,1, 0,0,1, 0,0,1},
+  // 5
+  {1,1,1, 1,0,0, 1,1,1, 0,0,1, 1,1,1},
+  // 6
+  {1,1,1, 1,0,0, 1,1,1, 1,0,1, 1,1,1},
+  // 7
+  {1,1,1, 0,0,1, 0,0,1, 0,0,1, 0,0,1},
+  // 8
+  {1,1,1, 1,0,1, 1,1,1, 1,0,1, 1,1,1},
+  // 9
+  {1,1,1, 1,0,1, 1,1,1, 0,0,1, 1,1,1}
+};
+
+static const int bpmTable[5] = {
+  BPM_STEP_1, BPM_STEP_2, BPM_STEP_3, BPM_STEP_4, BPM_STEP_5
+};
+
+ArduinoLEDMatrix matrix;
+
+void displaySetup() {
+    matrix.begin();
+    uint32_t warmUp[3] = {0, 0, 0};
+    matrix.loadFrame(warmUp);
+    delay(200);
+}
+
+static uint8_t frameBuffer[MATRIX_ROWS][MATRIX_COLS];
+static int currentBPM = -1;
+
+void displayBPM(uint8_t stepNumber) {
+    if (stepNumber < 1 || stepNumber > 5) return;
+    uint8_t bpm = bpmTable[stepNumber - 1];
+
+    memset(frameBuffer, 0, sizeof(frameBuffer));
+
+    int digits[3];
+    int numDigits;
+    if (bpm >= 100) {
+        numDigits = 3;
+        digits[0] = bpm / 100;
+        digits[1] = (bpm / 10) % 10;
+        digits[2] = bpm % 10;
+    } else if (bpm >= 10) {
+        numDigits = 2;
+        digits[0] = bpm / 10;
+        digits[1] = bpm % 10;
+    } else {
+        numDigits = 1;
+        digits[0] = bpm;
+    }
+
+    int totalWidth = numDigits * FONT_WIDTH + (numDigits - 1) * 1;
+    int startX     = (MATRIX_COLS - totalWidth) / 2;
+
+    for (int i = 0; i < numDigits; i++) {
+        drawDigit(digits[i], startX + i * (FONT_WIDTH + 1));
+    }
+
+    uint32_t bitmap[3] = {0, 0, 0};
+    for (int row = 0; row < MATRIX_ROWS; row++) {
+        for (int col = 0; col < MATRIX_COLS; col++) {
+            if (frameBuffer[row][col]) {
+                int n = row * MATRIX_COLS + col;
+                bitmap[n / 32] |= (1UL << (31 - (n % 32)));
+            }
+        }
+    }
+    matrix.loadFrame(bitmap);
+}
+
+void drawDigit(int digit, int x_offset) {
+    if (digit < 0 || digit > 9) return;
+    const int y_offset = (MATRIX_ROWS - FONT_HEIGHT) / 2;
+    for (int y = 0; y < FONT_HEIGHT; y++) {
+        for (int x = 0; x < FONT_WIDTH; x++) {
+            int col = x_offset + x;
+            int row = y_offset + y;
+            if (col >= 0 && col < MATRIX_COLS && row >= 0 && row < MATRIX_ROWS) {
+                frameBuffer[row][col] = font3x5[digit][y * FONT_WIDTH + x];
+            }
+        }
+    }
+}
+
+void clearDisplay() {
+    currentBPM = -1;
+    uint32_t blank[3] = {0, 0, 0};
+    matrix.loadFrame(blank);
+}
+\end{lstlisting}
+
+\subsection{MotorControl.h}
+\begin{lstlisting}[caption={MotorControl.h}, label={lst:motor_h}]
+#ifndef MOTOR_CONTROL_H
+#define MOTOR_CONTROL_H
+
+#include <Arduino.h>
+
+class MotorControl {
+public:
+    MotorControl();
+    void begin();
+    void createRpmTable();
+    void startRamp(uint8_t stepNumber);
+    void changeBPM(uint8_t stepNumber);
+    void stopRamp();
+
+private:
+    void stepToNumber(uint8_t stepNumber);
+    void updateStatus();
+
+    const uint8_t PIN_MOTOR_PWM = 5;
+    const uint8_t bpmTable[5]  = {60, 90, 120, 150, 180};
+    const float   VCC           = 5.0;
+    const uint8_t pwmTable[5]  = {26, 28, 30, 32, 37}; // 仮の数値
+
+    uint8_t currentBPM = 0;
+    float   RPM        = 0;
+    float   omega      = 0;
+    uint8_t pwmValue   = 0;
+    float   V_average  = 0;
+    float   rpmTable[5] = {};
+};
+
+#endif
+\end{lstlisting}
+
+\subsection{MotorControl.cpp}
+\begin{lstlisting}[caption={MotorControl.cpp}, label={lst:motor_cpp}]
+#include "MotorControl.h"
+
+MotorControl::MotorControl() {}
+
+void MotorControl::begin() {
+    pinMode(PIN_MOTOR_PWM, OUTPUT);
+    analogWrite(PIN_MOTOR_PWM, 0);
+}
+
+void MotorControl::createRpmTable() {
+    for (uint8_t i = 0; i < 5; i++) {
+        rpmTable[i] = bpmTable[i] / 16.0f;
+    }
+    Serial.println("[Motor] rpmTable 初期化完了");
+}
+
+void MotorControl::startRamp(uint8_t stepNumber) {
+    stepToNumber(stepNumber);
+    Serial.println("[Motor] Start Ramp Up...");
+    for (int i = 0; i <= pwmValue; i += 5) {
+        analogWrite(PIN_MOTOR_PWM, i);
+        delay(40);
+    }
+    analogWrite(PIN_MOTOR_PWM, pwmValue);
+    Serial.println("[Motor] Target speed reached.");
+}
+
+void MotorControl::stopRamp() {
+    Serial.println("[Motor] Start Ramp Down...");
+    for (int i = pwmValue; i >= 0; i -= 5) {
+        analogWrite(PIN_MOTOR_PWM, i);
+        delay(40);
+    }
+    analogWrite(PIN_MOTOR_PWM, 0);
+    Serial.println("[Motor] Stopped.");
+}
+
+void MotorControl::changeBPM(uint8_t stepNumber) {
+    stepToNumber(stepNumber);
+    updateStatus();
+    analogWrite(PIN_MOTOR_PWM, pwmValue);
+    Serial.print("[Motor] Speed Changed. PWM: "); Serial.println(pwmValue);
+}
+
+void MotorControl::stepToNumber(uint8_t stepNumber) {
+    if (stepNumber < 1 || stepNumber > 5) return;
+    currentBPM = bpmTable[stepNumber - 1];
+    pwmValue   = pwmTable[stepNumber - 1];
+    RPM        = rpmTable[stepNumber - 1];
+}
+
+void MotorControl::updateStatus() {
+    omega     = 2.0 * PI * RPM / 60.0f;
+    V_average = VCC * (pwmValue / 256.0f);
+}
+\end{lstlisting}

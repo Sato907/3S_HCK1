@@ -1,0 +1,46 @@
+\usepackage{jlreq-deluxe}
+\usepackage[noalphabet,hiragino-highsierra-pron]{pxchfon}
+\usepackage[T1,LGR]{fontenc}
+\usepackage{stix2}
+\usepackage{roboto}
+\usepackage[scale=0.95]{roboto-mono}
+
+\usepackage[fleqn,tbtags]{mathtools} % 数式関連 (w/ amsmath)
+\usepackage[table,dvipdfmx]{xcolor}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{ascmac} %screen/itembox/shadebox環境が使用できる．
+\usepackage{float} % 表・図の[H]配置指定に必要
+\usepackage{placeins} % \FloatBarrierで図表が節をまたがないようにする
+\usepackage{longtable} % 1ページに収まらない表をページをまたいで表示するために必要
+\usepackage{siunitx} % \SI{}{}による単位表記に必要
+\usepackage{pgfgantt}
+
+\usepackage[dvipdfmx]{hyperref}
+\hypersetup{%
+ bookmarksnumbered=true,%
+ colorlinks=true,%
+ linkcolor=black,
+ citecolor=blue,
+ urlcolor=blue}
+\usepackage[dvipdfmx]{pxjahyper} % (u)pLaTeXのときは必要
+\usepackage{listings,plistings}
+\renewcommand{\lstlistingname}{コード} % キャプションの接頭辞を「Listing」から「コード」に変更
+\lstset{%
+	aboveskip=0pt,
+	belowskip=0pt,
+	language=C++, % Arduinoのスケッチの関数も多くカバーできる．
+	morekeywords={ },
+	numbers=left,          % 行番号を左に表示
+	numberstyle=\small,    % 行番号のフォントサイズ
+	stepnumber=1,          % 行番号を何行おきに表示するか
+	numbersep=10pt,        % 行番号とコードの間の距離
+	backgroundcolor={},% 
+	basicstyle={\small\ttfamily},% 
+	keywordstyle=\color{blue}\bfseries,
+	commentstyle=\color{red},
+	frame=single,
+	breaklines=true}
+
+\newcommand{\mcbf}[1]{{\mcfamily\bfseries #1}}
+\newcommand{\gtbf}[1]{{\sffamily\bfseries #1}}
+\renewcommand\UrlFont{\color{blue}\rmfamily}

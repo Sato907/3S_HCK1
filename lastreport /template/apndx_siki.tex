@@ -1,0 +1,523 @@
+\section{指揮デバイスのプログラムソース}
+本節では，指揮デバイスの制御プログラムの全文を示す．ファイル構成は\ref{sec:siki_naibu}節の表\ref{table:siki_files}の通りである．
+
+\subsection{Controller\_simultaneous.ino}
+\begin{lstlisting}[caption={Controller\_simultaneous.ino}, label={lst:siki_ino}]
+#include "SyncManager.h"
+#include "PotManager.h"
+#include "AccManager.h"
+
+#include <Wire.h>
+#include <math.h>
+
+// Wi-Fi接続情報
+const char SSID[] = "hackathon001-WPA2";
+const char PASS[] = "hackathon001";
+
+const uint8_t input_PIN = 3; // スイッチの状態を読み取るピン
+bool switch_status;
+bool before_switch_status = 0;
+bool isButtonPlaying = false;
+
+SyncManager sync;
+PotManager pot;
+AccManager acc;
+
+void setup() {
+    Serial.begin(115200);
+    while (!Serial) {}
+
+    Serial.println("--- Setup Started ---");
+    pinMode(input_PIN, INPUT);
+
+    Serial.println("Attempting to connect to WiFi...");
+    sync.begin(SSID, PASS);
+
+    Serial.println("\nWiFi Connected successfully!");
+    Serial.println("Commands: button -> Start/End");
+
+    acc.setupADXL345();
+
+    before_switch_status = digitalRead(input_PIN);
+}
+
+void loop() {
+    button();
+    pot.update();
+    acc.update(sync, pot);
+}
+
+void button() {
+    switch_status = digitalRead(input_PIN);
+    if (switch_status == 0 && before_switch_status == 1) {
+        if (isButtonPlaying) {
+            Serial.println("Button: [END] sending UDP...");
+            sync.sendEnd();
+            isButtonPlaying = false;
+        } else {
+            Serial.println("Button: [START] sending UDP to all simultaneously...");
+            uint8_t step = pot.getBpmStep();
+            sync.sendStart(step);
+            isButtonPlaying = true;
+        }
+        delay(300); // チャタリング防止
+    }
+    before_switch_status = switch_status;
+}
+\end{lstlisting}
+
+\subsection{AccManager.h}
+\begin{lstlisting}[caption={AccManager.h}, label={lst:siki_acc_h}]
+// 加速度センサー管理クラス
+#ifndef ACC_MANAGER_H
+#define ACC_MANAGER_H
+
+#include <Arduino.h>
+#include <Wire.h>
+#include "SyncManager.h"
+#include "PotManager.h"
+
+class AccManager {
+public:
+    AccManager();
+    void setupADXL345();
+    // loop内で毎ループ呼ぶ
+    void update(SyncManager& sync, PotManager& pot);
+
+    void updateShakedInfo(SyncManager& sync, PotManager& pot);
+
+private:
+    float readAccMagnitude();
+    void  recoverI2C();   // I2Cバスロックアップからの復旧（バスクリア＋再初期化）
+
+    const uint8_t ADXL345_ADDR = 0x53; // SDO/ALT ADDRESS ピンがGNDの場合
+    const uint8_t REG_POWER_CTL = 0x2D; // 加速度センサの電源管理をするスイッチ
+    const uint8_t REG_DATA_FORMAT = 0x31; // 測定する範囲を設定するスイッチ
+    const uint8_t REG_DATAX0 = 0x32; // 測定した値が書き込まれる場所
+
+    const float accThreshold = 110.0f; // 検知閾値 必要に応じて調整
+    const unsigned long shakeInterval = 750; // 多重検知防止インターバル [ms]
+    const unsigned long ACC_SAMPLE_INTERVAL = 20;
+
+    // 内部変数
+    float currentAccVal = 0.0f; // 現在の加速度センサ値
+    float lastAccVal = 0.0f; // 前回の加速度センサ値
+    unsigned long lastDetectTime = 0; // 前回検知時刻 [ms]
+    unsigned long lastSampleTime = 0;
+    unsigned long lastRecoverMs  = 0;   // 復旧ログのスロットル用
+
+    bool isStarted = false; // 振られた判定のフラグ
+};
+
+#endif
+\end{lstlisting}
+
+\subsection{AccManager.cpp}
+\begin{lstlisting}[caption={AccManager.cpp}, label={lst:siki_acc_cpp}]
+#include "AccManager.h"
+
+AccManager::AccManager(){
+  // コンストラクタ（初期化処理なし）
+}
+
+void AccManager::setupADXL345() {
+  Wire.begin();
+
+  Wire.beginTransmission(ADXL345_ADDR);
+  Wire.write(REG_POWER_CTL);
+  Wire.write(0x08); // Measure bit ON
+  Wire.endTransmission();
+
+  Wire.beginTransmission(ADXL345_ADDR);
+  Wire.write(REG_DATA_FORMAT);
+  Wire.write(0x00);
+  Wire.endTransmission();
+
+  lastAccVal = readAccMagnitude();
+
+  Serial.println("GY-291 初期化完了");
+  Serial.print("閾値: ");
+  Serial.print(accThreshold);
+  Serial.print("インターバル: ");
+  Serial.print(shakeInterval);
+  Serial.println(" ms");
+}
+
+// ★loopから引っ越してきた時間管理とシェイク判定
+void AccManager::update(SyncManager& sync, PotManager& pot) {
+  unsigned long now = millis();
+
+  if (now - lastSampleTime >= ACC_SAMPLE_INTERVAL) {
+    lastSampleTime = now;
+
+    currentAccVal = readAccMagnitude();
+    float diff = fabsf(currentAccVal - lastAccVal);
+
+    bool overThreshold  = (diff > accThreshold);
+    bool intervalPassed = ((now - lastDetectTime) >= shakeInterval);
+
+    // 500msごとにdiff値を表示（閾値チューニング用）
+    static unsigned long lastDebugTime = 0;
+    if (now - lastDebugTime >= 500) {
+      lastDebugTime = now;
+      //Serial.print("[ACC] diff="); Serial.print(diff, 1);
+      //Serial.print(" / 閾値="); Serial.println(accThreshold, 1);
+    }
+
+    if (overThreshold && intervalPassed) {
+      lastDetectTime = now;
+      isStarted = !isStarted;
+
+      Serial.print("[SHAKE検知] diff=");
+      Serial.print(diff, 4);
+      Serial.println(isStarted ? " | START送信" : " | END送信");
+
+      updateShakedInfo(sync, pot);
+    }
+
+    lastAccVal = currentAccVal;
+  }
+}
+
+float AccManager::readAccMagnitude() {
+  Wire.beginTransmission(ADXL345_ADDR);
+  Wire.write(REG_DATAX0);
+  // endTransmission!=0 はNACK/バス異常。リピーテッドスタート前に検出する。
+  if (Wire.endTransmission(false) != 0) {
+    recoverI2C();
+    return lastAccVal;   // 直前値を返してニセshakeを防ぐ
+  }
+
+  uint8_t n = Wire.requestFrom(ADXL345_ADDR, (uint8_t)6, (uint8_t)true);
+  if (n < 6) {             // 6バイト読めない＝ロックアップ等
+    recoverI2C();
+    return lastAccVal;
+  }
+
+  int16_t rawX = (int16_t)((Wire.read()) | (Wire.read() << 8));
+  int16_t rawY = (int16_t)((Wire.read()) | (Wire.read() << 8));
+  int16_t rawZ = (int16_t)((Wire.read()) | (Wire.read() << 8));
+
+  float fx = (float)rawX;
+  float fy = (float)rawY;
+  float fz = (float)rawZ;
+
+  return sqrtf(fx * fx + fy * fy + fz * fz);
+}
+
+// I2Cバスのロックアップから復旧する。
+// スレーブがSDAを握ったまま固まった場合、SCLを手で9回叩いて解放し、
+// STOP条件を作ってから Wire を張り直し、ADXL345 を再初期化する。
+void AccManager::recoverI2C() {
+  unsigned long now = millis();
+  if (now - lastRecoverMs >= 1000) {   // ログのスロットル（毎20msの連発を防ぐ）
+    lastRecoverMs = now;
+    Serial.println("[ACC] I2C異常検出 → バス復旧を実行");
+  }
+
+  Wire.end();
+
+  // バスクリア: SCLを9クロック叩いて握られたSDAを解放
+  pinMode(SDA, INPUT_PULLUP);
+  pinMode(SCL, OUTPUT);
+  for (int i = 0; i < 9; i++) {
+    digitalWrite(SCL, LOW);  delayMicroseconds(5);
+    digitalWrite(SCL, HIGH); delayMicroseconds(5);
+  }
+  // STOP条件 (SDA: LOW→HIGH while SCL HIGH)
+  pinMode(SDA, OUTPUT);
+  digitalWrite(SDA, LOW);  delayMicroseconds(5);
+  digitalWrite(SCL, HIGH); delayMicroseconds(5);
+  digitalWrite(SDA, HIGH); delayMicroseconds(5);
+
+  // Wire再初期化＆センサ再設定（setupADXL345の通信部と同じ）
+  Wire.begin();
+  Wire.beginTransmission(ADXL345_ADDR);
+  Wire.write(REG_POWER_CTL);   Wire.write(0x08);
+  Wire.endTransmission();
+  Wire.beginTransmission(ADXL345_ADDR);
+  Wire.write(REG_DATA_FORMAT); Wire.write(0x00);
+  Wire.endTransmission();
+}
+
+void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
+  if (pot.bpmFrag) {
+    sync.sendBPM(pot.getBpmStep());
+    Serial.print("[SHAKE] BPM送信 step="); Serial.println(pot.getBpmStep());
+    pot.bpmFrag = false;
+  }
+  if (pot.volFrag) {
+    sync.sendVolume(pot.getVolStep());
+    Serial.print("[SHAKE] VOL送信 step="); Serial.println(pot.getVolStep());
+    pot.volFrag = false;
+  }
+}
+\end{lstlisting}
+
+\subsection{PotManager.h}
+\begin{lstlisting}[caption={PotManager.h}, label={lst:siki_pot_h}]
+// 可変抵抗器
+#ifndef POT_MANAGER_H
+#define POT_MANAGER_H
+
+#include <Arduino.h>
+#include "SyncManager.h"
+
+class PotManager {
+public:
+    // コンストラクタ（ポート番号などを初期化する）
+    PotManager();
+    //loop内で毎ループ呼ぶ
+    void update();
+    //現在の段階や変化を知るための窓口（ゲッター）
+    uint8_t getBpmStep() const { return currentBpmStep; }
+    uint8_t getVolStep() const { return 6 - currentVolStep; }
+
+    bool bpmFrag = false;
+    bool volFrag = false;
+
+private:
+    int calcStep(float val);
+    bool bpmUpdatePotentiometers();
+    bool volUpdatePotentiometers();
+
+    // ピン定義
+    const int PIN_BPM = A0; // BPM用可変抵抗器
+    const int PIN_VOL = A1; // 音量用可変抵抗器
+    const unsigned long SAMPLE_INTERVAL = 20; // センサを読みとる周期
+    const int sampleSize = 10; // 移動平均のサンプル数
+    const int STEP_BOUNDARIES[4] = {300, 500, 650, 818};
+
+    // 内部変数
+    unsigned long lastSampleTime = 0; // 前回サンプリング時刻
+    int   bpmSamples[10] = {0}; // BPMサンプル配列
+    long  bpmTotal = 0; // サンプル合計値
+    float averageBpmVal = 0.0f; // BPM移動平均値
+
+    int   volSamples[10] = {0}; // 音量サンプル配列
+    long  volTotal = 0; // サンプル合計値
+    float averageVolVal = 0.0f; // 音量移動平均値
+
+    int  bpmReadIndex = 0;
+    int  volReadIndex = 0;
+    bool bpmBufferFull = false;
+    bool volBufferFull = false;
+
+    uint8_t currentBpmStep = 0; // BPM段階 (1〜5)
+    uint8_t currentVolStep = 0; // 音量段階 (1〜5)
+    int prevBpmStep = 0;
+    int prevVolStep = 0;
+
+};
+
+#endif
+\end{lstlisting}
+
+\subsection{PotManager.cpp}
+\begin{lstlisting}[caption={PotManager.cpp}, label={lst:siki_pot_cpp}]
+#include "PotManager.h"
+
+PotManager::PotManager(){
+  // コンストラクタ（初期化処理なし）
+}
+
+// ★loopから引っ越してきた時間管理
+void PotManager::update() {
+  unsigned long now = micros();
+  if (now - lastSampleTime >= SAMPLE_INTERVAL) {
+    lastSampleTime = now;
+    if (bpmUpdatePotentiometers()) bpmFrag = true;
+    if (volUpdatePotentiometers()) volFrag = true;
+  }
+}
+
+int PotManager::calcStep(float val) {
+  if      (val <= STEP_BOUNDARIES[0]) return 1;
+  else if (val <= STEP_BOUNDARIES[1]) return 2;
+  else if (val <= STEP_BOUNDARIES[2]) return 3;
+  else if (val <= STEP_BOUNDARIES[3]) return 4;
+  else                                return 5;
+}
+
+bool PotManager::bpmUpdatePotentiometers() {
+  bpmTotal -= bpmSamples[bpmReadIndex];
+
+  bpmSamples[bpmReadIndex] = analogRead(PIN_BPM);
+
+  bpmTotal += bpmSamples[bpmReadIndex];
+
+  bpmReadIndex = (bpmReadIndex + 1) % sampleSize;
+
+  if (bpmReadIndex == 0) bpmBufferFull = true;
+
+  if (!bpmBufferFull) return false;
+
+  averageBpmVal = (float)bpmTotal / sampleSize;
+
+  currentBpmStep = calcStep(averageBpmVal);
+
+  if (currentBpmStep != prevBpmStep) {
+    Serial.println("------ BPMパラメータ更新 ------");
+
+    Serial.print("[BPM] 平均センサ値="); Serial.print(averageBpmVal, 1);
+    Serial.print("  段階=");          Serial.print(currentBpmStep);
+
+    prevBpmStep = currentBpmStep;
+    return true;
+  }
+  return false;
+}
+
+bool PotManager::volUpdatePotentiometers() {
+  volTotal -= volSamples[volReadIndex];
+
+  volSamples[volReadIndex] = analogRead(PIN_VOL);
+
+  volTotal += volSamples[volReadIndex];
+
+  volReadIndex = (volReadIndex + 1) % sampleSize;
+
+  if (volReadIndex == 0) volBufferFull = true;
+
+  if (!volBufferFull) return false;
+
+  averageVolVal = (float)volTotal / sampleSize;
+
+  currentVolStep = calcStep(averageVolVal);
+
+  if(currentVolStep != prevVolStep){
+    Serial.println("------ VOLパラメータ更新 ------ ");
+
+    Serial.print("[VOL] 平均センサ値="); Serial.print(averageVolVal, 1);
+    Serial.print("  段階=");          Serial.print(6 - currentVolStep);
+
+    prevVolStep = currentVolStep;
+    return true;
+  }
+  return false;
+}
+\end{lstlisting}
+
+\subsection{SyncManager.h}
+\begin{lstlisting}[caption={SyncManager.h}, label={lst:siki_sync_h}]
+#ifndef SYNC_MANAGER_H
+#define SYNC_MANAGER_H
+
+#include <WiFiS3.h>
+#include <WiFiUdp.h>
+
+//楽器の個別IP（ユニキャスト用）
+extern IPAddress fluteIP;
+extern IPAddress pianoIP;
+extern IPAddress stringsIP;
+extern IPAddress drumIP;
+
+//観覧車の個別IP（ユニキャスト用）
+extern IPAddress ferrisWheelIP;
+
+//チャンネル（マルチキャスト用）
+extern IPAddress ferrisWheelGroup; // 観覧車だけが聴くチャンネル（現在未使用）
+extern IPAddress instrumentGroup;  // 楽器全員が聴くチャンネル
+
+class SyncManager {
+public:
+    // コンストラクタ（ポート番号などを初期化する）
+    SyncManager();
+    // Wi-FiとUDPを準備する関数
+    void begin(const char ssid[], const char pass[]);
+    // 演奏開始合図（'S'）を全機へ同時に送信する自作関数
+    void sendStart(uint8_t stepNumber);
+   // BPM情報を送信する関数（引数の型を追加）
+    void sendBPM(uint8_t stepNumber);
+    // 音量情報を送信する関数（引数の型を追加）
+    void sendVolume(uint8_t stepNumber);
+    // 演奏終了合図('E')を全機へ同時に送信する関数
+    void sendEnd();
+
+private:
+    // 複数ターゲットへラウンドロビンで3回冗長送信を行う共通処理。
+    // ターゲットごとに3連射してから次のターゲットへ進む方式だと、後方の
+    // ターゲットほど到達が遅れて機器間に無視できない時間差が生まれるため、
+    // 1周ごとに全ターゲットへ送ってから次の周に進む方式にしている。
+    void packetRoundRobin(const uint8_t packet[], uint8_t b, const IPAddress targets[], uint8_t targetCount);
+};
+
+#endif
+\end{lstlisting}
+
+\subsection{SyncManager.cpp}
+\begin{lstlisting}[caption={SyncManager.cpp}, label={lst:siki_sync_cpp}]
+#include "SyncManager.h"
+
+const uint16_t TARGET_PORT = 5005;
+const uint16_t LOCAL_PORT = 8080;
+WiFiUDP Udp;
+
+IPAddress fluteIP(192, 168, 11, 14);
+IPAddress pianoIP(192, 168, 11, 12);
+IPAddress stringsIP(192, 168, 11, 13);
+IPAddress drumIP(192, 168, 11, 11);
+IPAddress ferrisWheelIP(192, 168, 11, 10);   // 観覧車ユニキャスト
+IPAddress ferrisWheelGroup(239, 255, 0, 1);  // 未使用（マルチキャスト不安定のため）
+IPAddress instrumentGroup(239, 255, 0, 2);
+
+SyncManager::SyncManager() {
+    // コンストラクタ（今回は初期化処理なし）(インスタンスが作られた瞬間に，自動的に一番最初に1回だけ実行される特殊な関数)
+}
+// Wi-FiおよびUDPの初期化フェーズ
+void SyncManager::begin(const char ssid[], const char pass[]) {
+    WiFi.begin(ssid, pass); // Wi-Fi接続処理を開始
+    // 接続状態が「WL_CONNECTED（接続完了）」になるまでループ待機
+    while (WiFi.status() != WL_CONNECTED) {
+    }
+    Udp.begin(LOCAL_PORT); // 自身のポートを開放し、UDP通信を有効化
+}
+// 演奏開始合図（'S'）を全機へラウンドロビンで同時送信
+void SyncManager::sendStart(uint8_t stepNumber) {
+    // 設計書通りの2バイト固定長ペイロード（第1バイト:ヘッダ'S', 第2バイト:ダミー0x00）
+    uint8_t startPacket[2] = {'S', stepNumber};
+    // ドラムはisInstJoinを'S'受信時にリセットするため、他機より早く
+    // 届かせたい。ただしラウンドロビン送信なら全ターゲットへの到達は
+    // ほぼ同時になるため、この並び自体はもう重要ではない。
+    IPAddress targets[] = {drumIP, ferrisWheelIP, pianoIP, stringsIP, fluteIP};
+    packetRoundRobin(startPacket, 2, targets, 5);
+}
+// BPM情報の送信（引数で段階番号を受け取る）
+// 'B' は観覧車のみが受信するため、観覧車へユニキャスト送信
+void SyncManager::sendBPM(uint8_t stepNumber){
+    uint8_t bpmPacket[2] = {'B',stepNumber};
+    IPAddress targets[] = {ferrisWheelIP};
+    packetRoundRobin(bpmPacket, 2, targets, 1);
+}
+//音量情報の送信（引数で段階番号を受け取る）
+// 'V' は全楽器機が受信するため、各楽器機へユニキャスト送信
+void SyncManager::sendVolume(uint8_t stepNumber){
+    uint8_t volumePacket[2] = {'V',(uint8_t)(6 - stepNumber)};
+    IPAddress targets[] = {fluteIP, pianoIP, stringsIP, drumIP};
+    packetRoundRobin(volumePacket, 2, targets, 4);
+}
+//演奏終了合図（'E'）を全機へラウンドロビンで同時送信
+void SyncManager::sendEnd(){
+    uint8_t endPacket[2] = {'E', 0x00};
+    IPAddress targets[] = {drumIP, ferrisWheelIP, pianoIP, stringsIP, fluteIP};
+    packetRoundRobin(endPacket, 2, targets, 5);
+}
+
+// 複数ターゲットへのラウンドロビン3回冗長送信（パケットロス対策）
+// 1周目で全ターゲットに1回ずつ送り、20ms空けてから2周目、3周目と繰り返す。
+// ターゲットごとに3連射してから次へ進む方式だと、後方のターゲットほど
+// 到達が遅れて機器間で無視できない時間差が生まれるため、この方式にしている。
+void SyncManager::packetRoundRobin(const uint8_t packet[], uint8_t b, const IPAddress targets[], uint8_t targetCount){
+    for (int round = 0; round < 3; round++) {
+        for (uint8_t t = 0; t < targetCount; t++) {
+            Udp.beginPacket(targets[t], TARGET_PORT); // 送信先IPとポートをセット
+            Udp.write(packet, b);
+            Udp.endPacket(); // パケットをパースして実際に送信
+        }
+        // 最後の周（3周目）以外は，20msのインターバル（遅延）を挟む
+        if (round < 2) {
+            delay(20);
+        }
+    }
+}
+\end{lstlisting}
