@@ -8,8 +8,44 @@
 
 \begin{figure}[h]
     \centering
-     \centering
-    \includegraphics[width=\textwidth]{./figs/zentai.png}
+    \resizebox{0.98\textwidth}{!}{%
+    \begin{tikzpicture}[
+        box/.style={rectangle, draw, fill=cyan!55!blue, text=white, font=\bfseries, minimum width=2.6cm, minimum height=1cm, align=center, rounded corners=1pt},
+        subbox/.style={rectangle, draw, fill=cyan!35!blue, text=white, font=\bfseries\small, minimum width=2.3cm, minimum height=0.9cm, align=center, rounded corners=1pt},
+        groupbox/.style={rectangle, draw, dashed, inner sep=10pt},
+        arr/.style={-{Latex[length=2.5mm]}, thick},
+        biarr/.style={{Latex[length=2.5mm]}-{Latex[length=2.5mm]}, thick},
+        lbl/.style={font=\footnotesize, align=center}
+    ]
+
+        \node[box] (siki) at (0,0.8) {指揮\\デバイス};
+        \node[box] (kan) at (4.6,3.2) {中継機\\デバイス};
+
+
+        \node[subbox] (drum) at (11,3.6) {ドラム\\（マスター）};
+        \node[subbox] (piano) at (9,1.2) {ピアノ\\（スレーブ）};
+        \node[subbox] (strings) at (11,0.2) {ストリングス\\（スレーブ）};
+        \node[subbox] (flute) at (13,1.2) {フルート\\（スレーブ）};
+
+        \node[groupbox, fit=(drum)(piano)(strings)(flute)] (gakki) {};
+        \node[font=\bfseries, above=2pt of gakki.north] {各楽器デバイス};
+
+        \node[box] (pc) at (11,-2.3) {PCから演奏再生\\(Processing)};
+
+
+        \draw[arr] (siki) -- (kan) node[midway, lbl, above, sloped] {UDP\\開始，終了／BPM};
+        \draw[arr] (kan) -- (gakki.north west) node[midway, lbl, above, sloped] {レーザー光\\（BPM推定）};
+        \draw[arr] (siki) -- (piano.west) node[midway, lbl, below, sloped] {UDP\\開始，終了／音量};
+
+
+        \draw[biarr] (drum) -- (piano) node[midway, lbl, sloped, above] {UDP（補正）};
+        \draw[biarr] (drum) -- (strings) node[midway, lbl, right] {UDP（補正）};
+        \draw[biarr] (drum) -- (flute) node[midway, lbl, sloped, above] {UDP（補正）};
+
+
+        \draw[arr] (gakki.south) -- (pc.north) node[midway, lbl, right] {USBシリアル通信\\（各機ごと）};
+    \end{tikzpicture}%
+    }
     \caption{全体の構成図}
     \label{zentai}
 \end{figure}
