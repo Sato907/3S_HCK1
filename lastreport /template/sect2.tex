@@ -645,6 +645,15 @@ void SyncManager::packetRoundRobin(const uint8_t packet[], uint8_t b, const IPAd
 
 なお，本節で説明したSyncManagerクラスによって送信された演奏開始・終了，BPM，音量の各情報が，中継機デバイス側でどのように受信・反映されるかについては\ref{sec:kan_naibu}項（中継機デバイスの内部設計）で説明する．
 
+以上で説明した指揮デバイス側の3クラス（SyncManager，PotManager，AccManager）と，中継機デバイス側でこれらの情報を受信するMain（FerrisWheel.ino）およびモータ制御を担うMotorControlクラスとの関係を図\ref{fig:siki_kan_class}に示す．指揮デバイス側のMain（Controller\_simultaneous.ino）はSyncManager・PotManager・AccManagerの3クラスを保持し，'S'（開始），'B'（BPM），'V'（音量），'E'（終了）の各ヘッダを付与したパケットをSyncManager経由で中継機デバイス側のMain（FerrisWheel.ino）へ無線送信する．中継機デバイス側では，受信したヘッダに応じてMotorControlクラスの各関数を呼び出すことで，回転速度の制御が行われる．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figs/classzu.png}
+    \caption{指揮デバイスと中継機デバイスのクラス図}
+    \label{fig:siki_kan_class}
+\end{figure}
+
 
 
 
@@ -1520,9 +1529,29 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
 
 各楽器クラスは，Minimライブラリの提供するInstrumentインタフェースを実装しており，コンストラクタで音色を構築したうえで，noteOn関数で発音を，noteOff関数で消音を行う共通の枠組みに従っている．発音命令はInstrumentPlayerクラスを介して各楽器固有のクラスへ委譲され，波形生成に必要なLUTデータはDataUtilsクラスに集約されている．最終的な音声信号は，楽器の種類に応じてAddReverbによる残響エフェクトを通したうえでAudioOutputへ出力される．プログラム全文は付録に示す．
 
+以上の各クラスの関係をまとめたクラス図を図\ref{fig:gakki_class}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figs/2026HCK_processing_クラス図-ページ-1.drawio.png}
+    \caption{楽器デバイス（Processing）のクラス図}
+    \label{fig:gakki_class}
+\end{figure}
+
+図\ref{fig:gakki_class}に示すように，Main（SoundProcessingCode.pde）がInstrumentPlayerおよびDataUtilsのインスタンスを保持し，発音命令の委譲と波形合成用データの取得を行う．AddReverbはInstrumentPlayerを介して生成された各楽器クラスの出力に対して独立に適用される残響エフェクトであり，FluteInstrument・StringsInstrument・PianoInstrumentおよびKickInstrument・HiHatInstrument・SnareInstrumentの各打楽器クラスは，いずれもDataUtilsから取得した倍音プロファイルをもとに波形を合成する．
+
 ここからは，シリアル通信によるArduinoとの連携，LUTデータの管理（DataUtils），発音命令の委譲（InstrumentPlayer），残響エフェクト（AddEffect），デバッグ用自動演奏（NoteSampler），各楽器クラスによる音色合成の順に，使用する変数・関数の仕様と処理内容について説明する．
 
-まず，Arduinoとのシリアル通信および発音ディスパッチについて説明する．SoundProcessingCode.pdeのsetup関数では，Minimライブラリの初期化，残響用バス（longOut・shortOut）の生成，InstrumentPlayerおよびDataUtilsの初期化，そしてシリアルポートの初期化を行う．楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，定数arduinoNumberによって，このProcessingインスタンスがどの楽器として動作するかを切り替える．Main（SoundProcessingCode.pde）で使用する主な変数の仕様を表\ref{table:gakki_main_var}に示す．
+まず，Arduinoとのシリアル通信および発音ディスパッチについて説明する．setup関数のフローチャートを図\ref{fig:gakki_setup}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/SC_setup.pdf}
+    \caption{setup関数のフローチャート}
+    \label{fig:gakki_setup}
+\end{figure}
+
+図\ref{fig:gakki_setup}に示すように，SoundProcessingCode.pdeのsetup関数では，Minimライブラリの初期化，残響用バス（longOut・shortOut）の生成，InstrumentPlayerおよびDataUtilsの初期化，そしてシリアルポートの初期化を行う．楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，定数arduinoNumberによって，このProcessingインスタンスがどの楽器として動作するかを切り替える．Main（SoundProcessingCode.pde）で使用する主な変数の仕様を表\ref{table:gakki_main_var}に示す．
 
 \begin{table}[H]
     \caption{Main（SoundProcessingCode.pde）で使用する主な変数の仕様一覧}
@@ -1572,7 +1601,26 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:gakki_main_func}に示した関数のうち，実際の演奏に用いられるserialEvent関数について，実際のコードとともに説明する．この関数は，Arduinoから届いた1行のデータをカンマで分割し，先頭要素をヘッダとして判定する．ヘッダが'N'（発音指示）の場合，5個1組（音程・長さ・開始ベロシティ・終了ベロシティ・種別）のデータを順に読み取り，durationにはBPMに応じた時間換算（$60000 \div (\text{BPM} \times 24)$）を施したうえで，arduinoNumberに応じた楽器のPlay関数を呼び出す．serialEvent関数の発音指示部分をコード\ref{lst:gakki_serial}に示す．
+続いて，draw関数について説明する．draw関数のフローチャートを図\ref{fig:gakki_draw}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/SC_draw.pdf}
+    \caption{draw関数のフローチャート}
+    \label{fig:gakki_draw}
+\end{figure}
+
+図\ref{fig:gakki_draw}に示すように，draw関数は，Minimライブラリが提供するオシロスコープ波形とFFTスペクトルアナライザを毎フレーム描画する関数であり，20〜20000Hzの範囲を対数スケールに変換したうえでスペクトルの線を描画し，最後にX軸・Y軸の目盛りとラベルを描画する．なお，この描画処理はデバッグ時の音色確認を目的としたものであり，発音タイミング自体には関与しない．
+
+以下では，表\ref{table:gakki_main_func}に示した関数のうち，実際の演奏に用いられるserialEvent関数について，実際のコードとともに説明する．serialEvent関数のフローチャートを図\ref{fig:gakki_serialevent}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.6\linewidth]{figs/SC_serialEvent.pdf}
+    \caption{serialEvent関数のフローチャート}
+    \label{fig:gakki_serialevent}
+\end{figure}
+この関数は，Arduinoから届いた1行のデータをカンマで分割し，先頭要素をヘッダとして判定する．ヘッダが'N'（発音指示）の場合，5個1組（音程・長さ・開始ベロシティ・終了ベロシティ・種別）のデータを順に読み取り，durationにはBPMに応じた時間換算（$60000 \div (\text{BPM} \times 24)$）を施したうえで，arduinoNumberに応じた楽器のPlay関数を呼び出す．serialEvent関数の発音指示部分をコード\ref{lst:gakki_serial}に示す．
 
 \begin{lstlisting}[caption={serialEvent関数（発音指示'N'の処理部分）}, label={lst:gakki_serial}]
 case "N" :
@@ -1615,7 +1663,18 @@ case "N" :
 
 ここで，種別typeによる分岐は，ハッカソン第11回時点でトランペット（TrumpetInstrument）とホルン（HornInstrument）を追加したことに伴い，楽譜データ上で発音する楽器の種類を判別するために新設されたものである．また，ヘッダが'B'（BPM変更）の場合はmusicBPMを60〜180の範囲に制限して更新し，ヘッダが'V'（マスターボリューム変更）の場合はcurrentMasterVolumeを0.2〜1.0の範囲に写像して更新する．
 
-次に，楽器デバイスにおけるLUTデータの管理（DataUtilsクラス）について説明する．本デバイスでは，アイオワ大学等が公開する実楽器の音声データをFFT解析し，各音程・各強弱（pp/mf/ff）ごとの「周波数と振幅のペア」をJSON形式のLUTとして事前に用意している．DataUtilsクラスは，このLUTの読み込みと，発音時のピッチ・ベロシティに応じた倍音プロファイルの動的な取得を担う．DataUtilsクラスで使用する主な変数の仕様を表\ref{table:gakki_utils_var}に示す．
+続いて，Play/keyPressed関数について説明する．Play関数のフローチャートを図\ref{fig:gakki_play}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figs/SC_Play.pdf}
+    \caption{Play関数のフローチャート}
+    \label{fig:gakki_play}
+\end{figure}
+
+図\ref{fig:gakki_play}に示すように，この関数は，isDebugModeが有効な場合にのみキー入力から呼び出される，Arduino未接続でも単体で音色を試奏するための関数であり，キー操作によってあらかじめ設定された音程・強弱等（soundOctave，soundDoReMi，soundStartVelocity，soundEndVelocity）をもとに，変数timbreが示す楽器（Flute／Strings／Piano／Drum等）に応じたInstrumentPlayerのPlayXxx関数を呼び出す．Drumが選択されている場合は，さらにsoundDoReMiの値によってPlayKick／PlaySnare／PlayHiHatのいずれかへ分岐する．
+
+次に，楽器デバイスにおけるLUTデータの管理（DataUtilsクラス）について説明する．計画書当初は，倍音の周波数と振幅を数式によって機械的に算出し合成する設計を検討していたが，低音域や高音域において実在の楽器との音色の再現度が低下するという問題が生じたため，実際はアイオワ大学等が公開する実楽器の音声データをFFT解析し，各音程・各強弱（pp/mf/ff）ごとの「周波数と振幅のペア」を抽出してJSON形式のLUTとして事前に用意しておく設計に変更した．DataUtilsクラスは，このLUTの読み込みと，発音時のピッチ・ベロシティに応じた倍音プロファイルの動的な取得を担う．DataUtilsクラスで使用する主な変数の仕様を表\ref{table:gakki_utils_var}に示す．
 
 \begin{table}[H]
     \caption{DataUtilsクラスで使用する主な変数の仕様一覧}
@@ -1659,7 +1718,48 @@ case "N" :
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:gakki_utils_func}に示した関数のうち，本デバイスの音色再現の核となるGetProfileForPitch関数とGetDynamicProfile関数について，実際のコードとともに説明する．はじめに，GetProfileForPitch関数について説明する．この関数は，要求されたピッチに最も近い有効なサンプルインデックスをLUTから探索し，そのサンプルが本来持つ基準音程（sourceMidi）と要求ピッチとの半音差から求めた倍率（pitchShiftFactor）を，実測された周波数構造にそのまま乗算することで，インハーモニシティ（倍音の非整数性）のデコボコを保持したまま滑らかにピッチをスケーリングする．GetProfileForPitch関数の要部をコード\ref{lst:gakki_getprofile}に示す．
+続いて，DataUtilsクラスのコンストラクタについて説明する．コンストラクタのフローチャートを図\ref{fig:gakki_datautils_ctor}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.4\linewidth]{figs/DU_DataUtils.pdf}
+    \caption{DataUtilsクラスのコンストラクタのフローチャート}
+    \label{fig:gakki_datautils_ctor}
+\end{figure}
+
+図\ref{fig:gakki_datautils_ctor}に示すように，コンストラクタでは，Load2LUT関数を用いて楽譜データやピアノ・ドラムの特殊データ等の2次元LUTを読み込んだうえで，Load3LUT関数を用いて各楽器・各強弱ごとの波形データ（3次元LUT）を読み込むことで，DataUtilsが保持する全LUTデータの初期化を行う．
+
+次に，Load2LUT関数およびLoad3LUT関数について説明する．両関数のフローチャートを図\ref{fig:gakki_loadlut}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.55\linewidth]{figs/DU_LoadLUT.pdf}
+    \caption{Load2LUT関数・Load3LUT関数のフローチャート}
+    \label{fig:gakki_loadlut}
+\end{figure}
+
+図\ref{fig:gakki_loadlut}に示すように，両関数はいずれもJSONファイルを1行ずつ読み込み，各行のデータが2次元か3次元かに応じて，Load2LUTはfloat配列として，Load3LUTは[周波数, 振幅]のペア配列（float[][2]）として格納する．読み込み対象のデータが存在しない場合は，データ欠損として扱い該当要素をnullのまま格納する．
+
+次に，GetLUT関数について説明する．GetLUT関数のフローチャートを図\ref{fig:gakki_getlut}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/DU_GetLUT.pdf}
+    \caption{GetLUT関数のフローチャート}
+    \label{fig:gakki_getlut}
+\end{figure}
+
+図\ref{fig:gakki_getlut}に示すように，この関数は，引数typeに指定された文字列に応じて，NoteSamplerが参照する試奏用楽譜データ，ピアノ専用の減衰特性等のLUT，およびドラム各パート（Kick／Snare／HiHat）のLUTのいずれかを返す統合ゲッターであり，該当する種別が存在しない場合はエラーを出力してnullを返す．
+
+以下では，表\ref{table:gakki_utils_func}に示した関数のうち，本デバイスの音色再現の核となるGetProfileForPitch関数とGetDynamicProfile関数について，実際のコードとともに説明する．はじめに，GetProfileForPitch関数について説明する．GetProfileForPitch関数のフローチャートを図\ref{fig:gakki_getprofile}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/DU_GetProfileForPitch.pdf}
+    \caption{GetProfileForPitch関数のフローチャート}
+    \label{fig:gakki_getprofile}
+\end{figure}
+この関数は，要求されたピッチに最も近い有効なサンプルインデックスをLUTから探索し，そのサンプルが本来持つ基準音程（sourceMidi）と要求ピッチとの半音差から求めた倍率（pitchShiftFactor）を，実測された周波数構造にそのまま乗算することで，インハーモニシティ（倍音の非整数性）のデコボコを保持したまま滑らかにピッチをスケーリングする．GetProfileForPitch関数の要部をコード\ref{lst:gakki_getprofile}に示す．
 
 \begin{lstlisting}[caption={DataUtils::GetProfileForPitch関数（要部）}, label={lst:gakki_getprofile}]
 float[][] GetProfileForPitch(float pitch, float[][][] lut, int baseMidiNote) {
@@ -1691,7 +1791,16 @@ float[][] GetProfileForPitch(float pitch, float[][][] lut, int baseMidiNote) {
 }
 \end{lstlisting}
 
-次に，GetDynamicProfile関数について説明する．この関数は，まずpp/mf/ffの3つの強弱プロファイルをGetProfileForPitch関数で取得したうえで，ベロシティを0〜1に正規化し，あらかじめ定めた3つの閾値（32/80/112 を127で除した値）と比較して，隣接する2つの強弱のうちベロシティに近い方のプロファイル形状を採用する．続いて，振幅0.05未満の微小なピークを除去したうえで，採用した各ピークの振幅の2乗和（エネルギー）に対する目標音量の比からゲインを算出し，全ピークへ一括で乗算することで最終的な音量を決定する．GetDynamicProfile関数の要部をコード\ref{lst:gakki_getdynamic}に示す．
+次に，GetDynamicProfile関数について説明する．GetDynamicProfile関数のフローチャートを図\ref{fig:gakki_getdynamic}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/DU_GetDynamicProfile.pdf}
+    \caption{GetDynamicProfile関数のフローチャート}
+    \label{fig:gakki_getdynamic}
+\end{figure}
+
+この関数は，まずpp/mf/ffの3つの強弱プロファイルをGetProfileForPitch関数で取得したうえで，ベロシティを0〜1に正規化し，あらかじめ定めた3つの閾値（32/80/112 を127で除した値）と比較して，隣接する2つの強弱のうちベロシティに近い方のプロファイル形状を採用する．続いて，振幅0.05未満の微小なピークを除去したうえで，採用した各ピークの振幅の2乗和（エネルギー）に対する目標音量の比からゲインを算出し，全ピークへ一括で乗算することで最終的な音量を決定する．GetDynamicProfile関数の要部をコード\ref{lst:gakki_getdynamic}に示す．
 
 \begin{lstlisting}[caption={DataUtils::GetDynamicProfile関数（要部）}, label={lst:gakki_getdynamic}]
 float[][] GetDynamicProfile(float pitch, float velocity, String type, int baseMidiNote, float basePower) {
@@ -1740,7 +1849,16 @@ float[][] GetDynamicProfile(float pitch, float velocity, String type, int baseMi
 }
 \end{lstlisting}
 
-次に，発音命令の委譲を行うInstrumentPlayerクラスについて説明する．このクラスは，AudioOutputへの参照を保持し，各PlayXxx関数が呼び出されるたびに，対応する楽器クラスのインスタンスをその場で生成してout.playNote関数へ渡すという単純な委譲処理のみを行う．InstrumentPlayerクラスで使用する主な関数の仕様を表\ref{table:gakki_player_func}に示す．
+次に，発音命令の委譲を行うInstrumentPlayerクラスについて説明する．InstrumentPlayerクラスのコンストラクタおよびPlayXxx関数のフローチャートを図\ref{fig:gakki_instplayer}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figs/InstrumentPlayer.pdf}
+    \caption{InstrumentPlayerクラスのフローチャート}
+    \label{fig:gakki_instplayer}
+\end{figure}
+
+このクラスは，AudioOutputへの参照を保持し，各PlayXxx関数が呼び出されるたびに，対応する楽器クラスのインスタンスをその場で生成してout.playNote関数へ渡すという単純な委譲処理のみを行う．InstrumentPlayerクラスで使用する主な関数の仕様を表\ref{table:gakki_player_func}に示す．
 
 \begin{table}[H]
     \caption{InstrumentPlayerクラスで使用する主な関数の仕様一覧}
@@ -1768,7 +1886,16 @@ void PlayFlute(float midiNote, float duration, float startVel, float endVel, flo
 }
 \end{lstlisting}
 
-次に，残響エフェクトを付加するAddEffect.pdeのAddReverbクラスについて説明する．このクラスはMinimライブラリのUGenを継承しており，講義で扱われたたたみ込み積分（コンボリューション）を，指数関数的に減衰するランダムノイズを疑似的なインパルス応答として用いることで実装している．左右のチャンネルの記憶バッファ（historyBufferL・historyBufferR）を独立させることで，ステレオ音場に対応している．AddReverbクラスの心臓部であるuGenerate関数をコード\ref{lst:gakki_reverb}に示す．
+次に，残響エフェクトを付加するAddEffect.pdeのAddReverbクラスについて説明する．AddReverbクラスのコンストラクタおよびuGenerate関数のフローチャートを図\ref{fig:gakki_addreverb}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figs/AE_AddReverb.pdf}
+    \caption{AddReverbクラスのフローチャート}
+    \label{fig:gakki_addreverb}
+\end{figure}
+
+このクラスはMinimライブラリのUGenを継承しており，講義で扱われたたたみ込み積分（コンボリューション）を，指数関数的に減衰するランダムノイズを疑似的なインパルス応答として用いることで実装している．左右のチャンネルの記憶バッファ（historyBufferL・historyBufferR）を独立させることで，ステレオ音場に対応している．AddReverbクラスの心臓部であるuGenerate関数をコード\ref{lst:gakki_reverb}に示す．
 
 \begin{lstlisting}[caption={AddReverb::uGenerate関数}, label={lst:gakki_reverb}]
 protected void uGenerate(float[] channels) {
@@ -1800,7 +1927,16 @@ protected void uGenerate(float[] channels) {
 
 setup関数内では，持続音向けの残響バスlongOut（カーネルサイズ15000，レベル0.20）と，打撃音向けの残響バスshortOut（カーネルサイズ2000，レベル0.25）の2種類のAddReverbが生成されており，各楽器クラスはnoteOn関数内でmasterEnvをこのいずれかへパッチすることで，音色に適した残響を選択している．
 
-次に，デバッグ用の自動演奏機能を提供するNoteSampler.pdeについて説明する．本機能は，指揮デバイスや中継機デバイスが未接続の状態でもPC単体で音色の検証を行えるようにするためのものであり，Processingの標準描画ループ（draw）に依存すると波形描画の負荷でタイミングがずれるため，音楽専用のスレッド（audioThread）を用いて高精度にタイミングを管理している．NoteSampler.pdeで使用する主な変数の仕様を表\ref{table:gakki_sampler_var}に示す．
+次に，デバッグ用の自動演奏機能を提供するNoteSampler.pdeについて説明する．本機能は，指揮デバイスや中継機デバイスが未接続の状態でもPC単体で音色の検証を行えるようにするためのものであり，Processingの標準描画ループ（draw）に依存すると波形描画の負荷でタイミングがずれるため，音楽専用のスレッド（audioThread）を用いて高精度にタイミングを管理している．audioThreadの処理ループおよびSoundPlay関数のフローチャートを図\ref{fig:gakki_soundplay_thread}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.45\linewidth]{figs/SC_SoundPlay.pdf}
+    \caption{audioThreadの処理ループおよびSoundPlay関数のフローチャート}
+    \label{fig:gakki_soundplay_thread}
+\end{figure}
+
+図\ref{fig:gakki_soundplay_thread}に示すように，スレッドはisPlayingおよびisDebugModeが共に有効な間，一定のインターバルごとにSoundPlay関数を呼び出し，現在のtickに該当する音符をNote配列から取得して各楽器のPlayメソッドを呼び出したうえで，次の音符のtickへ進む．NoteSampler.pdeで使用する主な変数の仕様を表\ref{table:gakki_sampler_var}に示す．
 
 \begin{table}[H]
     \caption{NoteSampler.pdeで使用する主な変数の仕様一覧}
@@ -1879,7 +2015,16 @@ void SoundPlay() {
 最後に，各楽器クラスによる音色合成について説明する．いずれの楽器クラスも，コンストラクタ内でDataUtilsから取得した倍音プロファイルをもとに正弦波（Oscil）を加算合成し，ADSR（Attack, Decay, Sustain, Release）エンベロープおよびLineによる時間変化を付加したうえでミキサー（Summer）へ結線し，noteOn関数でエンベロープとLineを一斉に起動する，という共通の設計に従っている．以下では，各楽器クラスに特有の合成技法について，実際のコードとともに説明する．
 
 \paragraph{フルート（FluteInstrument）}
-まず，フルートの音色合成について説明する．FluteInstrumentクラスは，DataUtilsから取得した倍音プロファイルをもとに正弦波を加算合成する層と，息が管に吹き込まれる音（Chiff）を再現するノイズ層の2層構造で構成される．加算合成の各倍音には，globalBreathSpeedという1つの共通の乱数速度で駆動されるビブラート（FM変調）と，倍音ごとに個別の深さを持つ音量の呼吸的揺らぎ（AM変調）が付加されている．FluteInstrumentクラスで使用する主な変数の仕様を表\ref{table:gakki_flute_var}に示す．
+まず，フルートの音色合成について説明する．FluteInstrumentコンストラクタのフローチャートを図\ref{fig:gakki_flute}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/FI_FluteInstrument.pdf}
+    \caption{FluteInstrumentコンストラクタのフローチャート}
+    \label{fig:gakki_flute}
+\end{figure}
+
+FluteInstrumentクラスは，DataUtilsから取得した倍音プロファイルをもとに正弦波を加算合成する層と，息が管に吹き込まれる音（Chiff）を再現するノイズ層の2層構造で構成される．加算合成の各倍音には，globalBreathSpeedという1つの共通の乱数速度で駆動されるビブラート（FM変調）と，倍音ごとに個別の深さを持つ音量の呼吸的揺らぎ（AM変調）が付加されている．FluteInstrumentクラスで使用する主な変数の仕様を表\ref{table:gakki_flute_var}に示す．
 
 \begin{table}[H]
     \caption{FluteInstrumentクラスで使用する主な変数の仕様一覧}
@@ -2076,7 +2221,16 @@ private void createInstrumentOscillators(final float[][] profile, float blendRat
 \end{lstlisting}
 
 \paragraph{ピアノ（PianoInstrument）}
-次に，ピアノの音色合成について説明する．PianoInstrumentクラスは，1つの音に対して2本の弦をわずかにデチューン（周波数をずらす）して重ねる「デュアル・ストリング構造」により，時間が経つにつれて自然に生じる音のうなり（Beat）を再現している点が特徴である．また，実測データ（LUT）が存在しない倍音・音域については，ピアノの物理特性の傾向を数式化した近似モデルで補完するハイブリッド方式を採用している．PianoInstrumentクラスで使用する主な変数・関数の仕様を表\ref{table:gakki_piano}に示す．
+次に，ピアノの音色合成について説明する．PianoInstrumentコンストラクタのフローチャートを図\ref{fig:gakki_piano}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/PI_PianoInstrument.pdf}
+    \caption{PianoInstrumentコンストラクタのフローチャート}
+    \label{fig:gakki_piano}
+\end{figure}
+
+PianoInstrumentクラスは，1つの音に対して2本の弦をわずかにデチューン（周波数をずらす）して重ねる「デュアル・ストリング構造」により，時間が経つにつれて自然に生じる音のうなり（Beat）を再現している点が特徴である．また，実測データ（LUT）が存在しない倍音・音域については，ピアノの物理特性の傾向を数式化した近似モデルで補完するハイブリッド方式を採用している．PianoInstrumentクラスで使用する主な変数・関数の仕様を表\ref{table:gakki_piano}に示す．
 
 \begin{table}[H]
     \caption{PianoInstrumentクラスで使用する主な変数・関数の仕様一覧}
@@ -2135,7 +2289,16 @@ hammerNoise.patch(hammerFilter).patch(hammerEnv);
 \end{lstlisting}
 
 \paragraph{ドラム（KickInstrument・SnareInstrument・HiHatInstrument）}
-次に，ドラムの音色合成について説明する．ドラムはフルート等の旋律楽器とは異なり，Instrumentクラスをキック・スネア・ハイハットの3種類（および過去に試作されたSnareInstrumentOld・HiHatInstrumentOldの旧版，未使用のCymbalInstrument）に分けて実装している．いずれも短時間で減衰する打撃音であるため，全体の出力はshortOutバスへパッチされる．3種の主要な変数・関数の仕様を表\ref{table:gakki_drum}に示す．
+次に，ドラムの音色合成について説明する．Kick・Snare・HiHatの各コンストラクタのフローチャートを図\ref{fig:gakki_drum}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figs/DI_DrumInstrument.pdf}
+    \caption{Kick・Snare・HiHatの各コンストラクタのフローチャート}
+    \label{fig:gakki_drum}
+\end{figure}
+
+ドラムはフルート等の旋律楽器とは異なり，Instrumentクラスをキック・スネア・ハイハットの3種類（および過去に試作されたSnareInstrumentOld・HiHatInstrumentOldの旧版，未使用のCymbalInstrument）に分けて実装している．いずれも短時間で減衰する打撃音であるため，全体の出力はshortOutバスへパッチされる．3種の主要な変数・関数の仕様を表\ref{table:gakki_drum}に示す．
 
 \begin{table}[H]
     \caption{ドラム関連クラスで使用する主な変数・関数の仕様一覧}
