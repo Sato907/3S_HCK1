@@ -1,0 +1,181 @@
+\section{回転速度実測プログラム（LaserIntervalTest）のプログラムソース}
+本節では，中継機デバイスの回転速度実測に用いたLaserIntervalTest.inoの全文を示す．
+
+\subsection{LaserIntervalTest.ino}
+\begin{lstlisting}[caption={LaserIntervalTest.ino}, label={lst:laser_full}]
+// CdSセルでのレーザー検知間隔を計測するスケッチ
+// 連続する2回のパルス検知の時間差(interval)をシリアルモニタに表示し続ける。
+//
+// 検知ロジックは HCK_inst_0701 の drum_0701.ino / notDrum_0701.ino で使っている
+// SyncManager::detectLight() をそのまま流用（起動時キャリブレーション＋
+// 直近ピーク履歴による適応しきい値）。BPM段階への変換は行わず、生のinterval[ms]
+// だけを出す。
+
+const int CDS_PIN = A0;
+
+const int CDS_ON_THRESHOLD  = 800; // 起動直後だけ使う仮しきい値
+const int CDS_OFF_THRESHOLD = 780; // 起動直後だけ使う仮しきい値
+const int CDS_MIN_DELTA = 25;      // 暗い状態との差がこれ未満ならレーザー扱いしない
+const uint8_t CDS_PEAK_HISTORY = 4; // 直近何回分のピークからしきい値を決めるか
+const uint8_t CDS_ON_RATIO = 65;    // baselineからピークまでの65%をONしきい値にする
+const uint8_t CDS_OFF_RATIO = 35;   // baselineからピークまでの35%をOFFしきい値にする
+const int CDS_THRESHOLD_STEP_LIMIT = 25; // 1回の検出でしきい値が動きすぎない上限
+const unsigned long CDS_STARTUP_CALIBRATION_MS = 1000; // 起動直後の誤検出防止時間
+const unsigned long DEBOUNCE_MS = 200;
+
+class LaserDetector {
+public:
+  LaserDetector()
+    : lastDetectTime(0), laserOn(false),
+      baseline(0), baselineReady(false),
+      onThreshold(CDS_ON_THRESHOLD), offThreshold(CDS_OFF_THRESHOLD),
+      pulsePeak(0), peakIndex(0), peakCount(0),
+      calibrated(false), startupCalibrated(false), waitingForRelease(false),
+      calibrationStartMs(0), startupMin(1023), releaseThreshold(0) {
+    clearPeakHistory();
+  }
+
+  // 新しいパルスを検知したら true を返す。interval[ms] を out に書く（前回検知が無ければ0）。
+  bool update(int cdsValue, unsigned long nowMs, unsigned long &intervalOut) {
+    if (calibrationStartMs == 0) calibrationStartMs = nowMs;
+    if (!detectLight(cdsValue, nowMs)) return false;
+    if (nowMs - lastDetectTime < DEBOUNCE_MS) return false;
+
+    intervalOut = (lastDetectTime != 0) ? (nowMs - lastDetectTime) : 0;
+    bool hasInterval = (lastDetectTime != 0);
+    lastDetectTime = nowMs;
+    return hasInterval;
+  }
+
+private:
+  unsigned long lastDetectTime;
+  bool          laserOn;
+  int           baseline;
+  bool          baselineReady;
+  int           onThreshold;
+  int           offThreshold;
+  int           pulsePeak;
+  int           peakHistory[CDS_PEAK_HISTORY];
+  uint8_t       peakIndex;
+  uint8_t       peakCount;
+  bool          calibrated;
+  bool          startupCalibrated;
+  bool          waitingForRelease;
+  unsigned long calibrationStartMs;
+  int           startupMin;
+  int           releaseThreshold;
+
+  bool detectLight(int v, unsigned long nowMs) {
+    if (!baselineReady) {
+      baseline = v;
+      startupMin = v;
+      baselineReady = true;
+      updateFallbackThresholds();
+    }
+
+    // 起動直後にレーザーが当たっていても、最初の1秒は検出せず暗い側の値を探す
+    if (!startupCalibrated) {
+      if (v < startupMin) startupMin = v;
+      baseline = startupMin;
+      updateFallbackThresholds();
+      if (nowMs - calibrationStartMs < CDS_STARTUP_CALIBRATION_MS) return false;
+      startupCalibrated = true;
+      waitingForRelease = (v >= onThreshold);
+      releaseThreshold = (baseline > 1023 - CDS_MIN_DELTA) ? baseline - CDS_MIN_DELTA : offThreshold;
+      return false;
+    }
+
+    if (waitingForRelease) {
+      if (v <= releaseThreshold) {
+        baseline = v;
+        updateFallbackThresholds();
+        waitingForRelease = false;
+      }
+      return false;
+    }
+
+    if (!laserOn) {
+      if (v < baseline) baseline = v;
+      else baseline = (baseline * 31 + v) / 32;
+      if (!calibrated) updateFallbackThresholds();
+    }
+
+    if (!laserOn && v >= onThreshold) {
+      laserOn = true;
+      pulsePeak = v;
+      return true;
+    }
+
+    if (laserOn) {
+      if (v > pulsePeak) pulsePeak = v;
+      if (v <= offThreshold) {
+        laserOn = false;
+        registerPeak(pulsePeak);
+      }
+    }
+    return false;
+  }
+
+  void registerPeak(int peak) {
+    if (peak - baseline < CDS_MIN_DELTA) return;
+
+    peakHistory[peakIndex] = peak;
+    peakIndex = (peakIndex + 1) % CDS_PEAK_HISTORY;
+    if (peakCount < CDS_PEAK_HISTORY) peakCount++;
+    if (peakCount < 3) return;
+
+    long sum = 0;
+    for (uint8_t i = 0; i < peakCount; i++) sum += peakHistory[i];
+    int peakAvg = sum / peakCount;
+    int amplitude = peakAvg - baseline;
+    if (amplitude < CDS_MIN_DELTA) return;
+
+    int targetOn = constrain(baseline + (amplitude * CDS_ON_RATIO) / 100, 0, 1023);
+    int targetOff = constrain(baseline + (amplitude * CDS_OFF_RATIO) / 100, 0, targetOn - 5);
+
+    if (!calibrated) {
+      onThreshold = targetOn;
+      offThreshold = targetOff;
+      calibrated = true;
+    } else {
+      onThreshold = limitStep(onThreshold, targetOn, CDS_THRESHOLD_STEP_LIMIT);
+      offThreshold = limitStep(offThreshold, targetOff, CDS_THRESHOLD_STEP_LIMIT);
+    }
+    if (offThreshold >= onThreshold) offThreshold = max(0, onThreshold - 5);
+  }
+
+  void updateFallbackThresholds() {
+    onThreshold = constrain(baseline + CDS_MIN_DELTA, 0, 1023);
+    offThreshold = constrain(baseline + CDS_MIN_DELTA / 2, 0, max(0, onThreshold - 5));
+  }
+
+  int limitStep(int current, int target, int limit) {
+    if (target > current + limit) return current + limit;
+    if (target < current - limit) return current - limit;
+    return target;
+  }
+
+  void clearPeakHistory() {
+    for (uint8_t i = 0; i < CDS_PEAK_HISTORY; i++) peakHistory[i] = 0;
+  }
+};
+
+LaserDetector detector;
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("--- レーザー間隔計測 Setup Started ---");
+}
+
+void loop() {
+  unsigned long now      = millis();
+  int           cdsValue = analogRead(CDS_PIN);
+  unsigned long interval = 0;
+
+  if (detector.update(cdsValue, now, interval)) {
+    Serial.print("[interval] ");
+    Serial.print(interval);
+    Serial.println(" ms");
+  }
+}
+\end{lstlisting}
