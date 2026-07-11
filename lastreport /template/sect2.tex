@@ -2074,3 +2074,349 @@ for(int i = 0; i < numHarmonics; i++) {
 \end{lstlisting}
 
 プログラム全文は付録に示す．
+
+\paragraph{楽器デバイスの同期方式（douki\_saigo）}
+次に，各楽器デバイスの同期方式を担うArduinoプログラムについて説明する．楽器デバイスは，指揮デバイスからの演奏開始指示を受けた後，中継機デバイスの回転に伴うレーザー光をCdSセルで検知することでおおまかなBPMを推定し，さらに楽器機同士のUDP通信によって発音タイミングを細かく補正することで，複数台のArduino間での高精度な同期を実現している．この同期方式では，ドラムを担当するArduinoを基準時刻源（マスター）とし，ピアノ・ストリングス・フルートを担当する3台のArduinoをスレーブとするマスタースレーブ方式が採用されている．
+
+続いて，同期プログラムのファイル構成を示す．表\ref{table:douki_files}の通り，各ファイルは担当する楽器ごとに用意されている．
+
+\begin{table}[H]
+    \caption{同期プログラム（douki\_saigo）のファイル構成}
+    \centering
+    \label{table:douki_files}
+    \begin{tabular}{p{4cm}p{10cm}}
+    \hline
+    \textbf{ファイル名} & \textbf{概要}\\
+    \hline
+    \texttt{drum\_0706.ino} & ドラム担当機のプログラム．同期のマスターとして動作し，全楽器機の発音タイミングを管理する\\
+    \hline
+    \texttt{flute\_0706.ino} & フルート担当機のプログラム．同期のスレーブとして動作する\\
+    \hline
+    \texttt{piano\_0706.ino} & ピアノ担当機のプログラム．同期のスレーブとして動作する\\
+    \hline
+    \texttt{strings\_0706.ino} & ストリングス担当機のプログラム．同期のスレーブとして動作する\\
+    \hline
+    \end{tabular}
+\end{table}
+
+\texttt{flute\_0706.ino}・\texttt{piano\_0706.ino}・\texttt{strings\_0706.ino}の3ファイルは，IPアドレス・楽器ID・CdS検知しきい値・埋め込みの楽譜データが異なるのみで，通信・同期ロジックの構造は完全に同一である．そのため，以下ではスレーブ側の代表例として\texttt{flute\_0706.ino}を用いて説明し，マスター側は\texttt{drum\_0706.ino}を用いて説明する．
+
+次に，各Arduino間の同期に用いられる通信ヘッダの一覧を示す．表\ref{table:douki_headers}の通り，指揮デバイスからの一斉指示に加え，マスター・スレーブ間で複数種類のパケットがやり取りされる．
+
+\begin{table}[H]
+    \caption{楽器機間の同期通信で使用するヘッダの一覧}
+    \centering
+    \label{table:douki_headers}
+    \begin{tabular}{p{1.5cm}p{4.3cm}p{7.7cm}}
+    \hline
+    \textbf{ヘッダ} & \textbf{送信元 → 送信先} & \textbf{概要}\\
+    \hline
+    'S' & 指揮デバイス → 全楽器機 & 演奏開始指示．受信した各機は状態を初期化する\\
+    \hline
+    'E' & 指揮デバイス → 全楽器機 & 演奏終了指示．受信した各機は状態を停止状態に戻す\\
+    \hline
+    'V' & 指揮デバイス → 全楽器機 & 音量段階の通知\\
+    \hline
+    'J' & スレーブ → マスター & 同期への参加予告\\
+    \hline
+    'M' & スレーブ → マスター & レーザー検知によるBPM提案\\
+    \hline
+    'N' & マスター → 各スレーブ & 多数決により決定した確定BPMのブロードキャスト\\
+    \hline
+    'T' & スレーブ → マスター & 自身の\texttt{globalTick}の報告（diff算出依頼）\\
+    \hline
+    'R' & マスター → スレーブ & T受信時点での\texttt{diff}（Tick差分）の返信\\
+    \hline
+    'O' & マスター → スレーブ & 演奏開始タイミング（\texttt{startGlobalTick}）の指示\\
+    \hline
+    \end{tabular}
+\end{table}
+
+続いて，レーザー光の検知処理について説明する．各Arduinoは，中継機デバイスの回転周期をCdSセルで検知するために，\ref{sec:kan_naibu}項で説明した\texttt{LaserDetector}クラスと同一の適応しきい値方式のロジックを実装した\texttt{SyncManager}クラスを備えている．検知したパルス間隔から求めた実測BPMは，マスターでは自身のBPM推定値として，スレーブでは'M'通信によるBPM提案として用いられる．検知ロジックの詳細な実装は\ref{sec:kan_naibu}項および付録に示すプログラム全文を参照されたい．
+
+次に，ドラム機（マスター）における同期状態管理について説明する．マスターは，\texttt{state}という状態変数によって管理される5段階の状態遷移に沿って動作する．各状態の内容を表\ref{table:douki_master_state}に示す．
+
+\begin{table}[H]
+    \caption{ドラム機（マスター）の状態遷移一覧}
+    \centering
+    \label{table:douki_master_state}
+    \begin{tabular}{p{1.5cm}p{12cm}}
+    \hline
+    \textbf{state} & \textbf{内容}\\
+    \hline
+    0 & BPM安定待ち．レーザー検知によるBPM推定値が\texttt{MIN\_STABLE\_COUNT}回連続で一致するまで待機する\\
+    \hline
+    1 & 楽器と同期中．参加を予告したスレーブ全機について，'T'受信時に返す\texttt{diff}が閾値以内に収まるまで待機する\\
+    \hline
+    2 & 同期完了・演奏開始前．各スレーブへの'O'通信の送信タイミングを監視しつつ，ドラム自身の演奏開始タイミングを待つ\\
+    \hline
+    3 & 演奏中．\texttt{elapsedPlayTick}を進めながらドラム自身の楽譜を再生する\\
+    \hline
+    4 & システム停止中．'S'通信を受信するまで何も行わない\\
+    \hline
+    \end{tabular}
+\end{table}
+
+続いて，ドラム機（マスター）で使用する主な変数の仕様を表\ref{table:douki_master_var}に示す．
+
+\begin{table}[H]
+    \caption{ドラム機（マスター）で使用する主な変数の仕様一覧}
+    \centering
+    \label{table:douki_master_var}
+    \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
+    \hline
+    \textbf{変数名} & \textbf{型} & \textbf{説明}\\
+    \hline
+    \texttt{state} & int & 現在の同期状態（0〜4）を保持\\
+    \hline
+    \texttt{globalTick} & uint32\_t & マスターを基準とする全体共通のTickカウンタ\\
+    \hline
+    \texttt{currentSongId} & int & 現在演奏中の楽譜IDを保持．'S'受信のたびにローテーションする\\
+    \hline
+    \texttt{elapsedPlayTick} & int32\_t & state2移行後に進行する演奏開始からの経過Tick\\
+    \hline
+    \texttt{isDrumPlaying} & bool & ドラム自身が演奏中かどうかを保持\\
+    \hline
+    \texttt{isInstJoin[]} & bool[4] & 各楽器が同期に参加する予告（'J'受信）をしたかを保持\\
+    \hline
+    \texttt{isInstConnected[]} & bool[4] & 各楽器が'T'通信により実際に接続済みであるかを保持\\
+    \hline
+    \texttt{lastReceivedDiff[]} & int32\_t[4] & 各楽器から'T'受信時に算出した直近の\texttt{diff}を保持\\
+    \hline
+    \texttt{receivedBpmLevels[]} & uint8\_t[4] & 自身および各スレーブから提案されたBPM段階を集約する配列\\
+    \hline
+    \texttt{currentBpmLevel} & uint8\_t & 多数決により確定した現在のBPM段階\\
+    \hline
+    \texttt{oSentCount[]} & uint8\_t[10] & 各演奏開始イベントに対する'O'通信の送信済み回数（最大3回）\\
+    \hline
+    \texttt{startSequence[][][]} & int & 曲IDごとの各楽器の演奏開始Tickと楽器IDを定義する配列\\
+    \hline
+    \end{tabular}
+\end{table}
+
+続いて，ドラム機（マスター）で使用する主な関数の仕様を表\ref{table:douki_master_func}に示す．
+
+\begin{table}[H]
+    \caption{ドラム機（マスター）で使用する主な関数の仕様一覧}
+    \centering
+    \label{table:douki_master_func}
+    \begin{tabular}{p{5.0cm}p{1.5cm}p{3.6cm}p{3.2cm}}
+    \hline
+    \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
+    \hline
+    \texttt{setup} & \texttt{void} & なし & Wi-Fi接続とUDP通信の初期化を行う\\
+    \hline
+    \texttt{loop} & \texttt{void} & なし & UDP受信処理と\texttt{state}に応じたステートマシンの実行を毎回行う\\
+    \hline
+    \texttt{checkSyncReady} & \texttt{bool} & なし & 参加予告のあった全スレーブが接続済みかつ\texttt{diff}が閾値以内であればtrueを返す\\
+    \hline
+    \texttt{processOCommands} & \texttt{void} & なし & 各演奏開始イベントについて，タイミングが近づいたスレーブへ'O'通信を送信し，ドラム自身の演奏開始も管理する\\
+    \hline
+    \texttt{sendOPacket\_Single} & \texttt{void} & \texttt{uint8\_t instId}, \texttt{uint8\_t songId}, \texttt{uint32\_t startGlobalTick} & 指定したスレーブへ'O'通信（演奏開始タイミング指示）を送信する\\
+    \hline
+    \texttt{sendNPacket} & \texttt{void} & \texttt{uint8\_t bpm} & 確定BPMを全スレーブへ'N'通信でブロードキャストする\\
+    \hline
+    \texttt{sendRPacket} & \texttt{void} & \texttt{uint8\_t instId}, \texttt{int32\_t diff} & 'T'受信元のスレーブへ\texttt{diff}を'R'通信で返信する\\
+    \hline
+    \texttt{updateTick} & \texttt{void} & なし & \texttt{tickIval}ごとに\texttt{globalTick}を進め，48Tickごとの多数決BPM決定や自身の楽譜再生を行う\\
+    \hline
+    \texttt{setBpm} & \texttt{void} & \texttt{uint8\_t bpm} & 確定BPMから\texttt{tickIval}を再計算する\\
+    \hline
+    \texttt{determineSystemBpmLevel} & \texttt{uint8\_t} & なし & 参加中の全楽器のBPM提案から中央値を求め，システム全体のBPM段階を決定する\\
+    \hline
+    \texttt{sendPacket} & \texttt{void} & なし & \texttt{curTick}に到達した音符を\texttt{Note}配列から取得し，自身のProcessingへシリアル送信する\\
+    \hline
+    \end{tabular}
+\end{table}
+
+以下では，マスターの同期制御における中核部分について，実際のコードとともに説明する．まず，'T'通信（スレーブからのTick報告）の受信処理について説明する．この処理は，スレーブの\texttt{globalTick}とマスター自身の\texttt{globalTick}との差である\texttt{diff}を算出し，'R'通信で即座に返信する．該当部分をコード\ref{lst:douki_master_t}に示す．
+
+\begin{lstlisting}[caption={drum\_0706.inoのloop関数（'T'通信受信部分）}, label={lst:douki_master_t}]
+case 'T':
+  if (pktSize >= 6) {
+    uint32_t slaveTick =
+      ((uint32_t)packetBuffer[1] << 24) |
+      ((uint32_t)packetBuffer[2] << 16) |
+      ((uint32_t)packetBuffer[3] << 8)  |
+       (uint32_t)packetBuffer[4];
+    uint8_t id = packetBuffer[5];
+
+    if (id < MAX_INSTRUMENTS && id != drumInstId) {
+      isInstConnected[id] = true;
+      if (isInstJoin[id] != true) isInstJoin[id] = true;
+      int32_t diff = (int32_t)(globalTick - slaveTick);
+      lastReceivedDiff[id] = diff;
+
+      sendRPacket(id, diff);
+    }
+  }
+  break;
+\end{lstlisting}
+
+次に，同期完了判定を行う\texttt{checkSyncReady}関数について説明する．この関数は，参加予告（'J'受信）のあった全スレーブについて，接続済みであり，かつ直近の\texttt{diff}が\texttt{tickIval}から算出したしきい値以内であるかを確認し，1台でも条件を満たさなければfalseを返す．\texttt{checkSyncReady}関数をコード\ref{lst:douki_checksyncready}に示す．
+
+\begin{lstlisting}[caption={checkSyncReady関数}, label={lst:douki_checksyncready}]
+bool checkSyncReady() {
+  bool expectedToJoin = false;
+
+  for (uint8_t i = 1; i < MAX_INSTRUMENTS; i++) {
+    if (isInstJoin[i]) {
+      expectedToJoin = true; // 参加予定の楽器が少なくとも1台いる
+      float SYNC_READY_THRESHOLD = 50 / tickIval;
+
+      // 参加予定だが未接続、または同期のズレが大きい場合は「まだ準備未完了」
+      if (!isInstConnected[i] || abs(lastReceivedDiff[i]) > SYNC_READY_THRESHOLD) {
+        return false;
+      }
+    }
+  }
+  return expectedToJoin;
+}
+\end{lstlisting}
+
+最後に，各楽器の演奏開始タイミングを管理する\texttt{processOCommands}関数について説明する．この関数は，\texttt{startSequence}に定義された各演奏開始イベントについて，該当楽器がドラム自身であれば\texttt{elapsedPlayTick}が開始Tickに達した時点で演奏を開始し，スレーブであれば開始Tickの\texttt{O\_ADVANCE\_TICKS}（96Tick）前から3段階に分けて'O'通信を送信することで，パケットロスに備えた冗長性を確保している．該当部分をコード\ref{lst:douki_processocommands}に示す．
+
+\begin{lstlisting}[caption={processOCommands関数（要部）}, label={lst:douki_processocommands}]
+if (instId == drumInstId) {
+  if (elapsedPlayTick >= evTick) {
+    if (!isDrumPlaying) {
+      isDrumPlaying = true;
+      curTick  = songStartParams[currentSongId].startTick;
+      scoreIdx = songStartParams[currentSongId].startNoteIdx;
+      state    = 3;
+    }
+    oSentCount[i] = 3;
+  }
+} else {
+  if (isInstJoin[instId] && isInstConnected[instId]) {
+    uint32_t startGlobalTick = (uint32_t)((int32_t)globalTick + ticksUntilStart);
+    if (ticksUntilStart <= O_ADVANCE_TICKS && oSentCount[i] == 0) {
+      sendOPacket_Single(instId, currentSongId, startGlobalTick);
+      oSentCount[i] = 1;
+    } else if (ticksUntilStart <= O_ADVANCE_TICKS * 2 / 3 && oSentCount[i] == 1) {
+      sendOPacket_Single(instId, currentSongId, startGlobalTick);
+      oSentCount[i] = 2;
+    } else if (ticksUntilStart <= O_ADVANCE_TICKS / 3 && oSentCount[i] == 2) {
+      sendOPacket_Single(instId, currentSongId, startGlobalTick);
+      oSentCount[i] = 3;
+    }
+  }
+}
+\end{lstlisting}
+
+次に，楽器機（スレーブ）における同期処理について説明する．スレーブは，\texttt{state}が0（BPM安定待ち）・1（マスターと同期中）・2（演奏中）・4（停止中）の4状態で動作し，'R'通信で受け取った\texttt{diff}をもとに自身の\texttt{tickIval}を補正することでマスターとの同期を保つ．続いて，楽器機（スレーブ）で使用する主な変数の仕様を表\ref{table:douki_slave_var}に示す．
+
+\begin{table}[H]
+    \caption{楽器機（スレーブ）で使用する主な変数の仕様一覧}
+    \centering
+    \label{table:douki_slave_var}
+    \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
+    \hline
+    \textbf{変数名} & \textbf{型} & \textbf{説明}\\
+    \hline
+    \texttt{baseTickIval} & uint32\_t & 確定BPMから算出した基本の1Tickあたりの時間[\textmu s]\\
+    \hline
+    \texttt{tickIval} & uint32\_t & 同期補正を反映した実際に使用する1Tickあたりの時間[\textmu s]\\
+    \hline
+    \texttt{ticksToCorrect} & int32\_t & 補正処理が残っているTick数\\
+    \hline
+    \texttt{lastDiff} & int32\_t & 直近に受信した\texttt{diff}．BPM変化時の補正再計算に使用\\
+    \hline
+    \texttt{drumNotStarted} & bool & マスターがまだ\texttt{globalTick}の加算を開始していないかを保持\\
+    \hline
+    \texttt{waitingForStart} & bool & 'O'通信を受信し，演奏開始タイミングを待機中かどうかを保持\\
+    \hline
+    \texttt{startGlobalTick} & uint32\_t & マスターから指示された演奏開始\texttt{globalTick}\\
+    \hline
+    \end{tabular}
+\end{table}
+
+続いて，楽器機（スレーブ）で使用する主な関数の仕様を表\ref{table:douki_slave_func}に示す．
+
+\begin{table}[H]
+    \caption{楽器機（スレーブ）で使用する主な関数の仕様一覧}
+    \centering
+    \label{table:douki_slave_func}
+    \begin{tabular}{p{4.2cm}p{1.5cm}p{2.8cm}p{4.5cm}}
+    \hline
+    \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
+    \hline
+    \texttt{setup} & \texttt{void} & なし & Wi-Fi接続とUDP通信の初期化を行う\\
+    \hline
+    \texttt{loop} & \texttt{void} & なし & UDP受信処理（'R'・'O'・'N'・'S'・'E'・'V'）と\texttt{state}に応じたステートマシンの実行を毎回行う\\
+    \hline
+    \texttt{applyDiffCorrection} & \texttt{void} & \texttt{int32\_t diff} & 受信した\texttt{diff}の大きさに応じて\texttt{tickIval}を加減速し，マスターとの同期を図る\\
+    \hline
+    \texttt{setBpm} & \texttt{void} & \texttt{uint8\_t bpm} & 確定BPMから\texttt{baseTickIval}を再計算する\\
+    \hline
+    \texttt{sendTPacket} & \texttt{void} & なし & 自身の\texttt{globalTick}を'T'通信でマスターへ送信し，\texttt{diff}の算出を依頼する\\
+    \hline
+    \texttt{sendJPacket} & \texttt{void} & なし & 同期への参加予告を'J'通信でマスターへ送信する\\
+    \hline
+    \texttt{sendMPacket} & \texttt{void} & \texttt{uint8\_t bpm} & レーザー検知によるBPM提案を'M'通信でマスターへ送信する\\
+    \hline
+    \texttt{updateTick} & \texttt{void} & なし & \texttt{tickIval}ごとに\texttt{globalTick}を進め，補正カウントダウンや自身の楽譜再生を行う\\
+    \hline
+    \texttt{sendPacket} & \texttt{void} & なし & \texttt{curTick}に到達した音符を\texttt{Note}配列から取得し，自身のProcessingへシリアル送信する\\
+    \hline
+    \end{tabular}
+\end{table}
+
+以下では，スレーブの同期補正における中核部分について，実際のコードとともに説明する．まず，'R'通信（マスターからの\texttt{diff}返信）の受信処理について説明する．この処理は，パケットの往復時間から通信遅延を見積もって\texttt{diff}を補正したうえで，マスターがまだ動作していない場合の特別処理を経て，通常時は\texttt{applyDiffCorrection}関数を呼び出す．該当部分をコード\ref{lst:douki_slave_r}に示す．
+
+\begin{lstlisting}[caption={flute\_0706.inoのloop関数（'R'通信受信部分・要部）}, label={lst:douki_slave_r}]
+case 'R':
+  if (state == 0 || state == 4) break;
+  if (pktSize >= 5) {
+    int32_t rawDiff =
+      ((int32_t)(int8_t)packetBuffer[1] << 24) |
+      ((int32_t)packetBuffer[2] << 16) |
+      ((int32_t)packetBuffer[3] <<  8) |
+       (int32_t)packetBuffer[4];
+
+    uint32_t rtt = micros() - lastTPacketMicroTime;
+    uint32_t latencyMicros = rtt / 2; // 片道遅延
+    int32_t latencyTicks = (baseTickIval > 0)
+      ? (int32_t)((latencyMicros + (baseTickIval / 2)) / baseTickIval) : 0;
+    int32_t diff = rawDiff - latencyTicks; // 通信遅延を差し引いた真のズレ
+
+    lastDiff = diff;
+    if (state >= 1) {
+      if (ticksToCorrect == 0 || abs(diff) >= 24) {
+        applyDiffCorrection(diff);
+      }
+    }
+  }
+  break;
+\end{lstlisting}
+
+次に，\texttt{applyDiffCorrection}関数について説明する．この関数は，\texttt{diff}の大きさに応じて補正の強さを4段階に切り替える．ズレが小さい場合は不感帯として何もせず，大幅なズレの場合は\texttt{tickIval}を2倍または2/3倍にして急速に補正し，中程度のズレの場合は次の48Tickで吸収するように比率補正を行う．\texttt{applyDiffCorrection}関数をコード\ref{lst:douki_diffcorrection}に示す．
+
+\begin{lstlisting}[caption={applyDiffCorrection関数}, label={lst:douki_diffcorrection}]
+void applyDiffCorrection(int32_t diff) {
+  if (baseTickIval == 0) return;
+  float SYNC_READY_THRESHOLD = 50 / baseTickIval;
+
+  if (abs(diff) <= SYNC_READY_THRESHOLD) {
+    // 不感帯：ズレが小さければ何もしない
+    tickIval = baseTickIval;
+    ticksToCorrect = 0;
+  } else if (diff <= -24) {
+    // 大幅に早い → ×2 で -diff Tick間遅らせる
+    tickIval       = baseTickIval * 2;
+    ticksToCorrect = -diff;
+  } else if (diff >= 24) {
+    // 大幅に遅い → ×2/3 で diff×3 Tick間速める
+    tickIval       = baseTickIval * 2 / 3;
+    ticksToCorrect = diff * 3;
+  } else {
+    // 小さいズレ → 次の48Tickでdiffを吸収する比率補正
+    tickIval       = (uint32_t)((48UL * baseTickIval) / (48 + diff));
+    ticksToCorrect = 48 + diff;
+  }
+}
+\end{lstlisting}
+
+最後に，'O'通信（マスターからの演奏開始指示）の受信処理について説明する．この処理は，指示された\texttt{startGlobalTick}と自身の\texttt{globalTick}を比較し，まだ到達していなければ\texttt{waitingForStart}を立てて待機し，すでに超過していれば超過分だけ\texttt{curTick}をオフセットして即座に演奏へ合流する．なお，'O'通信の受信および状態遷移に関する処理の詳細な実装は付録に示すプログラム全文を参照されたい．
+
+プログラム全文は付録に示す．
