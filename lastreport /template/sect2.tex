@@ -557,6 +557,92 @@ uint8_t getBpmStep() const { return currentBpmStep; }
 uint8_t getVolStep() const { return 6 - currentVolStep; }
 \end{lstlisting}
 
+最後に，各デバイスへの無線送信を担うSyncManagerクラスについて説明する．本クラスは，Wi-FiおよびUDP通信の初期化と，演奏開始・終了，BPM，音量の各情報を対象デバイスへ送信する機能を提供する．送信先のIPアドレスは，楽器デバイス4台・中継機デバイス1台のユニキャストアドレスとしてあらかじめグローバル変数に定義されており，送信する情報の種類に応じて対象となるデバイスが選択される．SyncManagerクラスで使用する主な変数の仕様を表\ref{table:siki_sync_var}に示す．
+
+\begin{table}[H]
+    \caption{SyncManagerクラスで使用する主な変数の仕様一覧}
+    \centering
+    \label{table:siki_sync_var}
+    \begin{tabular}{p{3.0cm}p{2.5cm}p{8.0cm}}
+    \hline
+    \textbf{変数名} & \textbf{型} & \textbf{説明}\\
+    \hline
+    TARGET\_PORT & const uint16\_t & 送信先の各デバイスが監視しているUDP受信ポート番号(5005)を定義\\
+    \hline
+    LOCAL\_PORT & const uint16\_t & 自身が使用するUDP送信元ポート番号(8080)を定義\\
+    \hline
+    fluteIP / pianoIP / stringsIP / drumIP & IPAddress & 各楽器デバイスへユニキャスト送信するためのIPアドレス\\
+    \hline
+    ferrisWheelIP & IPAddress & 中継機デバイスへユニキャスト送信するためのIPアドレス\\
+    \hline
+    ferrisWheelGroup / instrumentGroup & IPAddress & マルチキャスト送信用のチャンネルとして定義されているが，通信の不安定さから現在は未使用\\
+    \hline
+    \end{tabular}
+\end{table}
+
+続いて，SyncManagerクラスで使用する関数の仕様を表\ref{table:siki_sync_func}に示す．
+
+\begin{table}[H]
+    \caption{SyncManagerクラスで使用する関数の仕様一覧}
+    \centering
+    \label{table:siki_sync_func}
+    \begin{tabular}{p{3.4cm}p{1.5cm}p{4.8cm}p{4.8cm}}
+    \hline
+    \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
+    \hline
+    begin & void & const char ssid[], const char pass[] & 指定したSSID・パスワードでWi-Fi接続を確立し，接続完了まで待機したうえでUDP通信を開始する\\
+    \hline
+    sendStart & void & uint8\_t stepNumber & 演奏開始合図（ヘッダ'S'）を中継機デバイスおよび全楽器デバイスへ送信する\\
+    \hline
+    sendBPM & void & uint8\_t stepNumber & BPM段階番号（ヘッダ'B'）を中継機デバイスへ送信する\\
+    \hline
+    sendVolume & void & uint8\_t stepNumber & 音量段階番号（ヘッダ'V'）を配線特性に合わせて反転させたうえで全楽器デバイスへ送信する\\
+    \hline
+    sendEnd & void & なし & 演奏終了合図（ヘッダ'E'）を中継機デバイスおよび全楽器デバイスへ送信する\\
+    \hline
+    packetRoundRobin & void & const uint8\_t packet[], uint8\_t b, const IPAddress targets[], uint8\_t targetCount & 指定したパケットを全対象へラウンドロビン方式で3回冗長送信する，送信処理の共通部\\
+    \hline
+    \end{tabular}
+\end{table}
+
+以下では，表\ref{table:siki_sync_func}に示した関数のうち，begin関数，sendVolume関数，packetRoundRobin関数について，実際のコードとともに説明する．はじめに，begin関数について説明する．この関数は，WiFi.begin関数でWi-Fi接続を開始したうえで，接続状態がWL\_CONNECTEDになるまでループで待機し，接続確立後にUdp.begin関数でLOCAL\_PORTを開放する．begin関数をコード\ref{lst:sync_begin}に示す．
+
+\begin{lstlisting}[caption={SyncManager::begin関数}, label={lst:sync_begin}]
+void SyncManager::begin(const char ssid[], const char pass[]) {
+    WiFi.begin(ssid, pass);
+    while (WiFi.status() != WL_CONNECTED) {
+    }
+    Udp.begin(LOCAL_PORT);
+}
+\end{lstlisting}
+
+次に，sendVolume関数について説明する．この関数は，音量情報（ヘッダ'V'）を全楽器デバイスへ送信する．音量用可変抵抗器は配線の都合上，回した方向とセンサ値の増減が逆になるため，PotManagerクラスのgetVolStep関数と同様に，送信直前に6 - stepNumberという変換を行うことで表示・送信上の段階を反転させている．sendVolume関数をコード\ref{lst:sync_sendvolume}に示す．
+
+\begin{lstlisting}[caption={SyncManager::sendVolume関数}, label={lst:sync_sendvolume}]
+void SyncManager::sendVolume(uint8_t stepNumber){
+    uint8_t volumePacket[2] = {'V',(uint8_t)(6 - stepNumber)};
+    IPAddress targets[] = {fluteIP, pianoIP, stringsIP, drumIP};
+    packetRoundRobin(volumePacket, 2, targets, 4);
+}
+\end{lstlisting}
+
+最後に，packetRoundRobin関数について説明する．この関数は，sendStart・sendBPM・sendVolume・sendEndの各関数から共通して呼び出される送信処理であり，指定したパケットを全対象（targets）へ1回ずつ送信する動作を1周とし，20 msの間隔を空けながら3周繰り返すことで，UDP通信のパケットロスに対する耐性を高めている．対象ごとに3連射してから次の対象へ進む方式ではなく，1周ごとに全対象へ送ってから次の周に進む方式を採用しているのは，前者では後方の対象ほど到達が遅れ，機器間で無視できない時間差が生じるためである．packetRoundRobin関数をコード\ref{lst:sync_roundrobin}に示す．
+
+\begin{lstlisting}[caption={SyncManager::packetRoundRobin関数}, label={lst:sync_roundrobin}]
+void SyncManager::packetRoundRobin(const uint8_t packet[], uint8_t b, const IPAddress targets[], uint8_t targetCount){
+    for (int round = 0; round < 3; round++) {
+        for (uint8_t t = 0; t < targetCount; t++) {
+            Udp.beginPacket(targets[t], TARGET_PORT);
+            Udp.write(packet, b);
+            Udp.endPacket();
+        }
+        if (round < 2) {
+            delay(20);
+        }
+    }
+}
+\end{lstlisting}
+
 なお，本節で説明したSyncManagerクラスによって送信された演奏開始・終了，BPM，音量の各情報が，中継機デバイス側でどのように受信・反映されるかについては\ref{sec:kan_naibu}項（中継機デバイスの内部設計）で説明する．
 
 
@@ -590,7 +676,8 @@ uint8_t getVolStep() const { return 6 - currentVolStep; }
 \subsubsection{外部設計}
 本節では中継機デバイスの外部設計について説明する．まず，本デバイスを構成する部分について表\ref{kizai}に示す．この内，個別で購入する必要があるものはハイパワーギヤーボックス，
 ブレッドボード用DCジャックDIP化キット，ボタン電池，ボタン電池ホルダー，QIケーブル，有極コンデンサーである．
-%%もうすこし書きたいよね
+このうち，ルーターは，指揮デバイス・中継機デバイス・各楽器デバイスに搭載されたArduino Uno R4 WiFiが共通して接続するローカルなWi-Fiネットワークを構築するために使用する．各デバイスはこのネットワークに参加したうえで，UDP通信によって演奏開始・終了やBPM，音量等の情報をやり取りする．
+また，スライドスイッチは，観覧車のレーザー基板ごとに実装され，ボタン電池からレーザーモジュールへの給電をON/OFFする役割を持つ．レーザーは演奏中常時点灯させる必要があるが，非使用時にはこのスイッチによって電源を遮断できるようにすることで，ボタン電池の消耗を抑えている．
 
 
 \begin{table}[h]
@@ -624,6 +711,7 @@ uint8_t getVolStep() const { return 6 - currentVolStep; }
 また，中継機の回路図を図\ref{metro}に示す．モータードライバーにArduino D5，D6ピンを接続し，PWM制御を行えるようにする．
 モータードライバーへの電力供給は当初，外部電源として$\SI{9}{V}$のアルカリ電池を検討していたが， Arduinoの$\SI{5}{V}$からの電力供給とDCジャックからのACアダプター$\SI{5}{V}$$\SI{1}{A}$による外部給電により，アルカリ電池が不要であることが実装時に確認されたため除外した．
 また，モータードライバー及びDCジャックはピンヘッダーのはんだ付けを行う．加えて，ギアボックスは0.01 $\mu$Fのコンデンサーと直接はんだ付けを行う．ギアボックスと並列に接続された0.01 $\mu$Fのコンデンサは，モータのブラシ接点で発生する電気ノイズを吸収し，制御信号や周辺回路への影響を低減する役割を果たしている．
+残りの受動部品についても，いずれもノイズ対策および電源安定化を目的として実装している．抵抗器10 $\Omega$とコンデンサー0.047 $\mu$Fは，モータードライバーの出力端子間に直列接続することでRCスナバ回路を構成しており，0.01 $\mu$Fのコンデンサと合わせて，モータ駆動時に発生するスイッチングノイズを段階的に吸収している．また，有極性コンデンサー100 $\mu$Fは，DCジャックからの電源供給ライン上に並列接続する平滑用コンデンサであり，モータの起動・停止に伴う電流変動による電圧降下を抑制し，Arduinoおよびモータードライバーへの電源供給を安定させる役割を持つ．
 
 
 
@@ -1330,13 +1418,14 @@ bool detectLight(int v, unsigned long nowMs) {
 \subsubsection{概要}
 最後に，楽器デバイスについて説明する．楽器デバイスの構成図を図\ref{fig:jusin_sys}に示す．本デバイスは，レーザー光を受光するためのCdSセルとArduino，そしてProcessingにより楽曲を再生するためのPCで構成され，楽器を再現するデバイスであり，主に以下の４つの機能を有する．本システムでは，ドラム，フルート，ストリングス，ピアノの4種類の楽器を再現する．
 
-第一の機能は，レーザー光の受光によるBPMの推定である．本機能の設計について図\ref{fig:jusin_jou5}に示す．観覧車デバイスの回転に伴い照射されるレーザー光をCdSセルが検知すると，そのデジタル信号がArduinoへ送られ，レーザーの通過間隔から楽曲のBPMが検出される．
+第一の機能は，レーザー光の受光によるBPMの推定である．本機能のシーケンス図を図\ref{fig:jusin_jou5}に示す．中継機デバイスの回転に伴い照射されるレーザー光をCdSセルが検知すると，そのデジタル信号がArduinoへ送られ，レーザーの通過間隔から楽曲のBPMが検出される．
 
 第二の機能は，楽器デバイス間のUDP通信による同期補正である．ドラムを担当する楽器デバイスをマスター，ピアノ・ストリングス・フルートを担当する楽器デバイスをスレーブとし，各機で検出した発音タイミングのずれを相互に送受信することで，4台の楽器デバイス間の同期を補正する．
 
 第三の機能は，演奏の開始・終了および音量変更の受信である．これらの情報は，指揮デバイスからのUDP通信によって各楽器デバイスへ直接送信される．
 
-第四の機能は，楽曲の発音である．各楽器デバイスのArduinoに接続されたPC上で動作するProcessingが，ArduinoからのUSBシリアル通信で受け取った発音指示（音程・音量等）をもとに波形を合成することで再生される．ここからは，内部設計について説明する．これらの同期通信および発音処理の詳細については\ref{sec:gakki_naibu}項で説明する．
+第四の機能は，楽曲の発音である．各楽器デバイスのArduinoに接続されたPC上で動作するProcessingが，ArduinoからのUSBシリアル通信で受け取った発音指示（音程・音量等）をもとに波形を合成することで再生される．
+ここからは，外部設計と内部設計について説明する．
 
 \begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
         \centering % 中央揃え
@@ -1351,6 +1440,53 @@ bool detectLight(int v, unsigned long nowMs) {
         \caption{レーザー光受光によるBPM検出のシーケンス図} % 図の説明
         \label{fig:jusin_jou5} % 本文中で参照するためのラベル
 \end{figure}
+
+
+\subsubsection{外部設計}
+本節では，楽器デバイスの外部設計について説明する．まず，本デバイスを構成する部品について表\ref{table:ota}に示す．
+本デバイスでは，光センサモジュールとしてCdSセルを使用する．CdSセルにレーザー光が照射された際の出力をArduinoのアナログピンへ接続することで，観覧車デバイスのレーザー光の通過を検知する．
+また，今回はドラム，ピアノ，ストリングス，フルートの4種類の楽器の音色を再現するため，それぞれにArduinoを使用し，光センサおよびブレッドボードも4台用意する．
+
+
+\begin{table}[h]
+    \caption{楽器デバイスに必要な機器}
+    \centering
+    \label{table:ota}
+    \begin{tabular}{llr}\hline
+    機材 & 品番 & 個数 [個] \\ \hline
+    Arduino UNO R4 & -& 4 \\ \hline
+    CdSセル  &GL5516& 4 \\ \hline
+    ブレッドボード & -& 4 \\ \hline
+    ジャンパーワイヤー & - & 適宜 \\ \hline
+    \end{tabular}
+\end{table}
+
+次に，楽器デバイスの受光部の回路図を図\ref{fig:kairo_hikari}に示す．
+電源仕様は，PCとのUSB接続から電力を供給する．光センサはArduinoの$\SI{5}{V}$ピンから給電されるため，外部電源は不要である．
+また，光センサが光を受光した瞬間にA0のアナログピンにセンサ値を出力する．このセンサ値の変化をArduinoで処理することで光を検知する仕様である．
+本回路における固定抵抗($R_2 = 10\,\mathrm{k\Omega}$)の役割は，CdSセル(受光素子:$R_{Photo}$)における抵抗値の変化を，ArduinoのA/Dコンバータ(ADC)で読み取り可能な電圧変動へと変換することである，
+ArduinoのA0ピンは電圧を直接測定する仕様であり，センサ単体の抵抗値を直接計測することはできない．そこで，電源の電圧($V_{CC} = 5\,\mathrm{V}$)とグランド(GND)の間にCdSセルと固定抵抗を直列に接続し，分圧回路を構成する．
+A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のように示される．
+
+
+\begin{equation}
+  \label{eq:jukou}
+  V_{out} = V_{cc} \times \frac{R_2}{R_{Photo} + R_2}
+\end{equation}
+
+中継機デバイスのレーザー光が受光部を通過する際，CdSセルの抵抗値$R_{Photo}$はレーザー光の照射によって低下する．この抵抗値の変化が式\ref{eq:jukou}の分母に作用することで，結果としてアナログ信号へと変換され，A0ピンに印加される．
+したがって，当該抵抗器($10\mathrm{k\Omega}$)は単なる過電流防止の目的ではなく，CdSセルが捉えたレーザー光の照射の有無をArduino側で信号処理可能な電圧として抽出するための信号変換として機能している．
+
+
+
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
+        \centering % 中央揃え
+        \includegraphics[width=0.8\columnwidth]{figs/kairo_hikari.pdf} % 横幅を列幅の80%に指定
+        \caption{楽器デバイスの受光部の回路図} % 図の説明
+        \label{fig:kairo_hikari} % 本文中で参照するためのラベル
+\end{figure}
+
+
 
 
 
