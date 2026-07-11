@@ -122,20 +122,15 @@
 \begin{table}[h]
     \vspace{-1em}
     \caption{指揮デバイスのファイル構成}
-    \centering
     \label{table:siki_files}
-    \begin{tabular}{p{5cm}p{9cm}}
-    \hline
-    \textbf{ファイル名} & \textbf{概要}\\
-    \hline
-    \texttt{Controller\_simultaneous.ino} & setup/loopによる全体制御，ボタン入力の判定\\
-    \hline
-    \texttt{AccManager.h} / \texttt{AccManager.cpp} & 加速度センサ(ADXL345)の初期化，振り動作の検知，I2Cバス復旧処理\\
-    \hline
-    \texttt{PotManager.h} / \texttt{PotManager.cpp} & スライド式可変抵抗器2系統の移動平均処理およびBPM・音量段階の判定\\
-    \hline
-    \texttt{SyncManager.h} / \texttt{SyncManager.cpp} & Wi-Fi/UDP通信の初期化，各デバイスへの冗長送信処理\\
-    \hline
+    \centering
+    \begin{tabular}{|l|p{10cm}|}
+        \hline
+        \textbf{ファイル名} & \textbf{概要} \\ \hline \hline
+        \texttt{Controller\_simultaneous.ino} & setup/loopによる全体制御，ボタン入力の判定 \\ \hline
+        \texttt{AccManager.h} / \texttt{AccManager.cpp} & 加速度センサ(ADXL345)の初期化，振り動作の検知，I2Cバス復旧処理 \\ \hline
+        \texttt{PotManager.h} / \texttt{PotManager.cpp} & スライド式可変抵抗器2系統の移動平均処理およびBPM・音量段階の判定 \\ \hline
+        \texttt{SyncManager.h} / \texttt{SyncManager.cpp} & Wi-Fi/UDP通信の初期化，各デバイスへの冗長送信処理 \\ \hline
     \end{tabular}
 \end{table}
 
@@ -751,22 +746,16 @@ uint8_t getVolStep() const { return 6 - currentVolStep; }
 \begin{table}[h]
     \vspace{-1em}
     \caption{中継機デバイスのファイル構成}
-    \centering
     \label{tab:file1}
-    \begin{tabular}{p{4cm}p{10cm}}
-    \hline
-    \textbf{ファイル名} & \textbf{概要}\\
-    \hline
-    \texttt{FerrisWheel.ino} & WiFi接続・UDP受信の管理，受信ヘッダに応じたモータ制御・表示処理の呼び出し\\
-    \hline
-    \texttt{Display.cpp} & 表示文字の独自フォント定義，LEDマトリクスへの描画処理\\
-    \hline
-    \texttt{Display.h} & 定数定義，関数宣言，外部参照\\
-    \hline
-    \texttt{MotorControl.cpp} & PWM出力によるモータ回転制御，回転速度テーブルの生成\\
-    \hline
-    \texttt{MotorControl.h} & モータ制御用の定数・変数定義，関数宣言\\
-    \hline
+    \centering
+    \begin{tabular}{|l|p{10cm}|}
+        \hline
+        \textbf{ファイル名} & \textbf{概要} \\ \hline \hline
+        \texttt{FerrisWheel.ino} & WiFi接続・UDP受信の管理，受信ヘッダに応じたモータ制御・表示処理の呼び出し \\ \hline
+        \texttt{Display.cpp} & 表示文字の独自フォント定義，LEDマトリクスへの描画処理 \\ \hline
+        \texttt{Display.h} & 定数定義，関数宣言，外部参照 \\ \hline
+        \texttt{MotorControl.cpp} & PWM出力によるモータ回転制御，回転速度テーブルの生成 \\ \hline
+        \texttt{MotorControl.h} & モータ制御用の定数・変数定義，関数宣言 \\ \hline
     \end{tabular}
 \end{table}
 
@@ -1343,34 +1332,22 @@ bool detectLight(int v, unsigned long nowMs) {
 
 \begin{table}[H]
     \caption{Processingプログラムのファイル構成}
-    \centering
     \label{table:gakki_files}
-    \begin{tabular}{p{4cm}p{10cm}}
-    \hline
-    \textbf{ファイル名} & \textbf{概要}\\
-    \hline
-    \texttt{SoundProcessingCode.pde} & setup/draw/\texttt{serialEvent}による全体制御，シリアル通信の受信処理，デバッグ用のキー入力処理\\
-    \hline
-    \texttt{Utils.pde} & LUTデータの読み込みと保持，ピッチ・ベロシティに応じた倍音プロファイルの生成を行う\texttt{DataUtils}クラス\\
-    \hline
-    \texttt{InstrumentPlayer.pde} & 発音命令を各楽器クラスへ委譲する\texttt{InstrumentPlayer}クラス\\
-    \hline
-    \texttt{NoteSampler.pde} & Arduino未接続でも単体動作確認できる自動演奏機能，および内蔵の試奏用楽譜データ\\
-    \hline
-    \texttt{AddEffect.pde} & 残響音（リバーブ）エフェクトを付加する\texttt{AddReverb}クラス\\
-    \hline
-    \texttt{Flute.pde} & フルートの音色合成を行う\texttt{FluteInstrument}クラス\\
-    \hline
-    \texttt{Strings.pde} & ストリングス（弦楽器群）の音色合成を行う\texttt{StringsInstrument}クラス\\
-    \hline
-    \texttt{Piano.pde} & ピアノの音色合成を行う\texttt{PianoInstrument}クラス\\
-    \hline
-    \texttt{Drum.pde} & キック・スネア・ハイハットの音色合成を行う\texttt{KickInstrument}・\texttt{SnareInstrument}・\texttt{HiHatInstrument}クラス\\
-    \hline
-    \texttt{Horn.pde} & ホルンの音色合成を行う\texttt{HornInstrument}クラス\\
-    \hline
-    \texttt{Trumpet.pde} & トランペットの音色合成を行う\texttt{TrumpetInstrument}クラス\\
-    \hline
+    \centering
+    \begin{tabular}{|l|p{10cm}|}
+        \hline
+        \textbf{ファイル名} & \textbf{概要} \\ \hline \hline
+        \texttt{SoundProcessingCode.pde} & setup/draw/\texttt{serialEvent}による全体制御，シリアル通信の受信処理，デバッグ用のキー入力処理 \\ \hline
+        \texttt{Utils.pde} & LUTデータの読み込みと保持，ピッチ・ベロシティに応じた倍音プロファイルの生成を行う\texttt{DataUtils}クラス \\ \hline
+        \texttt{InstrumentPlayer.pde} & 発音命令を各楽器クラスへ委譲する\texttt{InstrumentPlayer}クラス \\ \hline
+        \texttt{NoteSampler.pde} & Arduino未接続でも単体動作確認できる自動演奏機能，および内蔵の試奏用楽譜データ \\ \hline
+        \texttt{AddEffect.pde} & 残響音（リバーブ）エフェクトを付加する\texttt{AddReverb}クラス \\ \hline
+        \texttt{Flute.pde} & フルートの音色合成を行う\texttt{FluteInstrument}クラス \\ \hline
+        \texttt{Strings.pde} & ストリングス（弦楽器群）の音色合成を行う\texttt{StringsInstrument}クラス \\ \hline
+        \texttt{Piano.pde} & ピアノの音色合成を行う\texttt{PianoInstrument}クラス \\ \hline
+        \texttt{Drum.pde} & キック・スネア・ハイハットの音色合成を行う\texttt{KickInstrument}・\texttt{SnareInstrument}・\texttt{HiHatInstrument}クラス \\ \hline
+        \texttt{Horn.pde} & ホルンの音色合成を行う\texttt{HornInstrument}クラス \\ \hline
+        \texttt{Trumpet.pde} & トランペットの音色合成を行う\texttt{TrumpetInstrument}クラス \\ \hline
     \end{tabular}
 \end{table}
 
