@@ -163,14 +163,14 @@
     \begin{tabular}{|l|p{10cm}|}
         \hline
         \textbf{ファイル名} & \textbf{概要} \\ \hline \hline
-        \texttt{Controller\_simultaneous.ino} & setup/loopによる全体制御，ボタン入力の判定 \\ \hline
-        \texttt{AccManager.h} / \texttt{AccManager.cpp} & 加速度センサ(ADXL345)の初期化，振り動作の検知，I2Cバス復旧処理 \\ \hline
-        \texttt{PotManager.h} / \texttt{PotManager.cpp} & スライド式可変抵抗器2系統の移動平均処理およびBPM・音量段階の判定 \\ \hline
-        \texttt{SyncManager.h} / \texttt{SyncManager.cpp} & Wi-Fi/UDP通信の初期化，各デバイスへの冗長送信処理 \\ \hline
+        Controller\_simultaneous.ino & setup/loopによる全体制御，ボタン入力の判定 \\ \hline
+        AccManager.h / AccManager.cpp & 加速度センサ(ADXL345)の初期化，振り動作の検知，I2Cバス復旧処理 \\ \hline
+        PotManager.h / PotManager.cpp & スライド式可変抵抗器2系統の移動平均処理およびBPM・音量段階の判定 \\ \hline
+        SyncManager.h / SyncManager.cpp & Wi-Fi/UDP通信の初期化，各デバイスへの冗長送信処理 \\ \hline
     \end{tabular}
 \end{table}
 
-\texttt{Controller\_simultaneous.ino}のloop関数は，ボタン判定を行う\texttt{button}関数，可変抵抗器を処理する\texttt{PotManager}，加速度センサを処理する\texttt{AccManager}を毎ループ順に呼び出す構成となっている．loop関数をコード\ref{lst:siki_loop}に示す．プログラム全文は付録に示す．
+Controller\_simultaneous.inoのloop関数は，ボタン判定を行うbutton関数，可変抵抗器を処理するPotManager，加速度センサを処理するAccManagerを毎ループ順に呼び出す構成となっている．loop関数をコード\ref{lst:siki_loop}に示す．プログラム全文は付録に示す．
 
 \begin{lstlisting}[caption={Controller\_simultaneous.inoのloop関数}, label={lst:siki_loop}]
 void loop() {
@@ -182,7 +182,7 @@ void loop() {
 
 ここからは，ボタン入力の判定，加速度センサの制御，可変抵抗器を用いたBPM・音量読み取り機能の順に，使用する変数・関数の仕様と処理内容について説明する．
 
-まず，指揮デバイスにおけるボタン入力の判定処理について説明する．ボタンの誤判定を防ぐため，プルアップ抵抗を用いた回路を構成しており，ボタンが押されていない状態ではデジタルピンに5 Vが印加され，押下時には回路がGNDに短絡されることでピンの電位がLOWへ遷移する．指揮デバイスのプログラムでは，このデジタルピンの電圧状態の変化を常時監視することでボタンの押下を判定する．さらに，チャタリングによる誤判定や冗長パケットによる誤作動を防止するため，押下検知後に一定時間の待機処理を設けるとともに，演奏状態管理フラグ（\texttt{isButtonPlaying}）を用いたトグル制御を導入している．これにより，同一の物理ボタンのみで演奏の開始と終了を交互に切り替えることが可能となる．ボタン入力の判定で使用する変数の仕様を表\ref{table:siki_button_var}に示す．
+まず，指揮デバイスにおけるボタン入力の判定処理について説明する．ボタンの誤判定を防ぐため，プルアップ抵抗を用いた回路を構成しており，ボタンが押されていない状態ではデジタルピンに5 Vが印加され，押下時には回路がGNDに短絡されることでピンの電位がLOWへ遷移する．指揮デバイスのプログラムでは，このデジタルピンの電圧状態の変化を常時監視することでボタンの押下を判定する．さらに，チャタリングによる誤判定や冗長パケットによる誤作動を防止するため，押下検知後に一定時間の待機処理を設けるとともに，演奏状態管理フラグ（isButtonPlaying）を用いたトグル制御を導入している．これにより，同一の物理ボタンのみで演奏の開始と終了を交互に切り替えることが可能となる．ボタン入力の判定で使用する変数の仕様を表\ref{table:siki_button_var}に示す．
 
 \begin{table}[H]
     \caption{ボタン入力の判定で使用する変数の仕様一覧}
@@ -192,13 +192,13 @@ void loop() {
     \hline
     \textbf{変数名} & \textbf{型} & \textbf{説明}\\
     \hline
-    \texttt{input\_PIN} & const uint8\_t & ボタンの状態を読み取るデジタルピン番号を定義\\
+    input\_PIN & const uint8\_t & ボタンの状態を読み取るデジタルピン番号を定義\\
     \hline
-    \texttt{switch\_status} & bool & 現在読み取ったボタンピンの状態を格納\\
+    switch\_status & bool & 現在読み取ったボタンピンの状態を格納\\
     \hline
-    \texttt{before\_switch\_status} & bool & 前回読み取ったボタンピンの状態を格納（立下り検知に使用）\\
+    before\_switch\_status & bool & 前回読み取ったボタンピンの状態を格納（立下り検知に使用）\\
     \hline
-    \texttt{isButtonPlaying} & bool & 演奏状態管理フラグ．トグル制御により演奏中(true)／停止中(false)を保持\\
+    isButtonPlaying & bool & 演奏状態管理フラグ．トグル制御により演奏中(true)／停止中(false)を保持\\
     \hline
     \end{tabular}
 \end{table}
@@ -213,12 +213,12 @@ void loop() {
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{button} & \texttt{void} & なし & \texttt{input\_PIN}の立下り（\texttt{switch\_status}が0かつ\texttt{before\_switch\_status}が1）を検知すると\texttt{isButtonPlaying}をトグルし，開始時は現在のBPM段階番号を付与して\texttt{SyncManager}の\texttt{sendStart}関数を，終了時は\texttt{sendEnd}関数を呼び出すことで，各楽器機・観覧車デバイスへ演奏開始・終了信号を送信する．送信後は300 msの待機によりチャタリングを防止する．\\
+    button & void & なし & input\_PINの立下り（switch\_statusが0かつbefore\_switch\_statusが1）を検知するとisButtonPlayingをトグルし，開始時は現在のBPM段階番号を付与してSyncManagerのsendStart関数を，終了時はsendEnd関数を呼び出すことで，各楽器機・観覧車デバイスへ演奏開始・終了信号を送信する．送信後は300 msの待機によりチャタリングを防止する．\\
     \hline
     \end{tabular}
 \end{table}
 
-\texttt{button}関数はこの1関数のみで構成されるため，以下では処理の流れに沿って実際のコードを2箇所に分けて説明する．まず，立下りエッジの検知部分について説明する．\texttt{switch\_status}に現在のピン状態を読み込み，前回値\texttt{before\_switch\_status}と比較することで，HIGH→LOWへ変化した瞬間（ボタンが押された瞬間）のみを検知する．該当部分をコード\ref{lst:btn_edge}に示す．
+button関数はこの1関数のみで構成されるため，以下では処理の流れに沿って実際のコードを2箇所に分けて説明する．まず，立下りエッジの検知部分について説明する．switch\_statusに現在のピン状態を読み込み，前回値before\_switch\_statusと比較することで，HIGH→LOWへ変化した瞬間（ボタンが押された瞬間）のみを検知する．該当部分をコード\ref{lst:btn_edge}に示す．
 
 \begin{lstlisting}[caption={button関数（立下りエッジの検知部分）}, label={lst:btn_edge}]
     switch_status = digitalRead(input_PIN);
@@ -228,7 +228,7 @@ void loop() {
     before_switch_status = switch_status;
 \end{lstlisting}
 
-次に，立下りを検知した際の状態トグルと送信処理について説明する．\texttt{isButtonPlaying}がtrue（演奏中）であればsync.\texttt{sendEnd}()を呼び出して演奏を終了し，false（停止中）であれば現在のBPM段階（pot.\texttt{getBpmStep}()）を引数としてsync.\texttt{sendStart}()を呼び出して演奏を開始する．いずれの場合も\texttt{isButtonPlaying}の値を反転させたうえで，delay(300)により300 ms待機することでチャタリングを防止する．該当部分をコード\ref{lst:btn_send}に示す．
+次に，立下りを検知した際の状態トグルと送信処理について説明する．isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出して演奏を終了し，false（停止中）であれば現在のBPM段階（pot.getBpmStep()）を引数としてsync.sendStart()を呼び出して演奏を開始する．いずれの場合もisButtonPlayingの値を反転させたうえで，delay(300)により300 ms待機することでチャタリングを防止する．該当部分をコード\ref{lst:btn_send}に示す．
 
 \begin{lstlisting}[caption={button関数（状態トグルと送信処理部分）}, label={lst:btn_send}]
     if (isButtonPlaying) {
@@ -242,9 +242,9 @@ void loop() {
     delay(300); // チャタリング防止
 \end{lstlisting}
 
-なお，\texttt{sendStart}・\texttt{sendEnd}の内部では，\texttt{SyncManager}クラスが複数台のデバイスへラウンドロビン方式による冗長送信を行っている．この通信処理の詳細な実装は付録に示すプログラム全文を参照されたい．
+なお，sendStart・sendEndの内部では，SyncManagerクラスが複数台のデバイスへラウンドロビン方式による冗長送信を行っている．この通信処理の詳細な実装は付録に示すプログラム全文を参照されたい．
 
-次に，指揮デバイスにおける加速度センサの制御処理について説明する．指揮デバイスは，加速度センサを用いてユーザが指揮棒を振ったことを検知し，演奏情報の更新を行う．センサ値の急激な変化を読み取ることで動作を判定し，誤検知防止機能を設けることで安定した動作を実現している．処理の流れは，差分算出と判定，多重検知の防止，状態の反転，事後処理の4段階に大別される．まず差分算出と判定では，現在の合成加速度\texttt{currentAccVal}と前回値\texttt{lastAccVal}との差の絶対値を求める．この差分が検知閾値\texttt{accThreshold}を超過し，かつ前回検知から\texttt{shakeInterval}以上の時間が経過している場合に，指揮棒を振ったと判定する．多重検知の防止では，一度振る動作を検知すると\texttt{lastDetectTime}を現在時刻に更新し，以降\texttt{shakeInterval}が経過するまでは加速度の変化を無視することで，一連の動作による複数回の誤検知を防止する．状態の反転では，振る動作を検知するたびに\texttt{isStarted}のbool値を反転させる．事後処理として，次回の判定に備えて\texttt{currentAccVal}の値を\texttt{lastAccVal}へ代入し，前回のサンプリング時刻を更新する．また，振る動作の確定時には，可変抵抗器側で設定値の変更を検知したフラグ\texttt{bpmFrag}または\texttt{volFrag}（\ref{sec:pot_detail}項で説明する）が有効になっている場合，\texttt{SyncManager}クラスを介してその情報の送信指示を行う．さらに，I2C通信の異常を検知した場合には自動復旧を行う機能を備えている．加速度センサの制御で使用する変数の仕様を表\ref{table:siki_acc_var}に示す．
+次に，指揮デバイスにおける加速度センサの制御処理について説明する．指揮デバイスは，加速度センサを用いてユーザが指揮棒を振ったことを検知し，演奏情報の更新を行う．センサ値の急激な変化を読み取ることで動作を判定し，誤検知防止機能を設けることで安定した動作を実現している．処理の流れは，差分算出と判定，多重検知の防止，状態の反転，事後処理の4段階に大別される．まず差分算出と判定では，現在の合成加速度currentAccValと前回値lastAccValとの差の絶対値を求める．この差分が検知閾値accThresholdを超過し，かつ前回検知からshakeInterval以上の時間が経過している場合に，指揮棒を振ったと判定する．多重検知の防止では，一度振る動作を検知するとlastDetectTimeを現在時刻に更新し，以降shakeIntervalが経過するまでは加速度の変化を無視することで，一連の動作による複数回の誤検知を防止する．状態の反転では，振る動作を検知するたびにisStartedのbool値を反転させる．事後処理として，次回の判定に備えてcurrentAccValの値をlastAccValへ代入し，前回のサンプリング時刻を更新する．また，振る動作の確定時には，可変抵抗器側で設定値の変更を検知したフラグbpmFragまたはvolFrag（\ref{sec:pot_detail}項で説明する）が有効になっている場合，SyncManagerクラスを介してその情報の送信指示を行う．さらに，I2C通信の異常を検知した場合には自動復旧を行う機能を備えている．加速度センサの制御で使用する変数の仕様を表\ref{table:siki_acc_var}に示す．
 
 \begin{table}[H]
     \caption{加速度センサの制御で使用する変数の仕様一覧}
@@ -254,59 +254,59 @@ void loop() {
     \hline
     \textbf{変数名} & \textbf{型} & \textbf{説明}\\
     \hline
-    \texttt{currentAccVal} & float & 加速度センサから算出した合成加速度の値を格納\\
+    currentAccVal & float & 加速度センサから算出した合成加速度の値を格納\\
     \hline
-    \texttt{lastAccVal} & float & 変化量算出のための直前の加速度センサ値を格納\\
+    lastAccVal & float & 変化量算出のための直前の加速度センサ値を格納\\
     \hline
-    \texttt{accThreshold} & const float & 振ったと判断するための変化量の閾値を定義\\
+    accThreshold & const float & 振ったと判断するための変化量の閾値を定義\\
     \hline
-    \texttt{lastDetectTime} & unsigned long & 前回振ったことを検知した時間をms単位で格納\\
+    lastDetectTime & unsigned long & 前回振ったことを検知した時間をms単位で格納\\
     \hline
-    \texttt{shakeInterval} & const unsigned long & 連続検知を防止するための待機時間を定義\\
+    shakeInterval & const unsigned long & 連続検知を防止するための待機時間を定義\\
     \hline
-    \texttt{lastSampleTime} & unsigned long & 前回センサ値をサンプリングした時間をms単位で格納\\
+    lastSampleTime & unsigned long & 前回センサ値をサンプリングした時間をms単位で格納\\
     \hline
-    \texttt{ACC\_SAMPLE\_INTERVAL} & const unsigned long & 加速度センサ値をサンプリングする周期を定義\\
+    ACC\_SAMPLE\_INTERVAL & const unsigned long & 加速度センサ値をサンプリングする周期を定義\\
     \hline
-    \texttt{isStarted} & bool & 楽器の演奏状態を保持(true: 演奏中/false: 停止中)\\
+    isStarted & bool & 楽器の演奏状態を保持(true: 演奏中/false: 停止中)\\
     \hline
-    \texttt{ADXL345\_ADDR} & const uint8\_t & 加速度センサ(ADXL345)のI2Cアドレスを定義\\
+    ADXL345\_ADDR & const uint8\_t & 加速度センサ(ADXL345)のI2Cアドレスを定義\\
     \hline
-    \texttt{REG\_POWER\_CTL} & const uint8\_t & 加速度センサの電源管理レジスタのアドレスを定義\\
+    REG\_POWER\_CTL & const uint8\_t & 加速度センサの電源管理レジスタのアドレスを定義\\
     \hline
-    \texttt{REG\_DATA\_FORMAT} & const uint8\_t & 測定範囲設定用レジスタのアドレスを定義\\
+    REG\_DATA\_FORMAT & const uint8\_t & 測定範囲設定用レジスタのアドレスを定義\\
     \hline
-    \texttt{REG\_DATAX0} & const uint8\_t & 測定値が格納される先頭レジスタのアドレスを定義\\
+    REG\_DATAX0 & const uint8\_t & 測定値が格納される先頭レジスタのアドレスを定義\\
     \hline
-    \texttt{lastRecoverMs} & unsigned long & I2C復旧処理の連続実行を防ぐための最終復旧時刻を保持\\
+    lastRecoverMs & unsigned long & I2C復旧処理の連続実行を防ぐための最終復旧時刻を保持\\
     \hline
     \end{tabular}
 \end{table}
 
-続いて，加速度センサ制御（\texttt{AccManager}クラス）で使用する関数の仕様を表\ref{table:siki_acc_func}に示す．
+続いて，加速度センサ制御（AccManagerクラス）で使用する関数の仕様を表\ref{table:siki_acc_func}に示す．
 
 \begin{table}[H]
-    \caption{加速度センサ制御（\texttt{AccManager}クラス）で使用する関数の仕様一覧}
+    \caption{加速度センサ制御（AccManagerクラス）で使用する関数の仕様一覧}
     \centering
     \label{table:siki_acc_func}
     \begin{tabular}{p{3.8cm}p{1.6cm}p{3.2cm}p{4.9cm}}
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{setupADXL345} & \texttt{void} & なし & ADXL345の電源投入と測定レンジの設定を行い，初期の加速度値を\texttt{lastAccVal}に格納する初期化関数\\
+    setupADXL345 & void & なし & ADXL345の電源投入と測定レンジの設定を行い，初期の加速度値をlastAccValに格納する初期化関数\\
     \hline
-    \texttt{readAccMagnitude} & \texttt{float} & なし & ADXL345からX/Y/Z軸の生の値を取得し，2乗和の平方根を返す．I2C通信異常を検知した場合は直前の加速度値を返す\\
+    readAccMagnitude & float & なし & ADXL345からX/Y/Z軸の生の値を取得し，2乗和の平方根を返す．I2C通信異常を検知した場合は直前の加速度値を返す\\
     \hline
-    \texttt{recoverI2C} & \texttt{void} & なし & I2Cバスのロックアップ異常を検出した場合に，SCL線のクロッキングによるバスクリアとSTOP条件の生成，Wireおよびセンサの再初期化によって通信を復旧する\\
+    recoverI2C & void & なし & I2Cバスのロックアップ異常を検出した場合に，SCL線のクロッキングによるバスクリアとSTOP条件の生成，Wireおよびセンサの再初期化によって通信を復旧する\\
     \hline
-    \texttt{update} & \texttt{void} & \texttt{SyncManager\& sync}, \texttt{PotManager\& pot} & \texttt{ACC\_SAMPLE\_INTERVAL}ごとに加速度値を取得し，差分算出・多重検知防止判定・状態の反転・事後処理までの一連の振る動作検知処理を行う．loop内で毎回呼び出す\\
+    update & void & SyncManager\& sync, PotManager\& pot & ACC\_SAMPLE\_INTERVALごとに加速度値を取得し，差分算出・多重検知防止判定・状態の反転・事後処理までの一連の振る動作検知処理を行う．loop内で毎回呼び出す\\
     \hline
-    \texttt{updateShakedInfo} & \texttt{void} & \texttt{SyncManager\& sync}, \texttt{PotManager\& pot} & 振る動作の確定時に呼び出され，\texttt{PotManager}の\texttt{bpmFrag}／\texttt{volFrag}が立っている場合に\texttt{SyncManager}経由でBPM・音量の段階番号を送信する\\
+    updateShakedInfo & void & SyncManager\& sync, PotManager\& pot & 振る動作の確定時に呼び出され，PotManagerのbpmFrag／volFragが立っている場合にSyncManager経由でBPM・音量の段階番号を送信する\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:siki_acc_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，\texttt{setupADXL345}関数について説明する．この関数は，Wire.beginによるI2C通信の開始後，ADXL345のPOWER\_CTLレジスタにMeasureビットを書き込むことでセンサを測定モードへ移行させ，DATA\_FORMATレジスタを初期値のまま設定する．\texttt{setupADXL345}関数をコード\ref{lst:acc_setup}に示す．
+以下では，表\ref{table:siki_acc_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，setupADXL345関数について説明する．この関数は，Wire.beginによるI2C通信の開始後，ADXL345のPOWER\_CTLレジスタにMeasureビットを書き込むことでセンサを測定モードへ移行させ，DATA\_FORMATレジスタを初期値のまま設定する．setupADXL345関数をコード\ref{lst:acc_setup}に示す．
 
 \begin{lstlisting}[caption={AccManager::setupADXL345関数}, label={lst:acc_setup}]
 void AccManager::setupADXL345() {
@@ -326,7 +326,7 @@ void AccManager::setupADXL345() {
 }
 \end{lstlisting}
 
-次に，加速度の実測値を取得する\texttt{readAccMagnitude}関数について説明する．この関数は，DATAX0レジスタから連続する6バイト（X, Y, Z軸それぞれ2バイトの符号付き整数）をrequestFromで読み出し，3軸のベクトル合成値（合成加速度）を平方根の計算により求めて返り値とする．\texttt{readAccMagnitude}関数をコード\ref{lst:acc_read}に示す．
+次に，加速度の実測値を取得するreadAccMagnitude関数について説明する．この関数は，DATAX0レジスタから連続する6バイト（X, Y, Z軸それぞれ2バイトの符号付き整数）をrequestFromで読み出し，3軸のベクトル合成値（合成加速度）を平方根の計算により求めて返り値とする．readAccMagnitude関数をコード\ref{lst:acc_read}に示す．
 
 \begin{lstlisting}[caption={AccManager::readAccMagnitude関数}, label={lst:acc_read}]
 float AccManager::readAccMagnitude() {
@@ -351,7 +351,7 @@ float AccManager::readAccMagnitude() {
 }
 \end{lstlisting}
 
-ここで，Wire.endTransmission(false)がエラーを返した場合，またはrequestFromで6バイト読み出せなかった場合には，I2Cバスがロックアップ（スレーブがSDA線を握ったまま停止する現象）していると判断し，\texttt{recoverI2C}関数を呼び出したうえで前回値\texttt{lastAccVal}を返すことで，誤ったシェイク検知（ニセshake）を防いでいる．続いて，\texttt{recoverI2C}関数について説明する．この関数は，SCL線を9回手動でトグルさせてSDA線の握りを解放したうえでSTOP条件を生成し，Wireを再初期化してADXL345を再設定することでバスを復旧させる．\texttt{lastRecoverMs}は，この復旧処理およびログ出力が短時間に連続して実行されることを防ぐスロットル用の時刻管理に用いられる．\texttt{recoverI2C}関数をコード\ref{lst:acc_recover}に示す．
+ここで，Wire.endTransmission(false)がエラーを返した場合，またはrequestFromで6バイト読み出せなかった場合には，I2Cバスがロックアップ（スレーブがSDA線を握ったまま停止する現象）していると判断し，recoverI2C関数を呼び出したうえで前回値lastAccValを返すことで，誤ったシェイク検知（ニセshake）を防いでいる．続いて，recoverI2C関数について説明する．この関数は，SCL線を9回手動でトグルさせてSDA線の握りを解放したうえでSTOP条件を生成し，Wireを再初期化してADXL345を再設定することでバスを復旧させる．lastRecoverMsは，この復旧処理およびログ出力が短時間に連続して実行されることを防ぐスロットル用の時刻管理に用いられる．recoverI2C関数をコード\ref{lst:acc_recover}に示す．
 
 \begin{lstlisting}[caption={AccManager::recoverI2C関数}, label={lst:acc_recover}]
 void AccManager::recoverI2C() {
@@ -386,7 +386,7 @@ void AccManager::recoverI2C() {
 }
 \end{lstlisting}
 
-次に，update関数について説明する．この関数はloop内で毎回呼び出され，\texttt{ACC\_SAMPLE\_INTERVAL}（20 ms）ごとに加速度の実測値を取得し，前回値との差diffを求める．diffが検知閾値\texttt{accThreshold}を超過し，かつ前回検知から\texttt{shakeInterval}（750 ms，多重検知防止用）が経過している場合にのみ，振り動作として検知し\texttt{updateShakedInfo}関数を呼び出す．update関数をコード\ref{lst:acc_update}に示す．
+次に，update関数について説明する．この関数はloop内で毎回呼び出され，ACC\_SAMPLE\_INTERVAL（20 ms）ごとに加速度の実測値を取得し，前回値との差diffを求める．diffが検知閾値accThresholdを超過し，かつ前回検知からshakeInterval（750 ms，多重検知防止用）が経過している場合にのみ，振り動作として検知しupdateShakedInfo関数を呼び出す．update関数をコード\ref{lst:acc_update}に示す．
 
 \begin{lstlisting}[caption={AccManager::update関数}, label={lst:acc_update}]
 void AccManager::update(SyncManager& sync, PotManager& pot) {
@@ -409,7 +409,7 @@ void AccManager::update(SyncManager& sync, PotManager& pot) {
 }
 \end{lstlisting}
 
-最後に，\texttt{updateShakedInfo}関数について説明する．この関数は，振り動作の検知をトリガとして，\texttt{PotManager}が保持する\texttt{bpmFrag}・\texttt{volFrag}フラグ（可変抵抗器の値が変化した場合に立つフラグ．\ref{sec:pot_detail}項で説明する）を確認し，フラグが立っている項目についてのみ\texttt{SyncManager}経由でBPMまたは音量の変更情報を送信する．すなわち，実際に無線送信が発生するのは，可変抵抗器を操作した後にデバイスを振った場合に限られる．\texttt{updateShakedInfo}関数をコード\ref{lst:acc_shaked}に示す．
+最後に，updateShakedInfo関数について説明する．この関数は，振り動作の検知をトリガとして，PotManagerが保持するbpmFrag・volFragフラグ（可変抵抗器の値が変化した場合に立つフラグ．\ref{sec:pot_detail}項で説明する）を確認し，フラグが立っている項目についてのみSyncManager経由でBPMまたは音量の変更情報を送信する．すなわち，実際に無線送信が発生するのは，可変抵抗器を操作した後にデバイスを振った場合に限られる．updateShakedInfo関数をコード\ref{lst:acc_shaked}に示す．
 
 \begin{lstlisting}[caption={AccManager::updateShakedInfo関数}, label={lst:acc_shaked}]
 void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
@@ -425,7 +425,7 @@ void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
 \end{lstlisting}
 
 \label{sec:pot_detail}
-最後に，指揮デバイスにおける可変抵抗器を用いたBPM・音量読み取り機能について説明する．指揮デバイスでは，演奏の要素であるBPMと音量を，ユーザが操作できるように可変抵抗器を用いて5段階で調整する．アナログ入力値の特性を考慮したデータ処理を行うことで，安定した制御環境を構築している．アルゴリズムは，サンプリングと移動平均化，範囲分割，パラメータの抽出と出力の3段階に分けられる．サンプリングと移動平均化では，\texttt{SAMPLE\_INTERVAL}ごとにBPMおよび音量変更用の可変抵抗器の電圧値を，配列\texttt{bpmSamples}・\texttt{volSamples}に\texttt{sampleSize}分だけ読み取り保存する．このとき，配列の各要素は書き込み位置（\texttt{bpmReadIndex}・\texttt{volReadIndex}）が指す最も古い値から順に上書きされ，上書きの直前に該当要素の値を合計\texttt{bpmTotal}・\texttt{volTotal}からあらかじめ減算し，新たに読み取った値を加算することで，配列全体を読み直すことなく常に最新の合計値を保持する（移動合計）．配列が一巡し全要素が新しい値に更新された時点（\texttt{bpmBufferFull}・\texttt{volBufferFull}がtrueになった時点）以降，この合計値を\texttt{sampleSize}で除算した移動平均値を\texttt{averageBpmVal}・\texttt{averageVolVal}に格納する．範囲分割では，移動平均化された値を\texttt{STEP\_BOUNDARIES}[]で定義した4つの閾値と比較し，1〜5の段階番号を\texttt{currentBpmStep}・\texttt{currentVolStep}に格納する．パラメータの抽出と出力では，算出した段階が直前の段階（\texttt{prevBpmStep}・\texttt{prevVolStep}）から変化した場合にのみ，公開フラグ\texttt{bpmFrag}・\texttt{volFrag}を立てる．外部からは\texttt{getBpmStep}()・\texttt{getVolStep}()を介して現在の段階を取得し，前述の加速度センサ制御における棒振り動作の確定時にこれらのフラグを参照して各楽器機への送信を行う．なお，音量用可変抵抗器は配線の都合上，回した方向とセンサ値の増減が逆になるため，\texttt{getVolStep}()は6-\texttt{currentVolStep}を返すことで表示上の段階を反転させる．BPM・音量読み取り機能で使用する変数の仕様を表\ref{table:siki_pot_var}に示す．
+最後に，指揮デバイスにおける可変抵抗器を用いたBPM・音量読み取り機能について説明する．指揮デバイスでは，演奏の要素であるBPMと音量を，ユーザが操作できるように可変抵抗器を用いて5段階で調整する．アナログ入力値の特性を考慮したデータ処理を行うことで，安定した制御環境を構築している．アルゴリズムは，サンプリングと移動平均化，範囲分割，パラメータの抽出と出力の3段階に分けられる．サンプリングと移動平均化では，SAMPLE\_INTERVALごとにBPMおよび音量変更用の可変抵抗器の電圧値を，配列bpmSamples・volSamplesにsampleSize分だけ読み取り保存する．このとき，配列の各要素は書き込み位置（bpmReadIndex・volReadIndex）が指す最も古い値から順に上書きされ，上書きの直前に該当要素の値を合計bpmTotal・volTotalからあらかじめ減算し，新たに読み取った値を加算することで，配列全体を読み直すことなく常に最新の合計値を保持する（移動合計）．配列が一巡し全要素が新しい値に更新された時点（bpmBufferFull・volBufferFullがtrueになった時点）以降，この合計値をsampleSizeで除算した移動平均値をaverageBpmVal・averageVolValに格納する．範囲分割では，移動平均化された値をSTEP\_BOUNDARIES[]で定義した4つの閾値と比較し，1〜5の段階番号をcurrentBpmStep・currentVolStepに格納する．パラメータの抽出と出力では，算出した段階が直前の段階（prevBpmStep・prevVolStep）から変化した場合にのみ，公開フラグbpmFrag・volFragを立てる．外部からはgetBpmStep()・getVolStep()を介して現在の段階を取得し，前述の加速度センサ制御における棒振り動作の確定時にこれらのフラグを参照して各楽器機への送信を行う．なお，音量用可変抵抗器は配線の都合上，回した方向とセンサ値の増減が逆になるため，getVolStep()は6-currentVolStepを返すことで表示上の段階を反転させる．BPM・音量読み取り機能で使用する変数の仕様を表\ref{table:siki_pot_var}に示す．
 
 \begin{center}
 \begin{longtable}{p{3.9cm}p{3.4cm}p{6.2cm}}
@@ -445,78 +445,78 @@ void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
     \endfoot
     \hline
     \endlastfoot
-    \texttt{PIN\_BPM} & const int & BPM変更用の可変抵抗器を接続するアナログ入力ピン番号を定義\\
+    PIN\_BPM & const int & BPM変更用の可変抵抗器を接続するアナログ入力ピン番号を定義\\
     \hline
-    \texttt{PIN\_VOL} & const int & 音量変更用の可変抵抗器を接続するアナログ入力ピン番号を定義\\
+    PIN\_VOL & const int & 音量変更用の可変抵抗器を接続するアナログ入力ピン番号を定義\\
     \hline
-    \texttt{SAMPLE\_INTERVAL} & const unsigned long & 可変抵抗器の値をサンプリングする周期を定義\\
+    SAMPLE\_INTERVAL & const unsigned long & 可変抵抗器の値をサンプリングする周期を定義\\
     \hline
-    \texttt{sampleSize} & const int & 移動平均算出のためのサンプル数を定義\\
+    sampleSize & const int & 移動平均算出のためのサンプル数を定義\\
     \hline
-    \texttt{STEP\_BOUNDARIES}[] & const int & 段階判定に用いる4つの閾値を保持する配列\\
+    STEP\_BOUNDARIES[] & const int & 段階判定に用いる4つの閾値を保持する配列\\
     \hline
-    \texttt{lastSampleTime} & unsigned long & 前回サンプリングを行った時間を格納\\
+    lastSampleTime & unsigned long & 前回サンプリングを行った時間を格納\\
     \hline
-    \texttt{bpmSamples}[] & int & BPM用のサンプル値を保持するための配列\\
+    bpmSamples[] & int & BPM用のサンプル値を保持するための配列\\
     \hline
-    \texttt{volSamples}[] & int & 音量用のサンプル値を保持するための配列\\
+    volSamples[] & int & 音量用のサンプル値を保持するための配列\\
     \hline
-    \texttt{bpmReadIndex} & int & \texttt{bpmSamples}[]内での現在の書き込み位置を管理するインデックス\\
+    bpmReadIndex & int & bpmSamples[]内での現在の書き込み位置を管理するインデックス\\
     \hline
-    \texttt{volReadIndex} & int & \texttt{volSamples}[]内での現在の書き込み位置を管理するインデックス\\
+    volReadIndex & int & volSamples[]内での現在の書き込み位置を管理するインデックス\\
     \hline
-    \texttt{bpmBufferFull} & bool & \texttt{bpmSamples}[]が一巡し，移動平均の算出が有効になったかを保持\\
+    bpmBufferFull & bool & bpmSamples[]が一巡し，移動平均の算出が有効になったかを保持\\
     \hline
-    \texttt{volBufferFull} & bool & \texttt{volSamples}[]が一巡し，移動平均の算出が有効になったかを保持\\
+    volBufferFull & bool & volSamples[]が一巡し，移動平均の算出が有効になったかを保持\\
     \hline
-    \texttt{bpmTotal} & long & \texttt{bpmSamples}[]内の累積合計を格納\\
+    bpmTotal & long & bpmSamples[]内の累積合計を格納\\
     \hline
-    \texttt{volTotal} & long & \texttt{volSamples}[]内の累積合計を格納\\
+    volTotal & long & volSamples[]内の累積合計を格納\\
     \hline
-    \texttt{averageBpmVal} & float & 算出されたBPM用のアナログ入力の移動平均値を格納\\
+    averageBpmVal & float & 算出されたBPM用のアナログ入力の移動平均値を格納\\
     \hline
-    \texttt{averageVolVal} & float & 算出された音量用のアナログ入力の移動平均値を格納\\
+    averageVolVal & float & 算出された音量用のアナログ入力の移動平均値を格納\\
     \hline
-    \texttt{currentBpmStep} & uint8\_t & 算出されたBPMの5段階のレベル(1〜5)を格納\\
+    currentBpmStep & uint8\_t & 算出されたBPMの5段階のレベル(1〜5)を格納\\
     \hline
-    \texttt{currentVolStep} & uint8\_t & 算出された音量の5段階のレベル(1〜5)を格納\\
+    currentVolStep & uint8\_t & 算出された音量の5段階のレベル(1〜5)を格納\\
     \hline
-    \texttt{prevBpmStep} & int & 段階の変化検知のための直前のBPM段階を格納\\
+    prevBpmStep & int & 段階の変化検知のための直前のBPM段階を格納\\
     \hline
-    \texttt{prevVolStep} & int & 段階の変化検知のための直前の音量段階を格納\\
+    prevVolStep & int & 段階の変化検知のための直前の音量段階を格納\\
     \hline
-    \texttt{bpmFrag} & bool & BPM段階が変化したことを示す公開フラグ．シェイク確定時の連動送信に使用\\
+    bpmFrag & bool & BPM段階が変化したことを示す公開フラグ．シェイク確定時の連動送信に使用\\
     \hline
-    \texttt{volFrag} & bool & 音量段階が変化したことを示す公開フラグ．シェイク確定時の連動送信に使用\\
+    volFrag & bool & 音量段階が変化したことを示す公開フラグ．シェイク確定時の連動送信に使用\\
 \end{longtable}
 \end{center}
 
-続いて，可変抵抗器読み取り機能（\texttt{PotManager}クラス）で使用する関数の仕様を表\ref{table:siki_pot_func}に示す．
+続いて，可変抵抗器読み取り機能（PotManagerクラス）で使用する関数の仕様を表\ref{table:siki_pot_func}に示す．
 
 \begin{table}[H]
-    \caption{可変抵抗器読み取り機能（\texttt{PotManager}クラス）で使用する関数の仕様一覧}
+    \caption{可変抵抗器読み取り機能（PotManagerクラス）で使用する関数の仕様一覧}
     \centering
     \label{table:siki_pot_func}
     \begin{tabular}{p{5.0cm}p{1.5cm}p{2.2cm}p{4.8cm}}
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{update} & \texttt{void} & なし & \texttt{SAMPLE\_INTERVAL}ごとにBPM・音量それぞれの可変抵抗器の値をサンプリングし，移動合計・移動平均・段階算出を行う．loop内で毎回呼び出す\\
+    update & void & なし & SAMPLE\_INTERVALごとにBPM・音量それぞれの可変抵抗器の値をサンプリングし，移動合計・移動平均・段階算出を行う．loop内で毎回呼び出す\\
     \hline
-    \texttt{calcStep} & \texttt{int} & \texttt{float val} & 0〜1023の移動平均値を\texttt{STEP\_BOUNDARIES}[]と比較し，1〜5のいずれかの段階を返す\\
+    calcStep & int & float val & 0〜1023の移動平均値をSTEP\_BOUNDARIES[]と比較し，1〜5のいずれかの段階を返す\\
     \hline
-    \texttt{bpmUpdatePotentiometers} & \texttt{bool} & なし & BPM用可変抵抗器の値を読み取り移動合計・移動平均を更新し，段階が変化した場合にtrueを返す\\
+    bpmUpdatePotentiometers & bool & なし & BPM用可変抵抗器の値を読み取り移動合計・移動平均を更新し，段階が変化した場合にtrueを返す\\
     \hline
-    \texttt{volUpdatePotentiometers} & \texttt{bool} & なし & 音量用可変抵抗器の値を読み取り移動合計・移動平均を更新し，段階が変化した場合にtrueを返す\\
+    volUpdatePotentiometers & bool & なし & 音量用可変抵抗器の値を読み取り移動合計・移動平均を更新し，段階が変化した場合にtrueを返す\\
     \hline
-    \texttt{getBpmStep} & \texttt{uint8\_t} & なし & 現在のBPM段階（\texttt{currentBpmStep}）を外部に返すゲッター\\
+    getBpmStep & uint8\_t & なし & 現在のBPM段階（currentBpmStep）を外部に返すゲッター\\
     \hline
-    \texttt{getVolStep} & \texttt{uint8\_t} & なし & 現在の音量段階を外部に返すゲッター．配線特性による値の反転を補正し，6-\texttt{currentVolStep}を返す\\
+    getVolStep & uint8\_t & なし & 現在の音量段階を外部に返すゲッター．配線特性による値の反転を補正し，6-currentVolStepを返す\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:siki_pot_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，update関数について説明する．この関数はloop内で毎回呼び出され，\texttt{SAMPLE\_INTERVAL}（20 $\mu$s）ごとに\texttt{bpmUpdatePotentiometers}関数と\texttt{volUpdatePotentiometers}関数を呼び出す．update関数をコード\ref{lst:pot_update}に示す．
+以下では，表\ref{table:siki_pot_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，update関数について説明する．この関数はloop内で毎回呼び出され，SAMPLE\_INTERVAL（20 $\mu$s）ごとにbpmUpdatePotentiometers関数とvolUpdatePotentiometers関数を呼び出す．update関数をコード\ref{lst:pot_update}に示す．
 
 \begin{lstlisting}[caption={PotManager::update関数}, label={lst:pot_update}]
 void PotManager::update() {
@@ -529,7 +529,7 @@ void PotManager::update() {
 }
 \end{lstlisting}
 
-次に，\texttt{bpmUpdatePotentiometers}関数について説明する．この関数は，リングバッファ（配列\texttt{bpmSamples}，添字\texttt{bpmReadIndex}）を用いた移動平均処理により，analogReadで取得したアナログ値のノイズを平滑化する．具体的には，配列の最も古いサンプルを合計値\texttt{bpmTotal}から減算し，新たに取得した値を加算したうえで書き込み位置を進める．\texttt{sampleSize}（10サンプル）分のバッファが一巡した時点から，合計値をサンプル数で割った移動平均\texttt{averageBpmVal}を算出し，\texttt{calcStep}関数で段階へ変換したうえで，前回段階から変化していればtrueを返す．\texttt{bpmUpdatePotentiometers}関数をコード\ref{lst:pot_bpm}に示す．
+次に，bpmUpdatePotentiometers関数について説明する．この関数は，リングバッファ（配列bpmSamples，添字bpmReadIndex）を用いた移動平均処理により，analogReadで取得したアナログ値のノイズを平滑化する．具体的には，配列の最も古いサンプルを合計値bpmTotalから減算し，新たに取得した値を加算したうえで書き込み位置を進める．sampleSize（10サンプル）分のバッファが一巡した時点から，合計値をサンプル数で割った移動平均averageBpmValを算出し，calcStep関数で段階へ変換したうえで，前回段階から変化していればtrueを返す．bpmUpdatePotentiometers関数をコード\ref{lst:pot_bpm}に示す．
 
 \begin{lstlisting}[caption={PotManager::bpmUpdatePotentiometers関数}, label={lst:pot_bpm}]
 bool PotManager::bpmUpdatePotentiometers() {
@@ -551,7 +551,7 @@ bool PotManager::bpmUpdatePotentiometers() {
 }
 \end{lstlisting}
 
-続いて，\texttt{calcStep}関数について説明する．この関数は，\texttt{bpmUpdatePotentiometers}関数および\texttt{volUpdatePotentiometers}関数から呼び出され，得られた移動平均値を1〜5の5段階に離散化する．\texttt{STEP\_BOUNDARIES}配列（300, 500, 650, 818）に対する大小比較によって段階を決定しており，境界値の間隔を均等にしていない理由は，可変抵抗器の実測特性に合わせて各段階の操作しやすさを調整しているためである．\texttt{calcStep}関数をコード\ref{lst:pot_calc}に示す．
+続いて，calcStep関数について説明する．この関数は，bpmUpdatePotentiometers関数およびvolUpdatePotentiometers関数から呼び出され，得られた移動平均値を1〜5の5段階に離散化する．STEP\_BOUNDARIES配列（300, 500, 650, 818）に対する大小比較によって段階を決定しており，境界値の間隔を均等にしていない理由は，可変抵抗器の実測特性に合わせて各段階の操作しやすさを調整しているためである．calcStep関数をコード\ref{lst:pot_calc}に示す．
 
 \begin{lstlisting}[caption={PotManager::calcStep関数}, label={lst:pot_calc}]
 int PotManager::calcStep(float val) {
@@ -563,7 +563,7 @@ int PotManager::calcStep(float val) {
 }
 \end{lstlisting}
 
-次に，\texttt{volUpdatePotentiometers}関数について説明する．この関数は\texttt{bpmUpdatePotentiometers}関数と同様の移動平均処理を行うが，対象のピンおよび内部変数が音量用（\texttt{PIN\_VOL}，\texttt{volSamples}等）に置き換わっている点のみが異なり，処理の骨格は共通している．\texttt{volUpdatePotentiometers}関数をコード\ref{lst:pot_vol}に示す．
+次に，volUpdatePotentiometers関数について説明する．この関数はbpmUpdatePotentiometers関数と同様の移動平均処理を行うが，対象のピンおよび内部変数が音量用（PIN\_VOL，volSamples等）に置き換わっている点のみが異なり，処理の骨格は共通している．volUpdatePotentiometers関数をコード\ref{lst:pot_vol}に示す．
 
 \begin{lstlisting}[caption={PotManager::volUpdatePotentiometers関数}, label={lst:pot_vol}]
 bool PotManager::volUpdatePotentiometers() {
@@ -585,14 +585,14 @@ bool PotManager::volUpdatePotentiometers() {
 }
 \end{lstlisting}
 
-最後に，\texttt{getBpmStep}関数および\texttt{getVolStep}関数について説明する．いずれも\texttt{PotManager.h}内でインライン定義されたゲッター関数であり，外部（\texttt{AccManager}クラス）から現在の段階番号を取得するために用いられる．\texttt{getVolStep}関数では，可変抵抗器を回転させる向きと，音量として直感的に理解しやすい段階の増減方向を一致させるため，\texttt{6 - currentVolStep}という変換を行っている点が\texttt{getBpmStep}関数と異なる．両関数をコード\ref{lst:pot_getters}に示す．
+最後に，getBpmStep関数およびgetVolStep関数について説明する．いずれもPotManager.h内でインライン定義されたゲッター関数であり，外部（AccManagerクラス）から現在の段階番号を取得するために用いられる．getVolStep関数では，可変抵抗器を回転させる向きと，音量として直感的に理解しやすい段階の増減方向を一致させるため，6 - currentVolStepという変換を行っている点がgetBpmStep関数と異なる．両関数をコード\ref{lst:pot_getters}に示す．
 
 \begin{lstlisting}[caption={PotManager::getBpmStep関数・getVolStep関数}, label={lst:pot_getters}]
 uint8_t getBpmStep() const { return currentBpmStep; }
 uint8_t getVolStep() const { return 6 - currentVolStep; }
 \end{lstlisting}
 
-なお，本節で説明した\texttt{SyncManager}クラスによって送信された演奏開始・終了，BPM，音量の各情報が，中継機デバイス側でどのように受信・反映されるかについては\ref{sec:kan_naibu}項（中継機デバイスの内部設計）で説明する．
+なお，本節で説明したSyncManagerクラスによって送信された演奏開始・終了，BPM，音量の各情報が，中継機デバイス側でどのように受信・反映されるかについては\ref{sec:kan_naibu}項（中継機デバイスの内部設計）で説明する．
 
 
 
@@ -787,15 +787,15 @@ uint8_t getVolStep() const { return 6 - currentVolStep; }
     \begin{tabular}{|l|p{10cm}|}
         \hline
         \textbf{ファイル名} & \textbf{概要} \\ \hline \hline
-        \texttt{FerrisWheel.ino} & WiFi接続・UDP受信の管理，受信ヘッダに応じたモータ制御・表示処理の呼び出し \\ \hline
-        \texttt{Display.cpp} & 表示文字の独自フォント定義，LEDマトリクスへの描画処理 \\ \hline
-        \texttt{Display.h} & 定数定義，関数宣言，外部参照 \\ \hline
-        \texttt{MotorControl.cpp} & PWM出力によるモータ回転制御，回転速度テーブルの生成 \\ \hline
-        \texttt{MotorControl.h} & モータ制御用の定数・変数定義，関数宣言 \\ \hline
+        FerrisWheel.ino & WiFi接続・UDP受信の管理，受信ヘッダに応じたモータ制御・表示処理の呼び出し \\ \hline
+        Display.cpp & 表示文字の独自フォント定義，LEDマトリクスへの描画処理 \\ \hline
+        Display.h & 定数定義，関数宣言，外部参照 \\ \hline
+        MotorControl.cpp & PWM出力によるモータ回転制御，回転速度テーブルの生成 \\ \hline
+        MotorControl.h & モータ制御用の定数・変数定義，関数宣言 \\ \hline
     \end{tabular}
 \end{table}
 
-\texttt{FerrisWheel.ino}のloop関数は，Udp.parsePacket()でパケットの到着を監視し，届いていればuint8\_t \texttt{packetBuffer}[10]として2バイト分を読み取る．先頭バイト\texttt{packetBuffer}[0]をヘッダ文字として判定し，ヘッダが'S'（演奏開始）の場合はmotor.\texttt{startRamp}()と\texttt{displayBPM}()を，'B'（BPM変更）の場合はmotor.\texttt{changeBPM}()と\texttt{displayBPM}()を，'E'（演奏終了）の場合はmotor.\texttt{stopRamp}()と\texttt{clearDisplay}()を，2バイト目のペイロード（BPM段階番号）を引数として呼び出す構成となっている．loop関数をコード\ref{lst:kan_loop}に示す．
+FerrisWheel.inoのloop関数は，Udp.parsePacket()でパケットの到着を監視し，届いていればuint8\_t packetBuffer[10]として2バイト分を読み取る．先頭バイトpacketBuffer[0]をヘッダ文字として判定し，ヘッダが'S'（演奏開始）の場合はmotor.startRamp()とdisplayBPM()を，'B'（BPM変更）の場合はmotor.changeBPM()とdisplayBPM()を，'E'（演奏終了）の場合はmotor.stopRamp()とclearDisplay()を，2バイト目のペイロード（BPM段階番号）を引数として呼び出す構成となっている．loop関数をコード\ref{lst:kan_loop}に示す．
 
 \begin{lstlisting}[caption={FerrisWheel.inoのloop関数}, label={lst:kan_loop}]
 void loop() {
@@ -830,46 +830,46 @@ void loop() {
 }
 \end{lstlisting}
 
-続いて，Main（\texttt{FerrisWheel.ino}）で使用する変数の仕様を表\ref{table:kan_main_var}に示す．
+続いて，Main（FerrisWheel.ino）で使用する変数の仕様を表\ref{table:kan_main_var}に示す．
 
 \begin{table}[H]
-    \caption{Main（\texttt{FerrisWheel.ino}）で使用する変数の仕様一覧}
+    \caption{Main（FerrisWheel.ino）で使用する変数の仕様一覧}
     \centering
     \label{table:kan_main_var}
     \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
     \hline
     \textbf{変数名} & \textbf{型} & \textbf{説明}\\
     \hline
-    \texttt{SSID} & const char[] & Wi-Fiのネットワーク名(hackathon001-WPA2)を定義\\
+    SSID & const char[] & Wi-Fiのネットワーク名(hackathon001-WPA2)を定義\\
     \hline
-    \texttt{PASS} & const char[] & そのWi-FiのパスワードWi-Fiパスワードを定義\\
+    PASS & const char[] & そのWi-FiのパスワードWi-Fiパスワードを定義\\
     \hline
-    \texttt{localIP} & IPAddress & 中継機デバイス自身の静的IPアドレスを定義\\
+    localIP & IPAddress & 中継機デバイス自身の静的IPアドレスを定義\\
     \hline
-    \texttt{gateway} & IPAddress & 静的IP設定に使用するデフォルトゲートウェイのアドレスを定義\\
+    gateway & IPAddress & 静的IP設定に使用するデフォルトゲートウェイのアドレスを定義\\
     \hline
-    \texttt{subnet} & IPAddress & 静的IP設定に使用するサブネットマスクを定義\\
+    subnet & IPAddress & 静的IP設定に使用するサブネットマスクを定義\\
     \hline
-    \texttt{LOCAL\_PORT} & const uint16\_t & UDP受信に利用する自身のローカルポート番号を定義\\
+    LOCAL\_PORT & const uint16\_t & UDP受信に利用する自身のローカルポート番号を定義\\
     \hline
-    \texttt{packetBuffer} & uint8\_t[10] & UDP通信で受信したパケットのデータを一時的に格納するバッファ配列\\
+    packetBuffer & uint8\_t[10] & UDP通信で受信したパケットのデータを一時的に格納するバッファ配列\\
     \hline
-    \texttt{running} & bool & 演奏中かどうかを判定し，演奏前（待機中）の予期せぬモータ回転を防ぐための状態管理フラグ\\
+    running & bool & 演奏中かどうかを判定し，演奏前（待機中）の予期せぬモータ回転を防ぐための状態管理フラグ\\
     \hline
     \end{tabular}
 \end{table}
 
-続いて，Main（\texttt{FerrisWheel.ino}）で使用する関数の仕様を表\ref{table:kan_main_func}に示す．
+続いて，Main（FerrisWheel.ino）で使用する関数の仕様を表\ref{table:kan_main_func}に示す．
 
 \begin{table}[H]
-    \caption{Main（\texttt{FerrisWheel.ino}）で使用する関数の仕様一覧}
+    \caption{Main（FerrisWheel.ino）で使用する関数の仕様一覧}
     \centering
     \label{table:kan_main_func}
     \begin{tabular}{p{2.4cm}p{1.6cm}p{2.2cm}p{7.3cm}}
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{loop} & \texttt{void} & なし & UDPパケットの受信確認を行い，ヘッダが'S'であればmotor.\texttt{startRamp}()と\texttt{displayBPM}()を，'B'であればmotor.\texttt{changeBPM}()と\texttt{displayBPM}()を，'E'であればmotor.\texttt{stopRamp}()と\texttt{clearDisplay}()を呼び出す．演奏前（\texttt{running}=false）に'B'を受信した場合は無視する．\\
+    loop & void & なし & UDPパケットの受信確認を行い，ヘッダが'S'であればmotor.startRamp()とdisplayBPM()を，'B'であればmotor.changeBPM()とdisplayBPM()を，'E'であればmotor.stopRamp()とclearDisplay()を呼び出す．演奏前（running=false）に'B'を受信した場合は無視する．\\
     \hline
     \end{tabular}
 \end{table}
@@ -880,7 +880,7 @@ void loop() {
 PWMとは，デジタル出力ピンから出力される短形波のHIGH状態とLOW状態の時間比率(デューティー比)を変化させることで，擬似的にアナログ電圧を生成する制御方式である．Arduinoのデジタル出力ピンは$\SI{5}{V}$のHIGHか$\SI{0}{V}$のLOWのいずれかしか出力できないが，HIGHとLOWを高速に切り替えてデューティー比を調整することで，負荷に対して見かけ上の連続的な電圧を印加することが可能となる．
 
 本デバイスは，ArduinoのD5ピンをモータドライバーモジュールに接続し，PWM制御を行う構成としている．ArduinoのanalogWrite関数は，引数として0から255の整数値を受け取り，この値に応じたデューティー比の短形波を出力する．このとき引数が0のときデューティー比は常時LOWであり，255のときデューティー比は常時HIGHとなる．中間値では，引数に比例したデューティー比の短形波が生成される．
-この関係を式で表すと，供給電圧を $V_{cc}$（定数 \texttt{VCC}），プログラム上の出力値を $pwmValue$ とすると，モータに加わる平均電圧 $V_{average}$ は(\ref{eq:average})式で決定される．
+この関係を式で表すと，供給電圧を $V_{cc}$（定数 VCC），プログラム上の出力値を $pwmValue$ とすると，モータに加わる平均電圧 $V_{average}$ は(\ref{eq:average})式で決定される．
 
 \begin{equation}
     \label{eq:average}
@@ -892,7 +892,7 @@ PWMとは，デジタル出力ピンから出力される短形波のHIGH状態�
 次に，ルックアップテーブルによる速度制御について説明する．一般的なDCモータの回転速度は供給電圧に比例する性質があるが\cite{ref:control}，実際には摩擦や機構の負荷などによる非線形な挙動を示す事が多い．
 そのため，当初検討していた「4拍で90度（1小節が90度）回転する」といった幾何学的な理論式による制御ではなく，より確実な速度追従を実現するため，幾何学的な縛りを廃止して実測値に基づくルックアップテーブル方式を採用する．
 
-本デバイスでは，表\ref{tab:pwm_lut}に示す離散的な5段階のBPM設定値と，あらかじめ実測により求めたPWM出力値を，コード内の配列\texttt{bpmTable}・\texttt{pwmTable}として対応させ，受信した段階番号に応じた\texttt{pwmValue}を即座に選択・出力する構成とする．表\ref{tab:pwm_lut}に示す実測周期は，後述する回転速度実測プログラム（LaserIntervalTest）を用いて計測した値に基づいて決定している．
+本デバイスでは，表\ref{tab:pwm_lut}に示す離散的な5段階のBPM設定値と，あらかじめ実測により求めたPWM出力値を，コード内の配列bpmTable・pwmTableとして対応させ，受信した段階番号に応じたpwmValueを即座に選択・出力する構成とする．表\ref{tab:pwm_lut}に示す実測周期は，後述する回転速度実測プログラム（LaserIntervalTest）を用いて計測した値に基づいて決定している．
 
 \begin{table}[H]
     \centering
@@ -909,67 +909,67 @@ PWMとは，デジタル出力ピンから出力される短形波のHIGH状態�
     \end{tabular}
 \end{table}
 
-続いて，モータ制御（\texttt{MotorControl}クラス）で使用する変数・定数の仕様を表\ref{table:kan_motor_var}に示す．
+続いて，モータ制御（MotorControlクラス）で使用する変数・定数の仕様を表\ref{table:kan_motor_var}に示す．
 
 \begin{table}[H]
-    \caption{モータ制御（\texttt{MotorControl}クラス）で使用する変数・定数の仕様一覧}
+    \caption{モータ制御（MotorControlクラス）で使用する変数・定数の仕様一覧}
     \centering
     \label{table:kan_motor_var}
     \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
     \hline
     \textbf{変数名} & \textbf{型} & \textbf{説明}\\
     \hline
-    \texttt{PIN\_MOTOR\_PWM} & const uint8\_t & モータ制御用の出力ピンを定義\\
+    PIN\_MOTOR\_PWM & const uint8\_t & モータ制御用の出力ピンを定義\\
     \hline
-    \texttt{bpmTable}[5] & const uint8\_t & 5つの離散値BPMを格納\\
+    bpmTable[5] & const uint8\_t & 5つの離散値BPMを格納\\
     \hline
-    \texttt{pwmTable}[5] & const uint8\_t & 5つの離散値PWM出力値を格納\\
+    pwmTable[5] & const uint8\_t & 5つの離散値PWM出力値を格納\\
     \hline
-    \texttt{VCC} & const float & Arduinoへの供給電圧$V_{cc}$を定義\\
+    VCC & const float & Arduinoへの供給電圧$V_{cc}$を定義\\
     \hline
-    \texttt{currentBPM} & uint8\_t & 現在演奏中のBPMデータを格納\\
+    currentBPM & uint8\_t & 現在演奏中のBPMデータを格納\\
     \hline
-    \texttt{RPM} & float & BPMから計算された目標回転数を格納\\
+    RPM & float & BPMから計算された目標回転数を格納\\
     \hline
-    \texttt{omega} & float & 目標角速度$\omega$を格納\\
+    omega & float & 目標角速度$\omega$を格納\\
     \hline
-    \texttt{pwmValue} & uint8\_t & analogWrite用の出力値を格納\\
+    pwmValue & uint8\_t & analogWrite用の出力値を格納\\
     \hline
-    \texttt{V\_average} & float & 平均電圧$V_{average}$を格納\\
+    V\_average & float & 平均電圧$V_{average}$を格納\\
     \hline
-    \texttt{rpmTable}[5] & float & \texttt{bpmTable}に対応する目標回転数を格納する配列\\
+    rpmTable[5] & float & bpmTableに対応する目標回転数を格納する配列\\
     \hline
     \end{tabular}
 \end{table}
 
-続いて，モータ制御（\texttt{MotorControl}クラス）で使用する関数の仕様を表\ref{table:kan_motor_func}に示す．
+続いて，モータ制御（MotorControlクラス）で使用する関数の仕様を表\ref{table:kan_motor_func}に示す．
 
 \begin{table}[H]
-    \caption{モータ制御（\texttt{MotorControl}クラス）で使用する関数の仕様一覧}
+    \caption{モータ制御（MotorControlクラス）で使用する関数の仕様一覧}
     \centering
     \label{table:kan_motor_func}
     \begin{tabular}{p{3.1cm}p{1.6cm}p{2.8cm}p{6.0cm}}
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{begin} & \texttt{void} & なし & setup内で一度だけ呼び出される関数であり，モータピンの初期化を行う\\
+    begin & void & なし & setup内で一度だけ呼び出される関数であり，モータピンの初期化を行う\\
     \hline
-    \texttt{createRpmTable} & \texttt{void} & なし & \texttt{bpmTable}の各値から目標回転数を算出し，\texttt{rpmTable}を作成する\\
+    createRpmTable & void & なし & bpmTableの各値から目標回転数を算出し，rpmTableを作成する\\
     \hline
-    \texttt{startRamp} & \texttt{void} & \texttt{uint8\_t stepNumber} & 演奏開始時の加速を制御する．段階番号から求めた目標の\texttt{pwmValue}まで，PWM出力値を5ずつ段階的に上げていくことで滑らかに目標速度へ到達させる\\
+    startRamp & void & uint8\_t stepNumber & 演奏開始時の加速を制御する．段階番号から求めた目標のpwmValueまで，PWM出力値を5ずつ段階的に上げていくことで滑らかに目標速度へ到達させる\\
     \hline
-    \texttt{stopRamp} & \texttt{void} & なし & 演奏終了時の減速を制御する．現在の\texttt{pwmValue}から0まで，PWM出力値を5ずつ段階的に下げていくことで滑らかに停止させる\\
+    stopRamp & void & なし & 演奏終了時の減速を制御する．現在のpwmValueから0まで，PWM出力値を5ずつ段階的に下げていくことで滑らかに停止させる\\
     \hline
-    \texttt{changeBPM} & \texttt{void} & \texttt{uint8\_t stepNumber} & 演奏中のBPM変更を行う．\texttt{startRamp}とは異なり，段階的な加減速を行わず目標の\texttt{pwmValue}を即座に出力する\\
+    changeBPM & void & uint8\_t stepNumber & 演奏中のBPM変更を行う．startRampとは異なり，段階的な加減速を行わず目標のpwmValueを即座に出力する\\
     \hline
-    \texttt{stepToNumber} & \texttt{void} & \texttt{uint8\_t stepNumber} & 受信した段階番号(1〜5)から，\texttt{bpmTable}・\texttt{pwmTable}・\texttt{rpmTable}を参照して\texttt{currentBPM}・\texttt{pwmValue}・\texttt{RPM}を求める\\
+    stepToNumber & void & uint8\_t stepNumber & 受信した段階番号(1〜5)から，bpmTable・pwmTable・rpmTableを参照してcurrentBPM・pwmValue・RPMを求める\\
     \hline
-    \texttt{updateStatus} & \texttt{void} & なし & \texttt{RPM}から角速度\texttt{omega}を，\texttt{pwmValue}から平均電圧\texttt{V\_average}を算出する\\
+    updateStatus & void & なし & RPMから角速度omegaを，pwmValueから平均電圧V\_averageを算出する\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:kan_motor_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，begin関数について説明する．この関数は，setup内で一度だけ呼び出され，モータドライバーへ接続された\texttt{PIN\_MOTOR\_PWM}を出力ピンとして初期化したうえで，出力を0にリセットする．begin関数をコード\ref{lst:motor_begin}に示す．
+以下では，表\ref{table:kan_motor_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，begin関数について説明する．この関数は，setup内で一度だけ呼び出され，モータドライバーへ接続されたPIN\_MOTOR\_PWMを出力ピンとして初期化したうえで，出力を0にリセットする．begin関数をコード\ref{lst:motor_begin}に示す．
 
 \begin{lstlisting}[caption={MotorControl::begin関数}, label={lst:motor_begin}]
 void MotorControl::begin() {
@@ -978,7 +978,7 @@ void MotorControl::begin() {
 }
 \end{lstlisting}
 
-次に，\texttt{createRpmTable}関数について説明する．この関数もsetup内で一度だけ呼び出され，\texttt{bpmTable}の各要素を16で除算することで\texttt{rpmTable}を生成する．\texttt{createRpmTable}関数をコード\ref{lst:motor_createrpm}に示す．
+次に，createRpmTable関数について説明する．この関数もsetup内で一度だけ呼び出され，bpmTableの各要素を16で除算することでrpmTableを生成する．createRpmTable関数をコード\ref{lst:motor_createrpm}に示す．
 
 \begin{lstlisting}[caption={MotorControl::createRpmTable関数}, label={lst:motor_createrpm}]
 void MotorControl::createRpmTable() {
@@ -988,7 +988,7 @@ void MotorControl::createRpmTable() {
 }
 \end{lstlisting}
 
-次に，\texttt{startRamp}関数について説明する．この関数は，まず\texttt{stepToNumber}関数によって目標の\texttt{pwmValue}を求めたうえで，出力値を0から\texttt{pwmValue}まで5刻みで増加させながら40 msずつ待機することで，モータを滑らかに加速させる．\texttt{startRamp}関数をコード\ref{lst:motor_startramp}に示す．
+次に，startRamp関数について説明する．この関数は，まずstepToNumber関数によって目標のpwmValueを求めたうえで，出力値を0からpwmValueまで5刻みで増加させながら40 msずつ待機することで，モータを滑らかに加速させる．startRamp関数をコード\ref{lst:motor_startramp}に示す．
 
 \begin{lstlisting}[caption={MotorControl::startRamp関数}, label={lst:motor_startramp}]
 void MotorControl::startRamp(uint8_t stepNumber) {
@@ -1001,7 +1001,7 @@ void MotorControl::startRamp(uint8_t stepNumber) {
 }
 \end{lstlisting}
 
-次に，\texttt{stopRamp}関数について説明する．この関数は\texttt{startRamp}関数と対になる処理であり，現在の\texttt{pwmValue}から0まで5刻みで減少させながら40 msずつ待機することで，モータを滑らかに減速・停止させる．\texttt{stopRamp}関数をコード\ref{lst:motor_stopramp}に示す．
+次に，stopRamp関数について説明する．この関数はstartRamp関数と対になる処理であり，現在のpwmValueから0まで5刻みで減少させながら40 msずつ待機することで，モータを滑らかに減速・停止させる．stopRamp関数をコード\ref{lst:motor_stopramp}に示す．
 
 \begin{lstlisting}[caption={MotorControl::stopRamp関数}, label={lst:motor_stopramp}]
 void MotorControl::stopRamp() {
@@ -1013,7 +1013,7 @@ void MotorControl::stopRamp() {
 }
 \end{lstlisting}
 
-次に，\texttt{changeBPM}関数について説明する．この関数は演奏中にBPMの段階が変更された際に呼び出され，\texttt{stepToNumber}関数と\texttt{updateStatus}関数によって新しい段階の値を求めたうえで，\texttt{startRamp}関数のような段階的な加減速を行わず，目標の\texttt{pwmValue}を即座に出力する．演奏を止めずにテンポを追従させるため，段階的な加減速は行わない仕様としている．\texttt{changeBPM}関数をコード\ref{lst:motor_changebpm}に示す．
+次に，changeBPM関数について説明する．この関数は演奏中にBPMの段階が変更された際に呼び出され，stepToNumber関数とupdateStatus関数によって新しい段階の値を求めたうえで，startRamp関数のような段階的な加減速を行わず，目標のpwmValueを即座に出力する．演奏を止めずにテンポを追従させるため，段階的な加減速は行わない仕様としている．changeBPM関数をコード\ref{lst:motor_changebpm}に示す．
 
 \begin{lstlisting}[caption={MotorControl::changeBPM関数}, label={lst:motor_changebpm}]
 void MotorControl::changeBPM(uint8_t stepNumber) {
@@ -1023,7 +1023,7 @@ void MotorControl::changeBPM(uint8_t stepNumber) {
 }
 \end{lstlisting}
 
-最後に，\texttt{stepToNumber}関数と\texttt{updateStatus}関数について説明する．\texttt{stepToNumber}関数は，受信した段階番号(1〜5)が範囲内であることを確認したうえで，\texttt{bpmTable}・\texttt{pwmTable}・\texttt{rpmTable}の該当インデックスから\texttt{currentBPM}・\texttt{pwmValue}・\texttt{RPM}をそれぞれ求める．\texttt{updateStatus}関数は，この\texttt{RPM}および\texttt{pwmValue}を基に，(\ref{eq:average})式に相当する計算によって\texttt{omega}と\texttt{V\_average}を算出する．両関数をコード\ref{lst:motor_steptonumber}に示す．
+最後に，stepToNumber関数とupdateStatus関数について説明する．stepToNumber関数は，受信した段階番号(1〜5)が範囲内であることを確認したうえで，bpmTable・pwmTable・rpmTableの該当インデックスからcurrentBPM・pwmValue・RPMをそれぞれ求める．updateStatus関数は，このRPMおよびpwmValueを基に，(\ref{eq:average})式に相当する計算によってomegaとV\_averageを算出する．両関数をコード\ref{lst:motor_steptonumber}に示す．
 
 \begin{lstlisting}[caption={MotorControl::stepToNumber関数・updateStatus関数}, label={lst:motor_steptonumber}]
 void MotorControl::stepToNumber(uint8_t stepNumber) {
@@ -1040,7 +1040,7 @@ void MotorControl::updateStatus() {
 \end{lstlisting}
 
 次に，中継機デバイスにおけるLEDMatrix表示処理について説明する．今回のシステムでは表示用のマトリクスとして，Arduino Uno R4 WiFi付属のマトリクスを使用する．
-このマトリクスを用いて，\texttt{FerrisWheel.ino}のloop関数から受信したBPM段階番号を数値変換し，独自定義したフォント配列を用いて表示を行う．
+このマトリクスを用いて，FerrisWheel.inoのloop関数から受信したBPM段階番号を数値変換し，独自定義したフォント配列を用いて表示を行う．
 ここで，今回利用するArduinoのマトリクスは縦12横8の範囲で構成されている．
 この時，通常で定義されている文字列では文字の間隔が短くなることや，それに付随した可読性の低下が考えられる．
 よって，今回は1文字を縦5横3で再定義することにより文字同士の間隔を開け，可読性の担保を目指す．
@@ -1066,23 +1066,23 @@ void MotorControl::updateStatus() {
     \hline
     BPM\_STEP\_1〜5 & \#define & BPM5段階(60,90,120,150,180)の各値を定義\\
     \hline
-    \texttt{FONT\_WIDTH} & \#define & 1文字の横ドット数(3)を定義\\
+    FONT\_WIDTH & \#define & 1文字の横ドット数(3)を定義\\
     \hline
-    \texttt{FONT\_HEIGHT} & \#define & 1文字の縦ドット数(5)を定義\\
+    FONT\_HEIGHT & \#define & 1文字の縦ドット数(5)を定義\\
     \hline
-    \texttt{MATRIX\_ROWS} & \#define & LEDマトリクスの行数(8)を定義\\
+    MATRIX\_ROWS & \#define & LEDマトリクスの行数(8)を定義\\
     \hline
-    \texttt{MATRIX\_COLS} & \#define & LEDマトリクスの列数(12)を定義\\
+    MATRIX\_COLS & \#define & LEDマトリクスの列数(12)を定義\\
     \hline
-    \texttt{font3x5}[10][15] & const uint8\_t & 独自定義した0〜9の3×5ドットパターンフォント配列\\
+    font3x5[10][15] & const uint8\_t & 独自定義した0〜9の3×5ドットパターンフォント配列\\
     \hline
     matrix & ArduinoLEDMatrix & LEDマトリクスのインスタンス\\
     \hline
-    \texttt{bpmTable}[5] & static const int & 段階番号(1〜5)から実際のBPM値へ変換するための対応表\\
+    bpmTable[5] & static const int & 段階番号(1〜5)から実際のBPM値へ変換するための対応表\\
     \hline
-    \texttt{frameBuffer}[8][12] & static uint8\_t & 描画用の共有フレームバッファ\\
+    frameBuffer[8][12] & static uint8\_t & 描画用の共有フレームバッファ\\
     \hline
-    \texttt{currentBPM} & static int & 現在表示中のBPM値を保持する内部状態変数．\texttt{clearDisplay}呼び出し時に初期値(-1)へリセットされる\\
+    currentBPM & static int & 現在表示中のBPM値を保持する内部状態変数．clearDisplay呼び出し時に初期値(-1)へリセットされる\\
     \hline
     \end{tabular}
 \end{table}
@@ -1098,19 +1098,19 @@ void MotorControl::updateStatus() {
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{displaySetup} & \texttt{void} & なし & LEDマトリクスの初期化を行う\\
+    displaySetup & void & なし & LEDマトリクスの初期化を行う\\
     \hline
-    \texttt{displayBPM} & \texttt{void} & \texttt{uint8\_t stepNumber} & 受信したBPM段階番号をLEDマトリクスに数値表示する\\
+    displayBPM & void & uint8\_t stepNumber & 受信したBPM段階番号をLEDマトリクスに数値表示する\\
     \hline
-    \texttt{drawDigit} & \texttt{void} & \texttt{int digit}, \texttt{int x\_offset} & 1桁の数字をフレームバッファの指定位置に描画する\\
+    drawDigit & void & int digit, int x\_offset & 1桁の数字をフレームバッファの指定位置に描画する\\
     \hline
-    \texttt{clearDisplay} & \texttt{void} & なし & LEDマトリクスを全消灯する\\
+    clearDisplay & void & なし & LEDマトリクスを全消灯する\\
     \hline
     \end{tabular}
 \end{table}
 
-LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りである．WiFi接続・UDP受信および各処理の呼び出しを行う\texttt{FerrisWheel.ino}，LEDマトリクスへの描画処理を行う\texttt{Display.cpp}，および関数宣言やフォント定義を行う\texttt{Display.h}で構成される．
-各モジュール間の関係について，\texttt{FerrisWheel.ino}から\texttt{Display.cpp}への関係は，表示処理を利用する依存関係である．また，\texttt{Display.cpp}から\texttt{Display.h}への関係は，関数宣言およびフォント定義を参照する依存関係である．
+LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りである．WiFi接続・UDP受信および各処理の呼び出しを行うFerrisWheel.ino，LEDマトリクスへの描画処理を行うDisplay.cpp，および関数宣言やフォント定義を行うDisplay.hで構成される．
+各モジュール間の関係について，FerrisWheel.inoからDisplay.cppへの関係は，表示処理を利用する依存関係である．また，Display.cppからDisplay.hへの関係は，関数宣言およびフォント定義を参照する依存関係である．
 
 \begin{figure}[h]
     \centering
@@ -1120,7 +1120,7 @@ LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りで�
     \label{matcla}
 \end{figure}
 
-以下では，表\ref{tab:func1}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，\texttt{displaySetup}関数について説明する．この関数は，matrix.begin()を呼び出した後，消灯フレームを一度描画してから200 ms待機する．これは，begin()直後の最初のloadFrame()は反映されない場合があるための対策である．\texttt{displaySetup}関数をコード\ref{lst:disp_setup}に示す．
+以下では，表\ref{tab:func1}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，displaySetup関数について説明する．この関数は，matrix.begin()を呼び出した後，消灯フレームを一度描画してから200 ms待機する．これは，begin()直後の最初のloadFrame()は反映されない場合があるための対策である．displaySetup関数をコード\ref{lst:disp_setup}に示す．
 
 \begin{lstlisting}[caption={displaySetup関数}, label={lst:disp_setup}]
 void displaySetup() {
@@ -1131,7 +1131,7 @@ void displaySetup() {
 }
 \end{lstlisting}
 
-次に，\texttt{displayBPM}関数について説明する．この関数は，loop関数から受け取ったBPM段階番号（1〜5）を\texttt{bpmTable}[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，\texttt{drawDigit}()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．\texttt{displayBPM}関数をコード\ref{lst:disp_displaybpm}に示す．
+次に，displayBPM関数について説明する．この関数は，loop関数から受け取ったBPM段階番号（1〜5）をbpmTable[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．displayBPM関数をコード\ref{lst:disp_displaybpm}に示す．
 
 \begin{lstlisting}[caption={displayBPM関数}, label={lst:disp_displaybpm}]
 void displayBPM(uint8_t stepNumber) {
@@ -1176,7 +1176,7 @@ void displayBPM(uint8_t stepNumber) {
 }
 \end{lstlisting}
 
-次に，\texttt{drawDigit}関数について説明する．この関数は，引数の数字が0から9の範囲内であるかを確認した後，縦方向の中央寄せオフセットを算出し，独自フォント配列から該当する数字のドットパターンを1ドットずつ読み取ってフレームバッファの指定位置に書き込む．\texttt{drawDigit}関数をコード\ref{lst:disp_drawdigit}に示す．
+次に，drawDigit関数について説明する．この関数は，引数の数字が0から9の範囲内であるかを確認した後，縦方向の中央寄せオフセットを算出し，独自フォント配列から該当する数字のドットパターンを1ドットずつ読み取ってフレームバッファの指定位置に書き込む．drawDigit関数をコード\ref{lst:disp_drawdigit}に示す．
 
 \begin{lstlisting}[caption={drawDigit関数}, label={lst:disp_drawdigit}]
 void drawDigit(int digit, int x_offset) {
@@ -1194,7 +1194,7 @@ void drawDigit(int digit, int x_offset) {
 }
 \end{lstlisting}
 
-最後に，\texttt{clearDisplay}関数について説明する．この関数は，BPM値を初期値(-1)にリセットし，全消灯フレームをmatrix.loadFrame()で描画して表示のリセットを行う．\texttt{clearDisplay}関数をコード\ref{lst:disp_cleardisplay}に示す．
+最後に，clearDisplay関数について説明する．この関数は，BPM値を初期値(-1)にリセットし，全消灯フレームをmatrix.loadFrame()で描画して表示のリセットを行う．clearDisplay関数をコード\ref{lst:disp_cleardisplay}に示す．
 
 \begin{lstlisting}[caption={clearDisplay関数}, label={lst:disp_cleardisplay}]
 void clearDisplay() {
@@ -1216,51 +1216,51 @@ void clearDisplay() {
     \hline
     \textbf{定数名} & \textbf{型} & \textbf{説明}\\
     \hline
-    \texttt{CDS\_PIN} & const int & CdSセルの出力を読み取るアナログピン番号を定義\\
+    CDS\_PIN & const int & CdSセルの出力を読み取るアナログピン番号を定義\\
     \hline
-    \texttt{CDS\_ON\_THRESHOLD} / \texttt{CDS\_OFF\_THRESHOLD} & const int & 起動直後にのみ使用する仮のON/OFFしきい値を定義\\
+    CDS\_ON\_THRESHOLD / CDS\_OFF\_THRESHOLD & const int & 起動直後にのみ使用する仮のON/OFFしきい値を定義\\
     \hline
-    \texttt{CDS\_MIN\_DELTA} & const int & 暗い状態との差がこの値未満であればレーザーとして扱わない閾値を定義\\
+    CDS\_MIN\_DELTA & const int & 暗い状態との差がこの値未満であればレーザーとして扱わない閾値を定義\\
     \hline
-    \texttt{CDS\_PEAK\_HISTORY} & const uint8\_t & しきい値の再計算に用いる直近ピーク値の保持個数を定義\\
+    CDS\_PEAK\_HISTORY & const uint8\_t & しきい値の再計算に用いる直近ピーク値の保持個数を定義\\
     \hline
-    \texttt{CDS\_ON\_RATIO} / \texttt{CDS\_OFF\_RATIO} & const uint8\_t & \texttt{baseline}からピーク値までの何\%をON/OFFしきい値とするかを定義\\
+    CDS\_ON\_RATIO / CDS\_OFF\_RATIO & const uint8\_t & baselineからピーク値までの何\%をON/OFFしきい値とするかを定義\\
     \hline
-    \texttt{CDS\_THRESHOLD\_STEP\_LIMIT} & const int & 1回の再計算でしきい値が変化できる上限幅を定義\\
+    CDS\_THRESHOLD\_STEP\_LIMIT & const int & 1回の再計算でしきい値が変化できる上限幅を定義\\
     \hline
-    \texttt{CDS\_STARTUP\_CALIBRATION\_MS} & const unsigned long & 起動直後の誤検出を防止するキャリブレーション時間を定義\\
+    CDS\_STARTUP\_CALIBRATION\_MS & const unsigned long & 起動直後の誤検出を防止するキャリブレーション時間を定義\\
     \hline
-    \texttt{DEBOUNCE\_MS} & const unsigned long & 同一パルスの多重検知を防止するデバウンス時間を定義\\
+    DEBOUNCE\_MS & const unsigned long & 同一パルスの多重検知を防止するデバウンス時間を定義\\
     \hline
     \end{tabular}
 \end{table}
 
-続いて，LaserIntervalTest（\texttt{LaserDetector}クラス）で使用する主な関数の仕様を表\ref{table:laser_func}に示す．
+続いて，LaserIntervalTest（LaserDetectorクラス）で使用する主な関数の仕様を表\ref{table:laser_func}に示す．
 
 \begin{table}[H]
-    \caption{LaserIntervalTest（\texttt{LaserDetector}クラス）で使用する主な関数の仕様一覧}
+    \caption{LaserIntervalTest（LaserDetectorクラス）で使用する主な関数の仕様一覧}
     \centering
     \label{table:laser_func}
     \begin{tabular}{p{5.2cm}p{1.3cm}p{3.3cm}p{3.3cm}}
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{update} & \texttt{bool} & \texttt{int cdsValue}, \texttt{unsigned long nowMs}, \texttt{unsigned long \&intervalOut} & loop内で毎回呼び出される公開関数．\texttt{detectLight}による検知およびデバウンス処理を経て，新規パルスを検知した場合にtrueを返し，前回検知からの経過時間\texttt{intervalOut}を書き込む\\
+    update & bool & int cdsValue, unsigned long nowMs, unsigned long \&intervalOut & loop内で毎回呼び出される公開関数．detectLightによる検知およびデバウンス処理を経て，新規パルスを検知した場合にtrueを返し，前回検知からの経過時間intervalOutを書き込む\\
     \hline
-    \texttt{detectLight} & \texttt{bool} & \texttt{int v}, \texttt{unsigned long nowMs} & \texttt{baseline}の追従，起動直後のキャリブレーション，ヒステリシスを持ったON/OFF判定によってレーザーパルスの立ち上がりを検知する内部関数\\
+    detectLight & bool & int v, unsigned long nowMs & baselineの追従，起動直後のキャリブレーション，ヒステリシスを持ったON/OFF判定によってレーザーパルスの立ち上がりを検知する内部関数\\
     \hline
-    \texttt{registerPeak} & \texttt{void} & \texttt{int peak} & 検知したパルスのピーク値を履歴に登録し，その平均値からON/OFFしきい値を再計算する内部関数\\
+    registerPeak & void & int peak & 検知したパルスのピーク値を履歴に登録し，その平均値からON/OFFしきい値を再計算する内部関数\\
     \hline
-    \texttt{updateFallbackThresholds} & \texttt{void} & なし & \texttt{baseline}の値からON/OFFしきい値の暫定値を算出する内部関数\\
+    updateFallbackThresholds & void & なし & baselineの値からON/OFFしきい値の暫定値を算出する内部関数\\
     \hline
-    \texttt{limitStep} & \texttt{int} & \texttt{int current}, \texttt{int target}, \texttt{int limit} & しきい値の1回あたりの変化量をlimit以内に制限する内部関数\\
+    limitStep & int & int current, int target, int limit & しきい値の1回あたりの変化量をlimit以内に制限する内部関数\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:laser_func}に示した主要な関数のうち，公開インタフェースであるupdate関数と，検知処理の中心である\texttt{detectLight}関数について，実際のコードとともに説明する．なお，\texttt{registerPeak}関数・\texttt{updateFallbackThresholds}関数・\texttt{limitStep}関数の詳細な実装は付録に示すプログラム全文を参照されたい．
+以下では，表\ref{table:laser_func}に示した主要な関数のうち，公開インタフェースであるupdate関数と，検知処理の中心であるdetectLight関数について，実際のコードとともに説明する．なお，registerPeak関数・updateFallbackThresholds関数・limitStep関数の詳細な実装は付録に示すプログラム全文を参照されたい．
 
-はじめに，setup関数とloop関数について説明する．setup関数ではシリアル通信を開始するのみであり，loop関数ではCdSセルの値を毎回取得し，\texttt{LaserDetector}のupdate関数へ渡している．新しいパルスが検知された場合は，得られたinterval[ms]をシリアルモニタへ出力する．setup関数・loop関数をコード\ref{lst:laser_setuploop}に示す．
+はじめに，setup関数とloop関数について説明する．setup関数ではシリアル通信を開始するのみであり，loop関数ではCdSセルの値を毎回取得し，LaserDetectorのupdate関数へ渡している．新しいパルスが検知された場合は，得られたinterval[ms]をシリアルモニタへ出力する．setup関数・loop関数をコード\ref{lst:laser_setuploop}に示す．
 
 \begin{lstlisting}[caption={LaserIntervalTest.inoのsetup関数・loop関数}, label={lst:laser_setuploop}]
 void setup() {
@@ -1281,7 +1281,7 @@ void loop() {
 }
 \end{lstlisting}
 
-次に，\texttt{LaserDetector}クラスのupdate関数について説明する．この関数は，\texttt{detectLight}関数によってパルスの立ち上がりが検知され，かつ前回検知から\texttt{DEBOUNCE\_MS}（200 ms）以上が経過している場合にのみ，trueを返してinterval（前回検知時刻との差）を書き込む．update関数をコード\ref{lst:laser_update}に示す．
+次に，LaserDetectorクラスのupdate関数について説明する．この関数は，detectLight関数によってパルスの立ち上がりが検知され，かつ前回検知からDEBOUNCE\_MS（200 ms）以上が経過している場合にのみ，trueを返してinterval（前回検知時刻との差）を書き込む．update関数をコード\ref{lst:laser_update}に示す．
 
 \begin{lstlisting}[caption={LaserDetector::update関数}, label={lst:laser_update}]
 bool update(int cdsValue, unsigned long nowMs, unsigned long &intervalOut) {
@@ -1296,7 +1296,7 @@ bool update(int cdsValue, unsigned long nowMs, unsigned long &intervalOut) {
 }
 \end{lstlisting}
 
-最後に，\texttt{detectLight}関数について説明する．この関数は，暗状態の推定値である\texttt{baseline}を継続的に追従させながら，値が\texttt{baseline}+\texttt{CDS\_MIN\_DELTA}相当の\texttt{onThreshold}を上回った瞬間をパルスの立ち上がりとして検知する状態機械である．起動直後は\texttt{startupCalibrated}フラグがfalseの間，\texttt{CDS\_STARTUP\_CALIBRATION\_MS}（1秒）をかけて最も暗い値を\texttt{baseline}の初期値として探索し，誤検知を防止する．また，キャリブレーション完了時点でレーザーが既に照射状態であった場合は，\texttt{waitingForRelease}フラグによって一度非照射状態に戻るまで検知を保留する．パルスの立ち下がり（照射終了）を検知すると\texttt{registerPeak}関数を呼び出し，しきい値を実測値に基づいて更新する．\texttt{detectLight}関数をコード\ref{lst:laser_detectlight}に示す．
+最後に，detectLight関数について説明する．この関数は，暗状態の推定値であるbaselineを継続的に追従させながら，値がbaseline+CDS\_MIN\_DELTA相当のonThresholdを上回った瞬間をパルスの立ち上がりとして検知する状態機械である．起動直後はstartupCalibratedフラグがfalseの間，CDS\_STARTUP\_CALIBRATION\_MS（1秒）をかけて最も暗い値をbaselineの初期値として探索し，誤検知を防止する．また，キャリブレーション完了時点でレーザーが既に照射状態であった場合は，waitingForReleaseフラグによって一度非照射状態に戻るまで検知を保留する．パルスの立ち下がり（照射終了）を検知するとregisterPeak関数を呼び出し，しきい値を実測値に基づいて更新する．detectLight関数をコード\ref{lst:laser_detectlight}に示す．
 
 \begin{lstlisting}[caption={LaserDetector::detectLight関数}, label={lst:laser_detectlight}]
 bool detectLight(int v, unsigned long nowMs) {
@@ -1352,7 +1352,7 @@ bool detectLight(int v, unsigned long nowMs) {
 
 プログラム全文は付録に示す．
 
-なお，本節で説明した\texttt{FerrisWheel.ino}のUDP受信処理は，指揮デバイスの\texttt{SyncManager}クラスから送信された演奏開始・終了，BPM，音量の各情報を受信する側の処理であり，送信側の詳細は\ref{sec:siki_naibu}項（指揮デバイスの内部設計）を参照されたい．また，中継機デバイスから楽器デバイスへの同期は，回転する観覧車に設置されたレーザーの通過光を各楽器デバイスのCdSセルで検知することで実現しているが，この受光をもとに各楽器デバイス間で発音タイミングを同期させるArduinoプログラム（douki\_saigo）の内部設計については，\ref{sec:gakki_naibu}項（楽器デバイスの内部設計）で説明する．
+なお，本節で説明したFerrisWheel.inoのUDP受信処理は，指揮デバイスのSyncManagerクラスから送信された演奏開始・終了，BPM，音量の各情報を受信する側の処理であり，送信側の詳細は\ref{sec:siki_naibu}項（指揮デバイスの内部設計）を参照されたい．また，中継機デバイスから楽器デバイスへの同期は，回転する観覧車に設置されたレーザーの通過光を各楽器デバイスのCdSセルで検知することで実現しているが，この受光をもとに各楽器デバイス間で発音タイミングを同期させるArduinoプログラム（douki\_saigo）の内部設計については，\ref{sec:gakki_naibu}項（楽器デバイスの内部設計）で説明する．
 
 
 
@@ -1373,75 +1373,75 @@ bool detectLight(int v, unsigned long nowMs) {
     \begin{tabular}{|l|p{10cm}|}
         \hline
         \textbf{ファイル名} & \textbf{概要} \\ \hline \hline
-        \texttt{SoundProcessingCode.pde} & setup/draw/\texttt{serialEvent}による全体制御，シリアル通信の受信処理，デバッグ用のキー入力処理 \\ \hline
-        \texttt{Utils.pde} & LUTデータの読み込みと保持，ピッチ・ベロシティに応じた倍音プロファイルの生成を行う\texttt{DataUtils}クラス \\ \hline
-        \texttt{InstrumentPlayer.pde} & 発音命令を各楽器クラスへ委譲する\texttt{InstrumentPlayer}クラス \\ \hline
-        \texttt{NoteSampler.pde} & Arduino未接続でも単体動作確認できる自動演奏機能，および内蔵の試奏用楽譜データ \\ \hline
-        \texttt{AddEffect.pde} & 残響音（リバーブ）エフェクトを付加する\texttt{AddReverb}クラス \\ \hline
-        \texttt{Flute.pde} & フルートの音色合成を行う\texttt{FluteInstrument}クラス \\ \hline
-        \texttt{Strings.pde} & ストリングス（弦楽器群）の音色合成を行う\texttt{StringsInstrument}クラス \\ \hline
-        \texttt{Piano.pde} & ピアノの音色合成を行う\texttt{PianoInstrument}クラス \\ \hline
-        \texttt{Drum.pde} & キック・スネア・ハイハットの音色合成を行う\texttt{KickInstrument}・\texttt{SnareInstrument}・\texttt{HiHatInstrument}クラス \\ \hline
-        \texttt{Horn.pde} & ホルンの音色合成を行う\texttt{HornInstrument}クラス \\ \hline
-        \texttt{Trumpet.pde} & トランペットの音色合成を行う\texttt{TrumpetInstrument}クラス \\ \hline
+        SoundProcessingCode.pde & setup/draw/serialEventによる全体制御，シリアル通信の受信処理，デバッグ用のキー入力処理 \\ \hline
+        Utils.pde & LUTデータの読み込みと保持，ピッチ・ベロシティに応じた倍音プロファイルの生成を行うDataUtilsクラス \\ \hline
+        InstrumentPlayer.pde & 発音命令を各楽器クラスへ委譲するInstrumentPlayerクラス \\ \hline
+        NoteSampler.pde & Arduino未接続でも単体動作確認できる自動演奏機能，および内蔵の試奏用楽譜データ \\ \hline
+        AddEffect.pde & 残響音（リバーブ）エフェクトを付加するAddReverbクラス \\ \hline
+        Flute.pde & フルートの音色合成を行うFluteInstrumentクラス \\ \hline
+        Strings.pde & ストリングス（弦楽器群）の音色合成を行うStringsInstrumentクラス \\ \hline
+        Piano.pde & ピアノの音色合成を行うPianoInstrumentクラス \\ \hline
+        Drum.pde & キック・スネア・ハイハットの音色合成を行うKickInstrument・SnareInstrument・HiHatInstrumentクラス \\ \hline
+        Horn.pde & ホルンの音色合成を行うHornInstrumentクラス \\ \hline
+        Trumpet.pde & トランペットの音色合成を行うTrumpetInstrumentクラス \\ \hline
     \end{tabular}
 \end{table}
 
-各楽器クラスは，Minimライブラリの提供するInstrumentインタフェースを実装しており，コンストラクタで音色を構築したうえで，noteOn関数で発音を，noteOff関数で消音を行う共通の枠組みに従っている．発音命令は\texttt{InstrumentPlayer}クラスを介して各楽器固有のクラスへ委譲され，波形生成に必要なLUTデータは\texttt{DataUtils}クラスに集約されている．最終的な音声信号は，楽器の種類に応じて\texttt{AddReverb}による残響エフェクトを通したうえでAudioOutputへ出力される．プログラム全文は付録に示す．
+各楽器クラスは，Minimライブラリの提供するInstrumentインタフェースを実装しており，コンストラクタで音色を構築したうえで，noteOn関数で発音を，noteOff関数で消音を行う共通の枠組みに従っている．発音命令はInstrumentPlayerクラスを介して各楽器固有のクラスへ委譲され，波形生成に必要なLUTデータはDataUtilsクラスに集約されている．最終的な音声信号は，楽器の種類に応じてAddReverbによる残響エフェクトを通したうえでAudioOutputへ出力される．プログラム全文は付録に示す．
 
-ここからは，シリアル通信によるArduinoとの連携，LUTデータの管理（\texttt{DataUtils}），発音命令の委譲（\texttt{InstrumentPlayer}），残響エフェクト（AddEffect），デバッグ用自動演奏（NoteSampler），各楽器クラスによる音色合成の順に，使用する変数・関数の仕様と処理内容について説明する．
+ここからは，シリアル通信によるArduinoとの連携，LUTデータの管理（DataUtils），発音命令の委譲（InstrumentPlayer），残響エフェクト（AddEffect），デバッグ用自動演奏（NoteSampler），各楽器クラスによる音色合成の順に，使用する変数・関数の仕様と処理内容について説明する．
 
-まず，Arduinoとのシリアル通信および発音ディスパッチについて説明する．\texttt{SoundProcessingCode.pde}のsetup関数では，Minimライブラリの初期化，残響用バス（\texttt{longOut}・\texttt{shortOut}）の生成，\texttt{InstrumentPlayer}および\texttt{DataUtils}の初期化，そしてシリアルポートの初期化を行う．楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，定数\texttt{arduinoNumber}によって，このProcessingインスタンスがどの楽器として動作するかを切り替える．Main（\texttt{SoundProcessingCode.pde}）で使用する主な変数の仕様を表\ref{table:gakki_main_var}に示す．
+まず，Arduinoとのシリアル通信および発音ディスパッチについて説明する．SoundProcessingCode.pdeのsetup関数では，Minimライブラリの初期化，残響用バス（longOut・shortOut）の生成，InstrumentPlayerおよびDataUtilsの初期化，そしてシリアルポートの初期化を行う．楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，定数arduinoNumberによって，このProcessingインスタンスがどの楽器として動作するかを切り替える．Main（SoundProcessingCode.pde）で使用する主な変数の仕様を表\ref{table:gakki_main_var}に示す．
 
 \begin{table}[H]
-    \caption{Main（\texttt{SoundProcessingCode.pde}）で使用する主な変数の仕様一覧}
+    \caption{Main（SoundProcessingCode.pde）で使用する主な変数の仕様一覧}
     \centering
     \label{table:gakki_main_var}
     \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
     \hline
     \textbf{変数名} & \textbf{型} & \textbf{説明}\\
     \hline
-    \texttt{myPort} & Serial & Arduinoとのシリアル通信ポート\\
+    myPort & Serial & Arduinoとのシリアル通信ポート\\
     \hline
-    \texttt{musicBPM} & int & 中継機から受信した現在のBPM値を保持（発音長さの変換に使用）\\
+    musicBPM & int & 中継機から受信した現在のBPM値を保持（発音長さの変換に使用）\\
     \hline
-    \texttt{currentMasterVolume} & float & 指揮デバイスから受信したマスターボリューム(0.2〜1.0)を保持\\
+    currentMasterVolume & float & 指揮デバイスから受信したマスターボリューム(0.2〜1.0)を保持\\
     \hline
-    \texttt{arduinoNumber} & final byte & このProcessingインスタンスが担当する楽器を指定(1:フルート，2:ストリングス，3:ピアノ系，4:ドラム)\\
+    arduinoNumber & final byte & このProcessingインスタンスが担当する楽器を指定(1:フルート，2:ストリングス，3:ピアノ系，4:ドラム)\\
     \hline
-    \texttt{isDebugMode} & boolean & キーボード操作によるデバッグ発音を許可するかのフラグ\\
+    isDebugMode & boolean & キーボード操作によるデバッグ発音を許可するかのフラグ\\
     \hline
-    \texttt{longOut} / \texttt{shortOut} & Summer & 残響エフェクト用の合成バス．ストリングス・フルート等の持続音は\texttt{longOut}へ，ドラム等の打撃音は\texttt{shortOut}へパッチされる\\
+    longOut / shortOut & Summer & 残響エフェクト用の合成バス．ストリングス・フルート等の持続音はlongOutへ，ドラム等の打撃音はshortOutへパッチされる\\
     \hline
-    player & \texttt{InstrumentPlayer} & 発音命令を委譲する\texttt{InstrumentPlayer}のインスタンス\\
+    player & InstrumentPlayer & 発音命令を委譲するInstrumentPlayerのインスタンス\\
     \hline
-    utils & \texttt{DataUtils} & LUTデータを保持・提供する\texttt{DataUtils}のインスタンス\\
+    utils & DataUtils & LUTデータを保持・提供するDataUtilsのインスタンス\\
     \hline
     \end{tabular}
 \end{table}
 
-続いて，Main（\texttt{SoundProcessingCode.pde}）で使用する主な関数の仕様を表\ref{table:gakki_main_func}に示す．
+続いて，Main（SoundProcessingCode.pde）で使用する主な関数の仕様を表\ref{table:gakki_main_func}に示す．
 
 \begin{table}[H]
-    \caption{Main（\texttt{SoundProcessingCode.pde}）で使用する主な関数の仕様一覧}
+    \caption{Main（SoundProcessingCode.pde）で使用する主な関数の仕様一覧}
     \centering
     \label{table:gakki_main_func}
     \begin{tabular}{p{2.8cm}p{1.6cm}p{2.8cm}p{6.3cm}}
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{setup} & \texttt{void} & なし & Minimの初期化，残響用バスの生成，\texttt{InstrumentPlayer}・\texttt{DataUtils}の初期化，シリアルポートの初期化を行う\\
+    setup & void & なし & Minimの初期化，残響用バスの生成，InstrumentPlayer・DataUtilsの初期化，シリアルポートの初期化を行う\\
     \hline
-    \texttt{draw} & \texttt{void} & なし & オシロスコープおよびFFTスペクトルアナライザの描画を毎フレーム行う\\
+    draw & void & なし & オシロスコープおよびFFTスペクトルアナライザの描画を毎フレーム行う\\
     \hline
-    \texttt{serialEvent} & \texttt{void} & \texttt{Serial p} & Arduinoから改行区切りで届いたシリアルデータを解析し，ヘッダ('N'/'B'/'V')に応じて発音・BPM変更・音量変更の各処理を呼び出す\\
+    serialEvent & void & Serial p & Arduinoから改行区切りで届いたシリアルデータを解析し，ヘッダ('N'/'B'/'V')に応じて発音・BPM変更・音量変更の各処理を呼び出す\\
     \hline
-    \texttt{Play} / \texttt{keyPressed} & \texttt{void} & なし & \texttt{isDebugMode}がtrueの場合にのみ有効な，キーボード操作による単体試奏・デバッグ用の関数\\
+    Play / keyPressed & void & なし & isDebugModeがtrueの場合にのみ有効な，キーボード操作による単体試奏・デバッグ用の関数\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:gakki_main_func}に示した関数のうち，実際の演奏に用いられる\texttt{serialEvent}関数について，実際のコードとともに説明する．この関数は，Arduinoから届いた1行のデータをカンマで分割し，先頭要素をヘッダとして判定する．ヘッダが'N'（発音指示）の場合，5個1組（音程・長さ・開始ベロシティ・終了ベロシティ・種別）のデータを順に読み取り，durationにはBPMに応じた時間換算（$60000 \div (\text{BPM} \times 24)$）を施したうえで，\texttt{arduinoNumber}に応じた楽器のPlay関数を呼び出す．\texttt{serialEvent}関数の発音指示部分をコード\ref{lst:gakki_serial}に示す．
+以下では，表\ref{table:gakki_main_func}に示した関数のうち，実際の演奏に用いられるserialEvent関数について，実際のコードとともに説明する．この関数は，Arduinoから届いた1行のデータをカンマで分割し，先頭要素をヘッダとして判定する．ヘッダが'N'（発音指示）の場合，5個1組（音程・長さ・開始ベロシティ・終了ベロシティ・種別）のデータを順に読み取り，durationにはBPMに応じた時間換算（$60000 \div (\text{BPM} \times 24)$）を施したうえで，arduinoNumberに応じた楽器のPlay関数を呼び出す．serialEvent関数の発音指示部分をコード\ref{lst:gakki_serial}に示す．
 
 \begin{lstlisting}[caption={serialEvent関数（発音指示'N'の処理部分）}, label={lst:gakki_serial}]
 case "N" :
@@ -1482,12 +1482,12 @@ case "N" :
   break;
 \end{lstlisting}
 
-ここで，種別typeによる分岐は，ハッカソン第11回時点でトランペット（\texttt{TrumpetInstrument}）とホルン（\texttt{HornInstrument}）を追加したことに伴い，楽譜データ上で発音する楽器の種類を判別するために新設されたものである．また，ヘッダが'B'（BPM変更）の場合は\texttt{musicBPM}を60〜180の範囲に制限して更新し，ヘッダが'V'（マスターボリューム変更）の場合は\texttt{currentMasterVolume}を0.2〜1.0の範囲に写像して更新する．
+ここで，種別typeによる分岐は，ハッカソン第11回時点でトランペット（TrumpetInstrument）とホルン（HornInstrument）を追加したことに伴い，楽譜データ上で発音する楽器の種類を判別するために新設されたものである．また，ヘッダが'B'（BPM変更）の場合はmusicBPMを60〜180の範囲に制限して更新し，ヘッダが'V'（マスターボリューム変更）の場合はcurrentMasterVolumeを0.2〜1.0の範囲に写像して更新する．
 
-次に，楽器デバイスにおけるLUTデータの管理（\texttt{DataUtils}クラス）について説明する．本デバイスでは，アイオワ大学等が公開する実楽器の音声データをFFT解析し，各音程・各強弱（pp/mf/ff）ごとの「周波数と振幅のペア」をJSON形式のLUTとして事前に用意している．\texttt{DataUtils}クラスは，このLUTの読み込みと，発音時のピッチ・ベロシティに応じた倍音プロファイルの動的な取得を担う．\texttt{DataUtils}クラスで使用する主な変数の仕様を表\ref{table:gakki_utils_var}に示す．
+次に，楽器デバイスにおけるLUTデータの管理（DataUtilsクラス）について説明する．本デバイスでは，アイオワ大学等が公開する実楽器の音声データをFFT解析し，各音程・各強弱（pp/mf/ff）ごとの「周波数と振幅のペア」をJSON形式のLUTとして事前に用意している．DataUtilsクラスは，このLUTの読み込みと，発音時のピッチ・ベロシティに応じた倍音プロファイルの動的な取得を担う．DataUtilsクラスで使用する主な変数の仕様を表\ref{table:gakki_utils_var}に示す．
 
 \begin{table}[H]
-    \caption{\texttt{DataUtils}クラスで使用する主な変数の仕様一覧}
+    \caption{DataUtilsクラスで使用する主な変数の仕様一覧}
     \centering
     \label{table:gakki_utils_var}
     \begin{tabular}{p{4.4cm}p{2.9cm}p{6.2cm}}
@@ -1496,39 +1496,39 @@ case "N" :
     \hline
     note & float[][] & NoteSamplerが参照する試奏用楽譜データ（2次元LUT）\\
     \hline
-    \texttt{fluteFFLUT} / MFLUT / PPLUT 等 & float[][][] & 各楽器・各強弱ごとの3次元LUT（音程インデックス × ピーク数 × [周波数, 振幅]）．フルート・バイオリン・ビオラ・チェロ・コントラバス・ピアノ・ホルン・トランペットの各強弱分を保持\\
+    fluteFFLUT / MFLUT / PPLUT 等 & float[][][] & 各楽器・各強弱ごとの3次元LUT（音程インデックス × ピーク数 × [周波数, 振幅]）．フルート・バイオリン・ビオラ・チェロ・コントラバス・ピアノ・ホルン・トランペットの各強弱分を保持\\
     \hline
-    \texttt{pianoDecayLUT} 等 & float[][] & ピアノ専用の減衰時間・うなり速度・うなり深さの2次元LUT（強弱ごとに3種類×3強弱の計9個）\\
+    pianoDecayLUT 等 & float[][] & ピアノ専用の減衰時間・うなり速度・うなり深さの2次元LUT（強弱ごとに3種類×3強弱の計9個）\\
     \hline
-    \texttt{kickLUT} / \texttt{snareLUT} / \texttt{hihatLUT} & float[][] & ドラム各パートの[周波数, 強度, 減衰時間]を格納する2次元LUT\\
+    kickLUT / snareLUT / hihatLUT & float[][] & ドラム各パートの[周波数, 強度, 減衰時間]を格納する2次元LUT\\
     \hline
     \end{tabular}
 \end{table}
 
-続いて，\texttt{DataUtils}クラスで使用する主な関数の仕様を表\ref{table:gakki_utils_func}に示す．
+続いて，DataUtilsクラスで使用する主な関数の仕様を表\ref{table:gakki_utils_func}に示す．
 
 \begin{table}[H]
-    \caption{\texttt{DataUtils}クラスで使用する主な関数の仕様一覧}
+    \caption{DataUtilsクラスで使用する主な関数の仕様一覧}
     \centering
     \label{table:gakki_utils_func}
     \begin{tabular}{p{4cm}p{2.1cm}p{4cm}p{3.4cm}}
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{Load2LUT} & \texttt{float[][]} & \texttt{String fileName} & JSONファイルを読み込み，float[][]の2次元LUTへ変換する\\
+    Load2LUT & float[][] & String fileName & JSONファイルを読み込み，float[][]の2次元LUTへ変換する\\
     \hline
-    \texttt{Load3LUT} & \texttt{float[][][]} & \texttt{String fileName} & JSONファイルを読み込み，float[][][]の3次元LUT（[周波数, 振幅]のペア配列）へ変換する\\
+    Load3LUT & float[][][] & String fileName & JSONファイルを読み込み，float[][][]の3次元LUT（[周波数, 振幅]のペア配列）へ変換する\\
     \hline
-    \texttt{GetProfileForPitch} & \texttt{float[][]} & \texttt{float pitch}, \texttt{float[][][] lut}, \texttt{int baseMidiNote} & 指定ピッチに最も近い実測データをLUTから探索し，元データとの半音差に応じて周波数を比例スケーリング（ピッチスケーリング）したうえで返す\\
+    GetProfileForPitch & float[][] & float pitch, float[][][] lut, int baseMidiNote & 指定ピッチに最も近い実測データをLUTから探索し，元データとの半音差に応じて周波数を比例スケーリング（ピッチスケーリング）したうえで返す\\
     \hline
-    \texttt{GetDynamicProfile} & \texttt{float[][]} & \texttt{float pitch}, \texttt{float velocity}, \texttt{String type}, \texttt{int baseMidiNote}, \texttt{float basePower} & pp/mf/ffの3つのプロファイルをベロシティに応じて選択・合成し，振幅0.05未満のピークを除去したうえで，目標音量に基づくゲイン正規化を行った最終的な[周波数, 音量]配列を返す\\
+    GetDynamicProfile & float[][] & float pitch, float velocity, String type, int baseMidiNote, float basePower & pp/mf/ffの3つのプロファイルをベロシティに応じて選択・合成し，振幅0.05未満のピークを除去したうえで，目標音量に基づくゲイン正規化を行った最終的な[周波数, 音量]配列を返す\\
     \hline
-    \texttt{GetLUT} & \texttt{float[][]} & \texttt{String type} & 文字列で指定した種別のLUT（ピアノの減衰特性やドラムのLUTなど）を返す統合ゲッター\\
+    GetLUT & float[][] & String type & 文字列で指定した種別のLUT（ピアノの減衰特性やドラムのLUTなど）を返す統合ゲッター\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:gakki_utils_func}に示した関数のうち，本デバイスの音色再現の核となる\texttt{GetProfileForPitch}関数と\texttt{GetDynamicProfile}関数について，実際のコードとともに説明する．はじめに，\texttt{GetProfileForPitch}関数について説明する．この関数は，要求されたピッチに最も近い有効なサンプルインデックスをLUTから探索し，そのサンプルが本来持つ基準音程（sourceMidi）と要求ピッチとの半音差から求めた倍率（pitchShiftFactor）を，実測された周波数構造にそのまま乗算することで，インハーモニシティ（倍音の非整数性）のデコボコを保持したまま滑らかにピッチをスケーリングする．\texttt{GetProfileForPitch}関数の要部をコード\ref{lst:gakki_getprofile}に示す．
+以下では，表\ref{table:gakki_utils_func}に示した関数のうち，本デバイスの音色再現の核となるGetProfileForPitch関数とGetDynamicProfile関数について，実際のコードとともに説明する．はじめに，GetProfileForPitch関数について説明する．この関数は，要求されたピッチに最も近い有効なサンプルインデックスをLUTから探索し，そのサンプルが本来持つ基準音程（sourceMidi）と要求ピッチとの半音差から求めた倍率（pitchShiftFactor）を，実測された周波数構造にそのまま乗算することで，インハーモニシティ（倍音の非整数性）のデコボコを保持したまま滑らかにピッチをスケーリングする．GetProfileForPitch関数の要部をコード\ref{lst:gakki_getprofile}に示す．
 
 \begin{lstlisting}[caption={DataUtils::GetProfileForPitch関数（要部）}, label={lst:gakki_getprofile}]
 float[][] GetProfileForPitch(float pitch, float[][][] lut, int baseMidiNote) {
@@ -1560,7 +1560,7 @@ float[][] GetProfileForPitch(float pitch, float[][][] lut, int baseMidiNote) {
 }
 \end{lstlisting}
 
-次に，\texttt{GetDynamicProfile}関数について説明する．この関数は，まずpp/mf/ffの3つの強弱プロファイルを\texttt{GetProfileForPitch}関数で取得したうえで，ベロシティを0〜1に正規化し，あらかじめ定めた3つの閾値（32/80/112 を127で除した値）と比較して，隣接する2つの強弱のうちベロシティに近い方のプロファイル形状を採用する．続いて，振幅0.05未満の微小なピークを除去したうえで，採用した各ピークの振幅の2乗和（エネルギー）に対する目標音量の比からゲインを算出し，全ピークへ一括で乗算することで最終的な音量を決定する．\texttt{GetDynamicProfile}関数の要部をコード\ref{lst:gakki_getdynamic}に示す．
+次に，GetDynamicProfile関数について説明する．この関数は，まずpp/mf/ffの3つの強弱プロファイルをGetProfileForPitch関数で取得したうえで，ベロシティを0〜1に正規化し，あらかじめ定めた3つの閾値（32/80/112 を127で除した値）と比較して，隣接する2つの強弱のうちベロシティに近い方のプロファイル形状を採用する．続いて，振幅0.05未満の微小なピークを除去したうえで，採用した各ピークの振幅の2乗和（エネルギー）に対する目標音量の比からゲインを算出し，全ピークへ一括で乗算することで最終的な音量を決定する．GetDynamicProfile関数の要部をコード\ref{lst:gakki_getdynamic}に示す．
 
 \begin{lstlisting}[caption={DataUtils::GetDynamicProfile関数（要部）}, label={lst:gakki_getdynamic}]
 float[][] GetDynamicProfile(float pitch, float velocity, String type, int baseMidiNote, float basePower) {
@@ -1609,26 +1609,26 @@ float[][] GetDynamicProfile(float pitch, float velocity, String type, int baseMi
 }
 \end{lstlisting}
 
-次に，発音命令の委譲を行う\texttt{InstrumentPlayer}クラスについて説明する．このクラスは，AudioOutputへの参照を保持し，各PlayXxx関数が呼び出されるたびに，対応する楽器クラスのインスタンスをその場で生成してout.playNote関数へ渡すという単純な委譲処理のみを行う．\texttt{InstrumentPlayer}クラスで使用する主な関数の仕様を表\ref{table:gakki_player_func}に示す．
+次に，発音命令の委譲を行うInstrumentPlayerクラスについて説明する．このクラスは，AudioOutputへの参照を保持し，各PlayXxx関数が呼び出されるたびに，対応する楽器クラスのインスタンスをその場で生成してout.playNote関数へ渡すという単純な委譲処理のみを行う．InstrumentPlayerクラスで使用する主な関数の仕様を表\ref{table:gakki_player_func}に示す．
 
 \begin{table}[H]
-    \caption{\texttt{InstrumentPlayer}クラスで使用する主な関数の仕様一覧}
+    \caption{InstrumentPlayerクラスで使用する主な関数の仕様一覧}
     \centering
     \label{table:gakki_player_func}
     \begin{tabular}{p{3.2cm}p{1.6cm}p{4.2cm}p{4.5cm}}
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{PlayFlute} / \texttt{PlayStrings} / \texttt{PlayHorn} / \texttt{PlayTrumpet} & \texttt{void} & \texttt{float pitch}, \texttt{float duration}, \texttt{float startVel}, \texttt{float endVel}, \texttt{float masterVol} & 音程・長さ・開始ベロシティ・終了ベロシティ・マスターボリュームを引数に取り，対応するInstrumentのインスタンスをout.playNoteへ渡す\\
+    PlayFlute / PlayStrings / PlayHorn / PlayTrumpet & void & float pitch, float duration, float startVel, float endVel, float masterVol & 音程・長さ・開始ベロシティ・終了ベロシティ・マスターボリュームを引数に取り，対応するInstrumentのインスタンスをout.playNoteへ渡す\\
     \hline
-    \texttt{PlayPiano} & \texttt{void} & \texttt{float pitch}, \texttt{float velocity}, \texttt{float masterVol} & 音程・ベロシティ・マスターボリュームを引数に取り，\texttt{PianoInstrument}を再生する（開始・終了ベロシティの区別はない）\\
+    PlayPiano & void & float pitch, float velocity, float masterVol & 音程・ベロシティ・マスターボリュームを引数に取り，PianoInstrumentを再生する（開始・終了ベロシティの区別はない）\\
     \hline
-    \texttt{PlayKick} / \texttt{PlaySnare} / \texttt{PlayHiHat} & \texttt{void} & \texttt{float masterVol}, \texttt{float velocity} 等 & マスターボリューム・ベロシティ等を引数に取り，対応するドラムパートのInstrumentを再生する\\
+    PlayKick / PlaySnare / PlayHiHat & void & float masterVol, float velocity 等 & マスターボリューム・ベロシティ等を引数に取り，対応するドラムパートのInstrumentを再生する\\
     \hline
     \end{tabular}
 \end{table}
 
-\texttt{InstrumentPlayer}クラスの\texttt{PlayFlute}関数をコード\ref{lst:gakki_player}に示す．他のPlayXxx関数も，生成するInstrumentクラスが異なるのみで，同様の構造となっている．
+InstrumentPlayerクラスのPlayFlute関数をコード\ref{lst:gakki_player}に示す．他のPlayXxx関数も，生成するInstrumentクラスが異なるのみで，同様の構造となっている．
 
 \begin{lstlisting}[caption={InstrumentPlayer::PlayFlute関数}, label={lst:gakki_player}]
 void PlayFlute(float midiNote, float duration, float startVel, float endVel, float masterVol) {
@@ -1637,7 +1637,7 @@ void PlayFlute(float midiNote, float duration, float startVel, float endVel, flo
 }
 \end{lstlisting}
 
-次に，残響エフェクトを付加する\texttt{AddEffect.pde}の\texttt{AddReverb}クラスについて説明する．このクラスはMinimライブラリのUGenを継承しており，講義で扱われたたたみ込み積分（コンボリューション）を，指数関数的に減衰するランダムノイズを疑似的なインパルス応答として用いることで実装している．左右のチャンネルの記憶バッファ（\texttt{historyBufferL}・\texttt{historyBufferR}）を独立させることで，ステレオ音場に対応している．\texttt{AddReverb}クラスの心臓部である\texttt{uGenerate}関数をコード\ref{lst:gakki_reverb}に示す．
+次に，残響エフェクトを付加するAddEffect.pdeのAddReverbクラスについて説明する．このクラスはMinimライブラリのUGenを継承しており，講義で扱われたたたみ込み積分（コンボリューション）を，指数関数的に減衰するランダムノイズを疑似的なインパルス応答として用いることで実装している．左右のチャンネルの記憶バッファ（historyBufferL・historyBufferR）を独立させることで，ステレオ音場に対応している．AddReverbクラスの心臓部であるuGenerate関数をコード\ref{lst:gakki_reverb}に示す．
 
 \begin{lstlisting}[caption={AddReverb::uGenerate関数}, label={lst:gakki_reverb}]
 protected void uGenerate(float[] channels) {
@@ -1667,12 +1667,12 @@ protected void uGenerate(float[] channels) {
 }
 \end{lstlisting}
 
-setup関数内では，持続音向けの残響バス\texttt{longOut}（カーネルサイズ15000，レベル0.20）と，打撃音向けの残響バス\texttt{shortOut}（カーネルサイズ2000，レベル0.25）の2種類の\texttt{AddReverb}が生成されており，各楽器クラスはnoteOn関数内で\texttt{masterEnv}をこのいずれかへパッチすることで，音色に適した残響を選択している．
+setup関数内では，持続音向けの残響バスlongOut（カーネルサイズ15000，レベル0.20）と，打撃音向けの残響バスshortOut（カーネルサイズ2000，レベル0.25）の2種類のAddReverbが生成されており，各楽器クラスはnoteOn関数内でmasterEnvをこのいずれかへパッチすることで，音色に適した残響を選択している．
 
-次に，デバッグ用の自動演奏機能を提供する\texttt{NoteSampler.pde}について説明する．本機能は，指揮デバイスや中継機デバイスが未接続の状態でもPC単体で音色の検証を行えるようにするためのものであり，Processingの標準描画ループ（draw）に依存すると波形描画の負荷でタイミングがずれるため，音楽専用のスレッド（\texttt{audioThread}）を用いて高精度にタイミングを管理している．\texttt{NoteSampler.pde}で使用する主な変数の仕様を表\ref{table:gakki_sampler_var}に示す．
+次に，デバッグ用の自動演奏機能を提供するNoteSampler.pdeについて説明する．本機能は，指揮デバイスや中継機デバイスが未接続の状態でもPC単体で音色の検証を行えるようにするためのものであり，Processingの標準描画ループ（draw）に依存すると波形描画の負荷でタイミングがずれるため，音楽専用のスレッド（audioThread）を用いて高精度にタイミングを管理している．NoteSampler.pdeで使用する主な変数の仕様を表\ref{table:gakki_sampler_var}に示す．
 
 \begin{table}[H]
-    \caption{\texttt{NoteSampler.pde}で使用する主な変数の仕様一覧}
+    \caption{NoteSampler.pdeで使用する主な変数の仕様一覧}
     \centering
     \label{table:gakki_sampler_var}
     \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
@@ -1683,37 +1683,37 @@ setup関数内では，持続音向けの残響バス\texttt{longOut}（カー�
     \hline
     interval & volatile long & 1 tickあたりのナノ秒単位の時間間隔\\
     \hline
-    \texttt{noteIndex} & volatile int & Note配列内で次に処理する音符のインデックス\\
+    noteIndex & volatile int & Note配列内で次に処理する音符のインデックス\\
     \hline
-    \texttt{returnTick}[][] & volatile int[][] & ループ再生のためのジャンプ情報（{トリガーtick, ジャンプ先tick, ジャンプ先\texttt{noteIndex}}）を格納する配列\\
+    returnTick[][] & volatile int[][] & ループ再生のためのジャンプ情報（{トリガーtick, ジャンプ先tick, ジャンプ先noteIndex}）を格納する配列\\
     \hline
-    \texttt{isPlaying} & volatile boolean & 自動演奏中かどうかを示すフラグ\\
+    isPlaying & volatile boolean & 自動演奏中かどうかを示すフラグ\\
     \hline
-    \texttt{audioThread} & Thread & 高精度なタイミング管理を行う音楽専用スレッド\\
+    audioThread & Thread & 高精度なタイミング管理を行う音楽専用スレッド\\
     \hline
     Note[][] & int[][] & 試奏用に内蔵された楽譜データ（{tick, 長さ, 音程, 開始ベロシティ, 終了ベロシティ, 種別}）\\
     \hline
     \end{tabular}
 \end{table}
 
-続いて，\texttt{NoteSampler.pde}で使用する主な関数の仕様を表\ref{table:gakki_sampler_func}に示す．
+続いて，NoteSampler.pdeで使用する主な関数の仕様を表\ref{table:gakki_sampler_func}に示す．
 
 \begin{table}[H]
-    \caption{\texttt{NoteSampler.pde}で使用する主な関数の仕様一覧}
+    \caption{NoteSampler.pdeで使用する主な関数の仕様一覧}
     \centering
     \label{table:gakki_sampler_func}
     \begin{tabular}{p{2.8cm}p{1.6cm}p{2.8cm}p{6.3cm}}
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{GetInterval} & \texttt{long} & \texttt{int playBPM} & 指定BPMから1 tickあたりのナノ秒間隔を算出する($60000000000 \div (\text{BPM} \times 24)$)\\
+    GetInterval & long & int playBPM & 指定BPMから1 tickあたりのナノ秒間隔を算出する($60000000000 \div (\text{BPM} \times 24)$)\\
     \hline
-    \texttt{SoundPlay} & \texttt{void} & なし & 音楽専用スレッドから毎tick呼び出され，\texttt{returnTick}によるループ判定を行った後，現在のtickに該当する音符をNote配列から取得してtimbreに応じたPlayXxx関数を呼び出す\\
+    SoundPlay & void & なし & 音楽専用スレッドから毎tick呼び出され，returnTickによるループ判定を行った後，現在のtickに該当する音符をNote配列から取得してtimbreに応じたPlayXxx関数を呼び出す\\
     \hline
     \end{tabular}
 \end{table}
 
-\texttt{SoundPlay}関数をコード\ref{lst:gakki_soundplay}に示す．
+SoundPlay関数をコード\ref{lst:gakki_soundplay}に示す．
 
 \begin{lstlisting}[caption={SoundPlay関数}, label={lst:gakki_soundplay}]
 void SoundPlay() {
@@ -1745,54 +1745,54 @@ void SoundPlay() {
 }
 \end{lstlisting}
 
-最後に，各楽器クラスによる音色合成について説明する．いずれの楽器クラスも，コンストラクタ内で\texttt{DataUtils}から取得した倍音プロファイルをもとに正弦波（Oscil）を加算合成し，ADSR（Attack, Decay, Sustain, Release）エンベロープおよびLineによる時間変化を付加したうえでミキサー（Summer）へ結線し，noteOn関数でエンベロープとLineを一斉に起動する，という共通の設計に従っている．以下では，各楽器クラスに特有の合成技法について，実際のコードとともに説明する．
+最後に，各楽器クラスによる音色合成について説明する．いずれの楽器クラスも，コンストラクタ内でDataUtilsから取得した倍音プロファイルをもとに正弦波（Oscil）を加算合成し，ADSR（Attack, Decay, Sustain, Release）エンベロープおよびLineによる時間変化を付加したうえでミキサー（Summer）へ結線し，noteOn関数でエンベロープとLineを一斉に起動する，という共通の設計に従っている．以下では，各楽器クラスに特有の合成技法について，実際のコードとともに説明する．
 
-\paragraph{フルート（\texttt{FluteInstrument}）}
-まず，フルートの音色合成について説明する．\texttt{FluteInstrument}クラスは，\texttt{DataUtils}から取得した倍音プロファイルをもとに正弦波を加算合成する層と，息が管に吹き込まれる音（Chiff）を再現するノイズ層の2層構造で構成される．加算合成の各倍音には，\texttt{globalBreathSpeed}という1つの共通の乱数速度で駆動されるビブラート（FM変調）と，倍音ごとに個別の深さを持つ音量の呼吸的揺らぎ（AM変調）が付加されている．\texttt{FluteInstrument}クラスで使用する主な変数の仕様を表\ref{table:gakki_flute_var}に示す．
+\paragraph{フルート（FluteInstrument）}
+まず，フルートの音色合成について説明する．FluteInstrumentクラスは，DataUtilsから取得した倍音プロファイルをもとに正弦波を加算合成する層と，息が管に吹き込まれる音（Chiff）を再現するノイズ層の2層構造で構成される．加算合成の各倍音には，globalBreathSpeedという1つの共通の乱数速度で駆動されるビブラート（FM変調）と，倍音ごとに個別の深さを持つ音量の呼吸的揺らぎ（AM変調）が付加されている．FluteInstrumentクラスで使用する主な変数の仕様を表\ref{table:gakki_flute_var}に示す．
 
 \begin{table}[H]
-    \caption{\texttt{FluteInstrument}クラスで使用する主な変数の仕様一覧}
+    \caption{FluteInstrumentクラスで使用する主な変数の仕様一覧}
     \centering
     \label{table:gakki_flute_var}
     \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
     \hline
     \textbf{変数名} & \textbf{型} & \textbf{説明}\\
     \hline
-    \texttt{numHarmonics} & byte & 実測データから動的に決定される倍音（Oscil）の数\\
+    numHarmonics & byte & 実測データから動的に決定される倍音（Oscil）の数\\
     \hline
-    \texttt{masterEnv} & ADSR & 音全体の発音・消音を制御するエンベロープ\\
+    masterEnv & ADSR & 音全体の発音・消音を制御するエンベロープ\\
     \hline
-    \texttt{harmonicEnvs}[] & ADSR[] & 各倍音の立ち上がりを個別に制御するエンベロープ配列\\
+    harmonicEnvs[] & ADSR[] & 各倍音の立ち上がりを個別に制御するエンベロープ配列\\
     \hline
-    \texttt{ampLines}[] & Line[] & 開始ベロシティと終了ベロシティの間で各倍音の音量を滑らかに変化させるLine配列\\
+    ampLines[] & Line[] & 開始ベロシティと終了ベロシティの間で各倍音の音量を滑らかに変化させるLine配列\\
     \hline
-    \texttt{wobbleLines}[] / \texttt{wobbleFactors}[] & Line[] / float[] & 倍音ごとの音量揺らぎ（AM変調）の深さをフェードさせるLine配列と，その揺らぎ比率\\
+    wobbleLines[] / wobbleFactors[] & Line[] / float[] & 倍音ごとの音量揺らぎ（AM変調）の深さをフェードさせるLine配列と，その揺らぎ比率\\
     \hline
-    \texttt{breathEnv} & ADSR & 息のノイズ（Chiff）成分のエンベロープ\\
+    breathEnv & ADSR & 息のノイズ（Chiff）成分のエンベロープ\\
     \hline
     \end{tabular}
 \end{table}
 
-続いて，\texttt{FluteInstrument}クラスで使用する主な関数の仕様を表\ref{table:gakki_flute_func}に示す．
+続いて，FluteInstrumentクラスで使用する主な関数の仕様を表\ref{table:gakki_flute_func}に示す．
 
 \begin{table}[H]
-    \caption{\texttt{FluteInstrument}クラスで使用する主な関数の仕様一覧}
+    \caption{FluteInstrumentクラスで使用する主な関数の仕様一覧}
     \centering
     \label{table:gakki_flute_func}
     \begin{tabular}{p{3.3cm}p{2cm}p{4.2cm}p{4cm}}
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{FluteInstrument}（コンストラクタ） & なし & \texttt{float midiNote}, \texttt{float duration}, \texttt{float startVel}, \texttt{float endVel}, \texttt{float masterVol} & \texttt{DataUtils}から取得した倍音プロファイルをもとに，加算合成層と息ノイズ層を構築する\\
+    FluteInstrument（コンストラクタ） & なし & float midiNote, float duration, float startVel, float endVel, float masterVol & DataUtilsから取得した倍音プロファイルをもとに，加算合成層と息ノイズ層を構築する\\
     \hline
-    \texttt{noteOn} & \texttt{void} & \texttt{float dur} & \texttt{masterEnv}・\texttt{harmonicEnvs}を起動し，\texttt{ampLines}・\texttt{wobbleLines}を開始値から終了値へフェードさせ，\texttt{masterEnv}を\texttt{longOut}へパッチする\\
+    noteOn & void & float dur & masterEnv・harmonicEnvsを起動し，ampLines・wobbleLinesを開始値から終了値へフェードさせ，masterEnvをlongOutへパッチする\\
     \hline
-    \texttt{noteOff} & \texttt{void} & なし & \texttt{masterEnv}および\texttt{harmonicEnvs}を消音し，リリース完了後に\texttt{longOut}からアンパッチする\\
+    noteOff & void & なし & masterEnvおよびharmonicEnvsを消音し，リリース完了後にlongOutからアンパッチする\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，コンストラクタとnoteOn関数について，実際のコードとともに説明する．まず，加算合成部分について説明する．各倍音についてOscilを生成し，位相をランダムに散らしたうえで，ビブラート用のOscil（\texttt{freqController}）を周波数へ，音量揺らぎ用のOscil（\texttt{ampLFO}）を振幅へそれぞれパッチしている．加算合成部分をコード\ref{lst:gakki_flute_ctor}に示す．
+以下では，コンストラクタとnoteOn関数について，実際のコードとともに説明する．まず，加算合成部分について説明する．各倍音についてOscilを生成し，位相をランダムに散らしたうえで，ビブラート用のOscil（freqController）を周波数へ，音量揺らぎ用のOscil（ampLFO）を振幅へそれぞれパッチしている．加算合成部分をコード\ref{lst:gakki_flute_ctor}に示す．
 
 \begin{lstlisting}[caption={FluteInstrumentコンストラクタ（加算合成部分）}, label={lst:gakki_flute_ctor}]
 for (int i = 0; i < numHarmonics; i++) {
@@ -1844,7 +1844,7 @@ breathFilter.patch(breathEnv);
 breathEnv.patch(mixer);
 \end{lstlisting}
 
-最後に，noteOn関数について説明する．この関数は，\texttt{masterEnv}と\texttt{harmonicEnvs}を起動したうえで，\texttt{ampLines}（ベース音量）と\texttt{wobbleLines}（揺らぎの深さ）を，音符の長さに0.5秒の余裕を加えた\texttt{safeDur}にわたって開始値から終了値へフェードさせる．noteOn関数をコード\ref{lst:gakki_flute_noteon}に示す．
+最後に，noteOn関数について説明する．この関数は，masterEnvとharmonicEnvsを起動したうえで，ampLines（ベース音量）とwobbleLines（揺らぎの深さ）を，音符の長さに0.5秒の余裕を加えたsafeDurにわたって開始値から終了値へフェードさせる．noteOn関数をコード\ref{lst:gakki_flute_noteon}に示す．
 
 \begin{lstlisting}[caption={FluteInstrument::noteOn関数}, label={lst:gakki_flute_noteon}]
 void noteOn(float dur) {
@@ -1864,29 +1864,29 @@ void noteOn(float dur) {
 }
 \end{lstlisting}
 
-\paragraph{ストリングス（\texttt{StringsInstrument}）}
-次に，ストリングスの音色合成について説明する．\texttt{StringsInstrument}クラスは，単一の楽器データではなく，コントラバス・チェロ・ビオラ・バイオリンの4種類のLUTを音程に応じてクロスフェード（混合）させることで，低音から高音まで滑らかに音色が変化する弦楽器群を表現している点が最大の特徴である．音程が低いほどコントラバスの比率が高く，音程が上がるにつれてチェロ・ビオラ・バイオリンへと比率が滑らかに移行する．\texttt{StringsInstrument}クラスで使用する主な変数・関数の仕様を表\ref{table:gakki_strings}に示す．
+\paragraph{ストリングス（StringsInstrument）}
+次に，ストリングスの音色合成について説明する．StringsInstrumentクラスは，単一の楽器データではなく，コントラバス・チェロ・ビオラ・バイオリンの4種類のLUTを音程に応じてクロスフェード（混合）させることで，低音から高音まで滑らかに音色が変化する弦楽器群を表現している点が最大の特徴である．音程が低いほどコントラバスの比率が高く，音程が上がるにつれてチェロ・ビオラ・バイオリンへと比率が滑らかに移行する．StringsInstrumentクラスで使用する主な変数・関数の仕様を表\ref{table:gakki_strings}に示す．
 
 \begin{table}[H]
-    \caption{\texttt{StringsInstrument}クラスで使用する主な変数・関数の仕様一覧}
+    \caption{StringsInstrumentクラスで使用する主な変数・関数の仕様一覧}
     \centering
     \label{table:gakki_strings}
     \begin{tabular}{p{4.3cm}p{9.7cm}}
     \hline
     \textbf{名称} & \textbf{説明}\\
     \hline
-    \texttt{maxTotalOscils}（変数） & 4楽器分の混合に対応するため多めに確保したOscilの最大本数(40)\\
+    maxTotalOscils（変数） & 4楽器分の混合に対応するため多めに確保したOscilの最大本数(40)\\
     \hline
-    \texttt{totalActiveOscils}（変数） & 実際に生成されたOscilの本数\\
+    totalActiveOscils（変数） & 実際に生成されたOscilの本数\\
     \hline
-    \texttt{createInstrumentOscillators}（関数） & 1つの楽器（コントラバス等）のLUTプロファイルを，振幅の大きい順に上限本数まで選別したうえでOscil群として生成し，ミキサーへ接続する\\
+    createInstrumentOscillators（関数） & 1つの楽器（コントラバス等）のLUTプロファイルを，振幅の大きい順に上限本数まで選別したうえでOscil群として生成し，ミキサーへ接続する\\
     \hline
-    noteOn / noteOff（関数） & 生成された\texttt{totalActiveOscils}本のOscilに対して，音量・ビブラート・音量揺らぎのフェードを一括で起動・終了する\\
+    noteOn / noteOff（関数） & 生成されたtotalActiveOscils本のOscilに対して，音量・ビブラート・音量揺らぎのフェードを一括で起動・終了する\\
     \hline
     \end{tabular}
 \end{table}
 
-まず，楽器ブレンド比率の算出について説明する．音程（\texttt{midiNote}）の値に応じて，隣接する2楽器間の比率をmap関数で線形補間する．ブレンド比率の算出部分をコード\ref{lst:gakki_strings_blend}に示す．
+まず，楽器ブレンド比率の算出について説明する．音程（midiNote）の値に応じて，隣接する2楽器間の比率をmap関数で線形補間する．ブレンド比率の算出部分をコード\ref{lst:gakki_strings_blend}に示す．
 
 \begin{lstlisting}[caption={StringsInstrumentコンストラクタ（楽器ブレンド比率の算出）}, label={lst:gakki_strings_blend}]
 float baseBassRatio = 0.0f, baseCelloRatio = 0.0f, baseViolaRatio = 0.0f, baseViolinRatio = 0.0f;
@@ -1907,7 +1907,7 @@ if (midiNote <= 36) {
 }
 \end{lstlisting}
 
-次に，\texttt{createInstrumentOscillators}関数について説明する．この関数は，指定された楽器のLUTプロファイルを振幅の大きい順にソートしたうえで上限本数（maxPeaks）まで選別し，周波数の低い順に並べ直してからOscilとして生成する．これにより，計算負荷を抑えつつ音色に対する寄与の大きい成分を優先的に採用している．\texttt{createInstrumentOscillators}関数の要部をコード\ref{lst:gakki_strings_create}に示す．
+次に，createInstrumentOscillators関数について説明する．この関数は，指定された楽器のLUTプロファイルを振幅の大きい順にソートしたうえで上限本数（maxPeaks）まで選別し，周波数の低い順に並べ直してからOscilとして生成する．これにより，計算負荷を抑えつつ音色に対する寄与の大きい成分を優先的に採用している．createInstrumentOscillators関数の要部をコード\ref{lst:gakki_strings_create}に示す．
 
 \begin{lstlisting}[caption={StringsInstrument::createInstrumentOscillators関数（要部）}, label={lst:gakki_strings_create}]
 private void createInstrumentOscillators(final float[][] profile, float blendRatio, int maxPeaks,
@@ -1944,31 +1944,31 @@ private void createInstrumentOscillators(final float[][] profile, float blendRat
 }
 \end{lstlisting}
 
-\paragraph{ピアノ（\texttt{PianoInstrument}）}
-次に，ピアノの音色合成について説明する．\texttt{PianoInstrument}クラスは，1つの音に対して2本の弦をわずかにデチューン（周波数をずらす）して重ねる「デュアル・ストリング構造」により，時間が経つにつれて自然に生じる音のうなり（Beat）を再現している点が特徴である．また，実測データ（LUT）が存在しない倍音・音域については，ピアノの物理特性の傾向を数式化した近似モデルで補完するハイブリッド方式を採用している．\texttt{PianoInstrument}クラスで使用する主な変数・関数の仕様を表\ref{table:gakki_piano}に示す．
+\paragraph{ピアノ（PianoInstrument）}
+次に，ピアノの音色合成について説明する．PianoInstrumentクラスは，1つの音に対して2本の弦をわずかにデチューン（周波数をずらす）して重ねる「デュアル・ストリング構造」により，時間が経つにつれて自然に生じる音のうなり（Beat）を再現している点が特徴である．また，実測データ（LUT）が存在しない倍音・音域については，ピアノの物理特性の傾向を数式化した近似モデルで補完するハイブリッド方式を採用している．PianoInstrumentクラスで使用する主な変数・関数の仕様を表\ref{table:gakki_piano}に示す．
 
 \begin{table}[H]
-    \caption{\texttt{PianoInstrument}クラスで使用する主な変数・関数の仕様一覧}
+    \caption{PianoInstrumentクラスで使用する主な変数・関数の仕様一覧}
     \centering
     \label{table:gakki_piano}
     \begin{tabular}{p{4.3cm}p{9.7cm}}
     \hline
     \textbf{名称} & \textbf{説明}\\
     \hline
-    \texttt{masterEnv}（変数） & ダンパー（離鍵時のミュート）の挙動を表す全体エンベロープ\\
+    masterEnv（変数） & ダンパー（離鍵時のミュート）の挙動を表す全体エンベロープ\\
     \hline
-    \texttt{hammerEnv}（変数） & ハンマーが弦を叩く瞬間のノイズ用エンベロープ\\
+    hammerEnv（変数） & ハンマーが弦を叩く瞬間のノイズ用エンベロープ\\
     \hline
-    \texttt{damps}（変数） & 芯の弦・共鳴弦それぞれのDamp（減衰）オブジェクトを保持するArrayList\\
+    damps（変数） & 芯の弦・共鳴弦それぞれのDamp（減衰）オブジェクトを保持するArrayList\\
     \hline
-    \texttt{PianoInstrument}（コンストラクタ） & ベロシティ層の決定，倍音ごとのデュアル・ストリング構築，ハンマーノイズの生成を行う\\
+    PianoInstrument（コンストラクタ） & ベロシティ層の決定，倍音ごとのデュアル・ストリング構築，ハンマーノイズの生成を行う\\
     \hline
-    noteOn / noteOff（関数） & \texttt{masterEnv}・\texttt{hammerEnv}および全\texttt{damps}要素を一斉に起動・終了する\\
+    noteOn / noteOff（関数） & masterEnv・hammerEnvおよび全damps要素を一斉に起動・終了する\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，デュアル・ストリング構造の構築部分について説明する．各倍音について，アタックの芯となるレイヤーA（\texttt{coreOsc}）と，時間差で立ち上がる共鳴弦のレイヤーB（\texttt{resOsc}）の2層を生成する．レイヤーBはレイヤーAよりわずかに周波数をずらし（\texttt{wobbleRate}分のデチューン），\texttt{buildUpTime}秒かけてゆっくり音量を上げることで，芯の音と干渉して自然なうなりを生む．デュアル・ストリング構造の構築部分をコード\ref{lst:gakki_piano_dual}に示す．
+以下では，デュアル・ストリング構造の構築部分について説明する．各倍音について，アタックの芯となるレイヤーA（coreOsc）と，時間差で立ち上がる共鳴弦のレイヤーB（resOsc）の2層を生成する．レイヤーBはレイヤーAよりわずかに周波数をずらし（wobbleRate分のデチューン），buildUpTime秒かけてゆっくり音量を上げることで，芯の音と干渉して自然なうなりを生む．デュアル・ストリング構造の構築部分をコード\ref{lst:gakki_piano_dual}に示す．
 
 \begin{lstlisting}[caption={PianoInstrumentコンストラクタ（デュアル・ストリング構造）}, label={lst:gakki_piano_dual}]
 // レイヤーA：アタックの芯（Dry弦）
@@ -2003,8 +2003,8 @@ hammerEnv = new ADSR(1.0f, 0.001f, 0.02f, 0.0f, 0.01f);
 hammerNoise.patch(hammerFilter).patch(hammerEnv);
 \end{lstlisting}
 
-\paragraph{ドラム（\texttt{KickInstrument}・\texttt{SnareInstrument}・\texttt{HiHatInstrument}）}
-次に，ドラムの音色合成について説明する．ドラムはフルート等の旋律楽器とは異なり，Instrumentクラスをキック・スネア・ハイハットの3種類（および過去に試作された\texttt{SnareInstrumentOld}・\texttt{HiHatInstrumentOld}の旧版，未使用の\texttt{CymbalInstrument}）に分けて実装している．いずれも短時間で減衰する打撃音であるため，全体の出力は\texttt{shortOut}バスへパッチされる．3種の主要な変数・関数の仕様を表\ref{table:gakki_drum}に示す．
+\paragraph{ドラム（KickInstrument・SnareInstrument・HiHatInstrument）}
+次に，ドラムの音色合成について説明する．ドラムはフルート等の旋律楽器とは異なり，Instrumentクラスをキック・スネア・ハイハットの3種類（および過去に試作されたSnareInstrumentOld・HiHatInstrumentOldの旧版，未使用のCymbalInstrument）に分けて実装している．いずれも短時間で減衰する打撃音であるため，全体の出力はshortOutバスへパッチされる．3種の主要な変数・関数の仕様を表\ref{table:gakki_drum}に示す．
 
 \begin{table}[H]
     \caption{ドラム関連クラスで使用する主な変数・関数の仕様一覧}
@@ -2014,18 +2014,18 @@ hammerNoise.patch(hammerFilter).patch(hammerEnv);
     \hline
     \textbf{名称} & \textbf{説明}\\
     \hline
-    \texttt{KickInstrument}（コンストラクタ） & \texttt{kickLUT}の各成分について，衝撃の瞬間に高い周波数から本来の周波数へ急降下するピッチスイープ（Line）を適用したOscilを最大50本生成する\\
+    KickInstrument（コンストラクタ） & kickLUTの各成分について，衝撃の瞬間に高い周波数から本来の周波数へ急降下するピッチスイープ（Line）を適用したOscilを最大50本生成する\\
     \hline
-    \texttt{SnareInstrument}（コンストラクタ） & 胴鳴り（Body），倍音（Overtone），スナッピー（ノイズ）の3パートを個別のOscil／Noiseとフィルターで構築する\\
+    SnareInstrument（コンストラクタ） & 胴鳴り（Body），倍音（Overtone），スナッピー（ノイズ）の3パートを個別のOscil／Noiseとフィルターで構築する\\
     \hline
-    \texttt{HiHatInstrument}（コンストラクタ） & 実測ピークに基づく複数の金属共鳴用Oscilと，高域ノイズによる打撃摩擦音を合成する\\
+    HiHatInstrument（コンストラクタ） & 実測ピークに基づく複数の金属共鳴用Oscilと，高域ノイズによる打撃摩擦音を合成する\\
     \hline
-    noteOn / noteOff（各クラス共通） & 各パートのエンベロープを一斉に起動・終了し，\texttt{masterEnv}を\texttt{shortOut}へパッチ／アンパッチする\\
+    noteOn / noteOff（各クラス共通） & 各パートのエンベロープを一斉に起動・終了し，masterEnvをshortOutへパッチ／アンパッチする\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，キックのピッチスイープと，スネアの胴鳴りパートについて，実際のコードとともに説明する．まず，\texttt{KickInstrument}のピッチスイープについて説明する．各周波数成分について，Lineを用いて0.01秒かけて「本来の周波数の1.5倍」から「本来の周波数」へ直線的に下げることで，太鼓の膜が叩かれた瞬間にピッチが下がっていく物理的な挙動を再現している．該当部分をコード\ref{lst:gakki_kick}に示す．
+以下では，キックのピッチスイープと，スネアの胴鳴りパートについて，実際のコードとともに説明する．まず，KickInstrumentのピッチスイープについて説明する．各周波数成分について，Lineを用いて0.01秒かけて「本来の周波数の1.5倍」から「本来の周波数」へ直線的に下げることで，太鼓の膜が叩かれた瞬間にピッチが下がっていく物理的な挙動を再現している．該当部分をコード\ref{lst:gakki_kick}に示す．
 
 \begin{lstlisting}[caption={KickInstrumentコンストラクタ（ピッチスイープ部分）}, label={lst:gakki_kick}]
 for (int i = 0; i < numComponents; i++) {
@@ -2048,7 +2048,7 @@ for (int i = 0; i < numComponents; i++) {
 }
 \end{lstlisting}
 
-次に，\texttt{SnareInstrument}の胴鳴りパートについて説明する．発音の瞬間に約3倍の周波数から本来の胴鳴り周波数（172.3~Hz）へ急降下させるピッチエンベロープにより，スネアドラム特有のアタック感を表現している．該当部分をコード\ref{lst:gakki_snare}に示す．
+次に，SnareInstrumentの胴鳴りパートについて説明する．発音の瞬間に約3倍の周波数から本来の胴鳴り周波数（172.3~Hz）へ急降下させるピッチエンベロープにより，スネアドラム特有のアタック感を表現している．該当部分をコード\ref{lst:gakki_snare}に示す．
 
 \begin{lstlisting}[caption={SnareInstrumentコンストラクタ（胴鳴りパート）}, label={lst:gakki_snare}]
 float bodyFreq      = 172.3f * random(0.99f, 1.01f); // 実測データの最強ピーク
@@ -2064,29 +2064,29 @@ bodyAmpEnv = new ADSR(1.0f, 0.001f, bodyDecay, 0.0f, 0.05f);
 bodyOsc.patch(bodyAmpEnv).patch(mixer);
 \end{lstlisting}
 
-\paragraph{ホルンとトランペット（\texttt{HornInstrument}・\texttt{TrumpetInstrument}）}
-最後に，ホルンおよびトランペットの音色合成について説明する．両クラスは，ハッカソン第11回時点で追加された金管楽器であり，事前課題の報告の通り，既存の\texttt{FluteInstrument}クラスの加算合成・ビブラート・息ノイズの構造をそのまま流用したうえで，\texttt{KickInstrument}で用いていたアタック時のピッチエンベロープ機能を新たに付加して作成されている．\texttt{HornInstrument}と\texttt{TrumpetInstrument}は，基準MIDIノートや各種パラメータの数値が異なるのみで，クラス構造自体は同一である．両クラスで使用する主な変数・関数の仕様を表\ref{table:gakki_horn}に示す．
+\paragraph{ホルンとトランペット（HornInstrument・TrumpetInstrument）}
+最後に，ホルンおよびトランペットの音色合成について説明する．両クラスは，ハッカソン第11回時点で追加された金管楽器であり，事前課題の報告の通り，既存のFluteInstrumentクラスの加算合成・ビブラート・息ノイズの構造をそのまま流用したうえで，KickInstrumentで用いていたアタック時のピッチエンベロープ機能を新たに付加して作成されている．HornInstrumentとTrumpetInstrumentは，基準MIDIノートや各種パラメータの数値が異なるのみで，クラス構造自体は同一である．両クラスで使用する主な変数・関数の仕様を表\ref{table:gakki_horn}に示す．
 
 \begin{table}[H]
-    \caption{\texttt{HornInstrument}・\texttt{TrumpetInstrument}クラスで使用する主な変数・関数の仕様一覧}
+    \caption{HornInstrument・TrumpetInstrumentクラスで使用する主な変数・関数の仕様一覧}
     \centering
     \label{table:gakki_horn}
     \begin{tabular}{p{4.3cm}p{9.7cm}}
     \hline
     \textbf{名称} & \textbf{説明}\\
     \hline
-    \texttt{pitchEnvLines}[]（変数） & アタック時のピッチ急降下を制御するLine配列（Flute由来の構造に新規追加）\\
+    pitchEnvLines[]（変数） & アタック時のピッチ急降下を制御するLine配列（Flute由来の構造に新規追加）\\
     \hline
-    \texttt{targetFreqs}[]（変数） & 各倍音の本来の周波数を保持する配列．noteOn時のピッチエンベロープ計算に使用\\
+    targetFreqs[]（変数） & 各倍音の本来の周波数を保持する配列．noteOn時のピッチエンベロープ計算に使用\\
     \hline
-    \texttt{HornInstrument} / \texttt{TrumpetInstrument}（コンストラクタ） & Flute同様の加算合成・ビブラート・息ノイズ構造に加え，各倍音の\texttt{pitchEnvLines}をOscilの周波数LFOのoffsetへパッチする\\
+    HornInstrument / TrumpetInstrument（コンストラクタ） & Flute同様の加算合成・ビブラート・息ノイズ構造に加え，各倍音のpitchEnvLinesをOscilの周波数LFOのoffsetへパッチする\\
     \hline
-    noteOn（関数） & \texttt{masterEnv}・\texttt{harmonicEnvs}の起動と\texttt{ampLines}・\texttt{wobbleLines}のフェードに加え，\texttt{pitchEnvLines}を「本来周波数の(1+\texttt{pitchMod})倍」から「本来周波数」へ\texttt{sweepTime}秒でフェードさせる\\
+    noteOn（関数） & masterEnv・harmonicEnvsの起動とampLines・wobbleLinesのフェードに加え，pitchEnvLinesを「本来周波数の(1+pitchMod)倍」から「本来周波数」へsweepTime秒でフェードさせる\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，両クラスに共通するアタック時のピッチエンベロープ機能について，\texttt{HornInstrument}のnoteOn関数を例に説明する．発音直後，各倍音の周波数を本来値より一時的に高く（ホルンでは\texttt{pitchMod}=0.05，すなわち5\%増しから）設定し，\texttt{sweepTime}秒（ホルンでは0.12秒）かけて本来の周波数へ直線的に戻すことで，金管楽器特有の「音の頭が一瞬上ずってから定まる」挙動を再現している．該当部分をコード\ref{lst:gakki_horn_pitch}に示す．なお，トランペットでは同じ構造に対して\texttt{pitchMod}=0.03，\texttt{sweepTime}=0.07秒という異なる数値が用いられている．
+以下では，両クラスに共通するアタック時のピッチエンベロープ機能について，HornInstrumentのnoteOn関数を例に説明する．発音直後，各倍音の周波数を本来値より一時的に高く（ホルンではpitchMod=0.05，すなわち5\%増しから）設定し，sweepTime秒（ホルンでは0.12秒）かけて本来の周波数へ直線的に戻すことで，金管楽器特有の「音の頭が一瞬上ずってから定まる」挙動を再現している．該当部分をコード\ref{lst:gakki_horn_pitch}に示す．なお，トランペットでは同じ構造に対してpitchMod=0.03，sweepTime=0.07秒という異なる数値が用いられている．
 
 \begin{lstlisting}[caption={HornInstrument::noteOn関数（ピッチエンベロープ部分）}, label={lst:gakki_horn_pitch}]
 float sweepTime = 0.12f; // 変化にかかる時間
@@ -2124,18 +2124,18 @@ for(int i = 0; i < numHarmonics; i++) {
     \hline
     \textbf{ファイル名} & \textbf{概要}\\
     \hline
-    \texttt{drum\_0706.ino} & ドラム担当機のプログラム．同期のマスターとして動作し，全楽器機の発音タイミングを管理する\\
+    drum\_0706.ino & ドラム担当機のプログラム．同期のマスターとして動作し，全楽器機の発音タイミングを管理する\\
     \hline
-    \texttt{flute\_0706.ino} & フルート担当機のプログラム．同期のスレーブとして動作する\\
+    flute\_0706.ino & フルート担当機のプログラム．同期のスレーブとして動作する\\
     \hline
-    \texttt{piano\_0706.ino} & ピアノ担当機のプログラム．同期のスレーブとして動作する\\
+    piano\_0706.ino & ピアノ担当機のプログラム．同期のスレーブとして動作する\\
     \hline
-    \texttt{strings\_0706.ino} & ストリングス担当機のプログラム．同期のスレーブとして動作する\\
+    strings\_0706.ino & ストリングス担当機のプログラム．同期のスレーブとして動作する\\
     \hline
     \end{tabular}
 \end{table}
 
-\texttt{flute\_0706.ino}・\texttt{piano\_0706.ino}・\texttt{strings\_0706.ino}の3ファイルは，IPアドレス・楽器ID・CdS検知しきい値・埋め込みの楽譜データが異なるのみで，通信・同期ロジックの構造は完全に同一である．そのため，以下ではスレーブ側の代表例として\texttt{flute\_0706.ino}を用いて説明し，マスター側は\texttt{drum\_0706.ino}を用いて説明する．
+flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPアドレス・楽器ID・CdS検知しきい値・埋め込みの楽譜データが異なるのみで，通信・同期ロジックの構造は完全に同一である．そのため，以下ではスレーブ側の代表例としてflute\_0706.inoを用いて説明し，マスター側はdrum\_0706.inoを用いて説明する．
 
 次に，各Arduino間の同期に用いられる通信ヘッダの一覧を示す．表\ref{table:douki_headers}の通り，指揮デバイスからの一斉指示に加え，マスター・スレーブ間で複数種類のパケットがやり取りされる．
 
@@ -2159,18 +2159,18 @@ for(int i = 0; i < numHarmonics; i++) {
     \hline
     'N' & マスター → 各スレーブ & 多数決により決定した確定BPMのブロードキャスト\\
     \hline
-    'T' & スレーブ → マスター & 自身の\texttt{globalTick}の報告（diff算出依頼）\\
+    'T' & スレーブ → マスター & 自身のglobalTickの報告（diff算出依頼）\\
     \hline
-    'R' & マスター → スレーブ & T受信時点での\texttt{diff}（Tick差分）の返信\\
+    'R' & マスター → スレーブ & T受信時点でのdiff（Tick差分）の返信\\
     \hline
-    'O' & マスター → スレーブ & 演奏開始タイミング（\texttt{startGlobalTick}）の指示\\
+    'O' & マスター → スレーブ & 演奏開始タイミング（startGlobalTick）の指示\\
     \hline
     \end{tabular}
 \end{table}
 
-続いて，レーザー光の検知処理について説明する．各Arduinoは，中継機デバイスの回転周期をCdSセルで検知するために，\ref{sec:kan_naibu}項で説明した\texttt{LaserDetector}クラスと同一の適応しきい値方式のロジックを実装した\texttt{SyncManager}クラスを備えている．検知したパルス間隔から求めた実測BPMは，マスターでは自身のBPM推定値として，スレーブでは'M'通信によるBPM提案として用いられる．検知ロジックの詳細な実装は\ref{sec:kan_naibu}項および付録に示すプログラム全文を参照されたい．
+続いて，レーザー光の検知処理について説明する．各Arduinoは，中継機デバイスの回転周期をCdSセルで検知するために，\ref{sec:kan_naibu}項で説明したLaserDetectorクラスと同一の適応しきい値方式のロジックを実装したSyncManagerクラスを備えている．検知したパルス間隔から求めた実測BPMは，マスターでは自身のBPM推定値として，スレーブでは'M'通信によるBPM提案として用いられる．検知ロジックの詳細な実装は\ref{sec:kan_naibu}項および付録に示すプログラム全文を参照されたい．
 
-次に，ドラム機（マスター）における同期状態管理について説明する．マスターは，\texttt{state}という状態変数によって管理される5段階の状態遷移に沿って動作する．各状態の内容を表\ref{table:douki_master_state}に示す．
+次に，ドラム機（マスター）における同期状態管理について説明する．マスターは，stateという状態変数によって管理される5段階の状態遷移に沿って動作する．各状態の内容を表\ref{table:douki_master_state}に示す．
 
 \begin{table}[H]
     \caption{ドラム機（マスター）の状態遷移一覧}
@@ -2180,13 +2180,13 @@ for(int i = 0; i < numHarmonics; i++) {
     \hline
     \textbf{state} & \textbf{内容}\\
     \hline
-    0 & BPM安定待ち．レーザー検知によるBPM推定値が\texttt{MIN\_STABLE\_COUNT}回連続で一致するまで待機する\\
+    0 & BPM安定待ち．レーザー検知によるBPM推定値がMIN\_STABLE\_COUNT回連続で一致するまで待機する\\
     \hline
-    1 & 楽器と同期中．参加を予告したスレーブ全機について，'T'受信時に返す\texttt{diff}が閾値以内に収まるまで待機する\\
+    1 & 楽器と同期中．参加を予告したスレーブ全機について，'T'受信時に返すdiffが閾値以内に収まるまで待機する\\
     \hline
     2 & 同期完了・演奏開始前．各スレーブへの'O'通信の送信タイミングを監視しつつ，ドラム自身の演奏開始タイミングを待つ\\
     \hline
-    3 & 演奏中．\texttt{elapsedPlayTick}を進めながらドラム自身の楽譜を再生する\\
+    3 & 演奏中．elapsedPlayTickを進めながらドラム自身の楽譜を再生する\\
     \hline
     4 & システム停止中．'S'通信を受信するまで何も行わない\\
     \hline
@@ -2203,29 +2203,29 @@ for(int i = 0; i < numHarmonics; i++) {
     \hline
     \textbf{変数名} & \textbf{型} & \textbf{説明}\\
     \hline
-    \texttt{state} & int & 現在の同期状態（0〜4）を保持\\
+    state & int & 現在の同期状態（0〜4）を保持\\
     \hline
-    \texttt{globalTick} & uint32\_t & マスターを基準とする全体共通のTickカウンタ\\
+    globalTick & uint32\_t & マスターを基準とする全体共通のTickカウンタ\\
     \hline
-    \texttt{currentSongId} & int & 現在演奏中の楽譜IDを保持．'S'受信のたびにローテーションする\\
+    currentSongId & int & 現在演奏中の楽譜IDを保持．'S'受信のたびにローテーションする\\
     \hline
-    \texttt{elapsedPlayTick} & int32\_t & state2移行後に進行する演奏開始からの経過Tick\\
+    elapsedPlayTick & int32\_t & state2移行後に進行する演奏開始からの経過Tick\\
     \hline
-    \texttt{isDrumPlaying} & bool & ドラム自身が演奏中かどうかを保持\\
+    isDrumPlaying & bool & ドラム自身が演奏中かどうかを保持\\
     \hline
-    \texttt{isInstJoin[]} & bool[4] & 各楽器が同期に参加する予告（'J'受信）をしたかを保持\\
+    isInstJoin[] & bool[4] & 各楽器が同期に参加する予告（'J'受信）をしたかを保持\\
     \hline
-    \texttt{isInstConnected[]} & bool[4] & 各楽器が'T'通信により実際に接続済みであるかを保持\\
+    isInstConnected[] & bool[4] & 各楽器が'T'通信により実際に接続済みであるかを保持\\
     \hline
-    \texttt{lastReceivedDiff[]} & int32\_t[4] & 各楽器から'T'受信時に算出した直近の\texttt{diff}を保持\\
+    lastReceivedDiff[] & int32\_t[4] & 各楽器から'T'受信時に算出した直近のdiffを保持\\
     \hline
-    \texttt{receivedBpmLevels[]} & uint8\_t[4] & 自身および各スレーブから提案されたBPM段階を集約する配列\\
+    receivedBpmLevels[] & uint8\_t[4] & 自身および各スレーブから提案されたBPM段階を集約する配列\\
     \hline
-    \texttt{currentBpmLevel} & uint8\_t & 多数決により確定した現在のBPM段階\\
+    currentBpmLevel & uint8\_t & 多数決により確定した現在のBPM段階\\
     \hline
-    \texttt{oSentCount[]} & uint8\_t[10] & 各演奏開始イベントに対する'O'通信の送信済み回数（最大3回）\\
+    oSentCount[] & uint8\_t[10] & 各演奏開始イベントに対する'O'通信の送信済み回数（最大3回）\\
     \hline
-    \texttt{startSequence[][][]} & int & 曲IDごとの各楽器の演奏開始Tickと楽器IDを定義する配列\\
+    startSequence[][][] & int & 曲IDごとの各楽器の演奏開始Tickと楽器IDを定義する配列\\
     \hline
     \end{tabular}
 \end{table}
@@ -2240,32 +2240,32 @@ for(int i = 0; i < numHarmonics; i++) {
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{setup} & \texttt{void} & なし & Wi-Fi接続とUDP通信の初期化を行う\\
+    setup & void & なし & Wi-Fi接続とUDP通信の初期化を行う\\
     \hline
-    \texttt{loop} & \texttt{void} & なし & UDP受信処理と\texttt{state}に応じたステートマシンの実行を毎回行う\\
+    loop & void & なし & UDP受信処理とstateに応じたステートマシンの実行を毎回行う\\
     \hline
-    \texttt{checkSyncReady} & \texttt{bool} & なし & 参加予告のあった全スレーブが接続済みかつ\texttt{diff}が閾値以内であればtrueを返す\\
+    checkSyncReady & bool & なし & 参加予告のあった全スレーブが接続済みかつdiffが閾値以内であればtrueを返す\\
     \hline
-    \texttt{processOCommands} & \texttt{void} & なし & 各演奏開始イベントについて，タイミングが近づいたスレーブへ'O'通信を送信し，ドラム自身の演奏開始も管理する\\
+    processOCommands & void & なし & 各演奏開始イベントについて，タイミングが近づいたスレーブへ'O'通信を送信し，ドラム自身の演奏開始も管理する\\
     \hline
-    \texttt{sendOPacket\_Single} & \texttt{void} & \texttt{uint8\_t instId}, \texttt{uint8\_t songId}, \texttt{uint32\_t startGlobalTick} & 指定したスレーブへ'O'通信（演奏開始タイミング指示）を送信する\\
+    sendOPacket\_Single & void & uint8\_t instId, uint8\_t songId, uint32\_t startGlobalTick & 指定したスレーブへ'O'通信（演奏開始タイミング指示）を送信する\\
     \hline
-    \texttt{sendNPacket} & \texttt{void} & \texttt{uint8\_t bpm} & 確定BPMを全スレーブへ'N'通信でブロードキャストする\\
+    sendNPacket & void & uint8\_t bpm & 確定BPMを全スレーブへ'N'通信でブロードキャストする\\
     \hline
-    \texttt{sendRPacket} & \texttt{void} & \texttt{uint8\_t instId}, \texttt{int32\_t diff} & 'T'受信元のスレーブへ\texttt{diff}を'R'通信で返信する\\
+    sendRPacket & void & uint8\_t instId, int32\_t diff & 'T'受信元のスレーブへdiffを'R'通信で返信する\\
     \hline
-    \texttt{updateTick} & \texttt{void} & なし & \texttt{tickIval}ごとに\texttt{globalTick}を進め，48Tickごとの多数決BPM決定や自身の楽譜再生を行う\\
+    updateTick & void & なし & tickIvalごとにglobalTickを進め，48Tickごとの多数決BPM決定や自身の楽譜再生を行う\\
     \hline
-    \texttt{setBpm} & \texttt{void} & \texttt{uint8\_t bpm} & 確定BPMから\texttt{tickIval}を再計算する\\
+    setBpm & void & uint8\_t bpm & 確定BPMからtickIvalを再計算する\\
     \hline
-    \texttt{determineSystemBpmLevel} & \texttt{uint8\_t} & なし & 参加中の全楽器のBPM提案から中央値を求め，システム全体のBPM段階を決定する\\
+    determineSystemBpmLevel & uint8\_t & なし & 参加中の全楽器のBPM提案から中央値を求め，システム全体のBPM段階を決定する\\
     \hline
-    \texttt{sendPacket} & \texttt{void} & なし & \texttt{curTick}に到達した音符を\texttt{Note}配列から取得し，自身のProcessingへシリアル送信する\\
+    sendPacket & void & なし & curTickに到達した音符をNote配列から取得し，自身のProcessingへシリアル送信する\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，マスターの同期制御における中核部分について，実際のコードとともに説明する．まず，'T'通信（スレーブからのTick報告）の受信処理について説明する．この処理は，スレーブの\texttt{globalTick}とマスター自身の\texttt{globalTick}との差である\texttt{diff}を算出し，'R'通信で即座に返信する．該当部分をコード\ref{lst:douki_master_t}に示す．
+以下では，マスターの同期制御における中核部分について，実際のコードとともに説明する．まず，'T'通信（スレーブからのTick報告）の受信処理について説明する．この処理は，スレーブのglobalTickとマスター自身のglobalTickとの差であるdiffを算出し，'R'通信で即座に返信する．該当部分をコード\ref{lst:douki_master_t}に示す．
 
 \begin{lstlisting}[caption={drum\_0706.inoのloop関数（'T'通信受信部分）}, label={lst:douki_master_t}]
 case 'T':
@@ -2289,7 +2289,7 @@ case 'T':
   break;
 \end{lstlisting}
 
-次に，同期完了判定を行う\texttt{checkSyncReady}関数について説明する．この関数は，参加予告（'J'受信）のあった全スレーブについて，接続済みであり，かつ直近の\texttt{diff}が\texttt{tickIval}から算出したしきい値以内であるかを確認し，1台でも条件を満たさなければfalseを返す．\texttt{checkSyncReady}関数をコード\ref{lst:douki_checksyncready}に示す．
+次に，同期完了判定を行うcheckSyncReady関数について説明する．この関数は，参加予告（'J'受信）のあった全スレーブについて，接続済みであり，かつ直近のdiffがtickIvalから算出したしきい値以内であるかを確認し，1台でも条件を満たさなければfalseを返す．checkSyncReady関数をコード\ref{lst:douki_checksyncready}に示す．
 
 \begin{lstlisting}[caption={checkSyncReady関数}, label={lst:douki_checksyncready}]
 bool checkSyncReady() {
@@ -2310,7 +2310,7 @@ bool checkSyncReady() {
 }
 \end{lstlisting}
 
-最後に，各楽器の演奏開始タイミングを管理する\texttt{processOCommands}関数について説明する．この関数は，\texttt{startSequence}に定義された各演奏開始イベントについて，該当楽器がドラム自身であれば\texttt{elapsedPlayTick}が開始Tickに達した時点で演奏を開始し，スレーブであれば開始Tickの\texttt{O\_ADVANCE\_TICKS}（96Tick）前から3段階に分けて'O'通信を送信することで，パケットロスに備えた冗長性を確保している．該当部分をコード\ref{lst:douki_processocommands}に示す．
+最後に，各楽器の演奏開始タイミングを管理するprocessOCommands関数について説明する．この関数は，startSequenceに定義された各演奏開始イベントについて，該当楽器がドラム自身であればelapsedPlayTickが開始Tickに達した時点で演奏を開始し，スレーブであれば開始TickのO\_ADVANCE\_TICKS（96Tick）前から3段階に分けて'O'通信を送信することで，パケットロスに備えた冗長性を確保している．該当部分をコード\ref{lst:douki_processocommands}に示す．
 
 \begin{lstlisting}[caption={processOCommands関数（要部）}, label={lst:douki_processocommands}]
 if (instId == drumInstId) {
@@ -2340,7 +2340,7 @@ if (instId == drumInstId) {
 }
 \end{lstlisting}
 
-次に，楽器機（スレーブ）における同期処理について説明する．スレーブは，\texttt{state}が0（BPM安定待ち）・1（マスターと同期中）・2（演奏中）・4（停止中）の4状態で動作し，'R'通信で受け取った\texttt{diff}をもとに自身の\texttt{tickIval}を補正することでマスターとの同期を保つ．続いて，楽器機（スレーブ）で使用する主な変数の仕様を表\ref{table:douki_slave_var}に示す．
+次に，楽器機（スレーブ）における同期処理について説明する．スレーブは，stateが0（BPM安定待ち）・1（マスターと同期中）・2（演奏中）・4（停止中）の4状態で動作し，'R'通信で受け取ったdiffをもとに自身のtickIvalを補正することでマスターとの同期を保つ．続いて，楽器機（スレーブ）で使用する主な変数の仕様を表\ref{table:douki_slave_var}に示す．
 
 \begin{table}[H]
     \caption{楽器機（スレーブ）で使用する主な変数の仕様一覧}
@@ -2350,19 +2350,19 @@ if (instId == drumInstId) {
     \hline
     \textbf{変数名} & \textbf{型} & \textbf{説明}\\
     \hline
-    \texttt{baseTickIval} & uint32\_t & 確定BPMから算出した基本の1Tickあたりの時間[\textmu s]\\
+    baseTickIval & uint32\_t & 確定BPMから算出した基本の1Tickあたりの時間[\textmu s]\\
     \hline
-    \texttt{tickIval} & uint32\_t & 同期補正を反映した実際に使用する1Tickあたりの時間[\textmu s]\\
+    tickIval & uint32\_t & 同期補正を反映した実際に使用する1Tickあたりの時間[\textmu s]\\
     \hline
-    \texttt{ticksToCorrect} & int32\_t & 補正処理が残っているTick数\\
+    ticksToCorrect & int32\_t & 補正処理が残っているTick数\\
     \hline
-    \texttt{lastDiff} & int32\_t & 直近に受信した\texttt{diff}．BPM変化時の補正再計算に使用\\
+    lastDiff & int32\_t & 直近に受信したdiff．BPM変化時の補正再計算に使用\\
     \hline
-    \texttt{drumNotStarted} & bool & マスターがまだ\texttt{globalTick}の加算を開始していないかを保持\\
+    drumNotStarted & bool & マスターがまだglobalTickの加算を開始していないかを保持\\
     \hline
-    \texttt{waitingForStart} & bool & 'O'通信を受信し，演奏開始タイミングを待機中かどうかを保持\\
+    waitingForStart & bool & 'O'通信を受信し，演奏開始タイミングを待機中かどうかを保持\\
     \hline
-    \texttt{startGlobalTick} & uint32\_t & マスターから指示された演奏開始\texttt{globalTick}\\
+    startGlobalTick & uint32\_t & マスターから指示された演奏開始globalTick\\
     \hline
     \end{tabular}
 \end{table}
@@ -2377,28 +2377,28 @@ if (instId == drumInstId) {
     \hline
     \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
     \hline
-    \texttt{setup} & \texttt{void} & なし & Wi-Fi接続とUDP通信の初期化を行う\\
+    setup & void & なし & Wi-Fi接続とUDP通信の初期化を行う\\
     \hline
-    \texttt{loop} & \texttt{void} & なし & UDP受信処理（'R'・'O'・'N'・'S'・'E'・'V'）と\texttt{state}に応じたステートマシンの実行を毎回行う\\
+    loop & void & なし & UDP受信処理（'R'・'O'・'N'・'S'・'E'・'V'）とstateに応じたステートマシンの実行を毎回行う\\
     \hline
-    \texttt{applyDiffCorrection} & \texttt{void} & \texttt{int32\_t diff} & 受信した\texttt{diff}の大きさに応じて\texttt{tickIval}を加減速し，マスターとの同期を図る\\
+    applyDiffCorrection & void & int32\_t diff & 受信したdiffの大きさに応じてtickIvalを加減速し，マスターとの同期を図る\\
     \hline
-    \texttt{setBpm} & \texttt{void} & \texttt{uint8\_t bpm} & 確定BPMから\texttt{baseTickIval}を再計算する\\
+    setBpm & void & uint8\_t bpm & 確定BPMからbaseTickIvalを再計算する\\
     \hline
-    \texttt{sendTPacket} & \texttt{void} & なし & 自身の\texttt{globalTick}を'T'通信でマスターへ送信し，\texttt{diff}の算出を依頼する\\
+    sendTPacket & void & なし & 自身のglobalTickを'T'通信でマスターへ送信し，diffの算出を依頼する\\
     \hline
-    \texttt{sendJPacket} & \texttt{void} & なし & 同期への参加予告を'J'通信でマスターへ送信する\\
+    sendJPacket & void & なし & 同期への参加予告を'J'通信でマスターへ送信する\\
     \hline
-    \texttt{sendMPacket} & \texttt{void} & \texttt{uint8\_t bpm} & レーザー検知によるBPM提案を'M'通信でマスターへ送信する\\
+    sendMPacket & void & uint8\_t bpm & レーザー検知によるBPM提案を'M'通信でマスターへ送信する\\
     \hline
-    \texttt{updateTick} & \texttt{void} & なし & \texttt{tickIval}ごとに\texttt{globalTick}を進め，補正カウントダウンや自身の楽譜再生を行う\\
+    updateTick & void & なし & tickIvalごとにglobalTickを進め，補正カウントダウンや自身の楽譜再生を行う\\
     \hline
-    \texttt{sendPacket} & \texttt{void} & なし & \texttt{curTick}に到達した音符を\texttt{Note}配列から取得し，自身のProcessingへシリアル送信する\\
+    sendPacket & void & なし & curTickに到達した音符をNote配列から取得し，自身のProcessingへシリアル送信する\\
     \hline
     \end{tabular}
 \end{table}
 
-以下では，スレーブの同期補正における中核部分について，実際のコードとともに説明する．まず，'R'通信（マスターからの\texttt{diff}返信）の受信処理について説明する．この処理は，パケットの往復時間から通信遅延を見積もって\texttt{diff}を補正したうえで，マスターがまだ動作していない場合の特別処理を経て，通常時は\texttt{applyDiffCorrection}関数を呼び出す．該当部分をコード\ref{lst:douki_slave_r}に示す．
+以下では，スレーブの同期補正における中核部分について，実際のコードとともに説明する．まず，'R'通信（マスターからのdiff返信）の受信処理について説明する．この処理は，パケットの往復時間から通信遅延を見積もってdiffを補正したうえで，マスターがまだ動作していない場合の特別処理を経て，通常時はapplyDiffCorrection関数を呼び出す．該当部分をコード\ref{lst:douki_slave_r}に示す．
 
 \begin{lstlisting}[caption={flute\_0706.inoのloop関数（'R'通信受信部分・要部）}, label={lst:douki_slave_r}]
 case 'R':
@@ -2426,7 +2426,7 @@ case 'R':
   break;
 \end{lstlisting}
 
-次に，\texttt{applyDiffCorrection}関数について説明する．この関数は，\texttt{diff}の大きさに応じて補正の強さを4段階に切り替える．ズレが小さい場合は不感帯として何もせず，大幅なズレの場合は\texttt{tickIval}を2倍または2/3倍にして急速に補正し，中程度のズレの場合は次の48Tickで吸収するように比率補正を行う．\texttt{applyDiffCorrection}関数をコード\ref{lst:douki_diffcorrection}に示す．
+次に，applyDiffCorrection関数について説明する．この関数は，diffの大きさに応じて補正の強さを4段階に切り替える．ズレが小さい場合は不感帯として何もせず，大幅なズレの場合はtickIvalを2倍または2/3倍にして急速に補正し，中程度のズレの場合は次の48Tickで吸収するように比率補正を行う．applyDiffCorrection関数をコード\ref{lst:douki_diffcorrection}に示す．
 
 \begin{lstlisting}[caption={applyDiffCorrection関数}, label={lst:douki_diffcorrection}]
 void applyDiffCorrection(int32_t diff) {
@@ -2453,6 +2453,6 @@ void applyDiffCorrection(int32_t diff) {
 }
 \end{lstlisting}
 
-最後に，'O'通信（マスターからの演奏開始指示）の受信処理について説明する．この処理は，指示された\texttt{startGlobalTick}と自身の\texttt{globalTick}を比較し，まだ到達していなければ\texttt{waitingForStart}を立てて待機し，すでに超過していれば超過分だけ\texttt{curTick}をオフセットして即座に演奏へ合流する．なお，'O'通信の受信および状態遷移に関する処理の詳細な実装は付録に示すプログラム全文を参照されたい．
+最後に，'O'通信（マスターからの演奏開始指示）の受信処理について説明する．この処理は，指示されたstartGlobalTickと自身のglobalTickを比較し，まだ到達していなければwaitingForStartを立てて待機し，すでに超過していれば超過分だけcurTickをオフセットして即座に演奏へ合流する．なお，'O'通信の受信および状態遷移に関する処理の詳細な実装は付録に示すプログラム全文を参照されたい．
 
 プログラム全文は付録に示す．
