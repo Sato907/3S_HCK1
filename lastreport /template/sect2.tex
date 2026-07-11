@@ -554,12 +554,17 @@ bool PotManager::volUpdatePotentiometers() {
 }
 \end{lstlisting}
 
-最後に，\texttt{getBpmStep}関数および\texttt{getVolStep}関数について説明する．いずれも\texttt{PotManager.h}内でインライン定義されたゲッター関数であり，外部（\texttt{AccManager}クラス）から現在の段階番号を取得するために用いられる．\texttt{getVolStep}関数では，可変抵抗器を回転させる向きと，音量として直感的に理解しやすい段階の増減方向を一致させるため，\texttt{6 - \texttt{currentVolStep}}という変換を行っている点が\texttt{getBpmStep}関数と異なる．両関数をコード\ref{lst:pot_getters}に示す．
+最後に，\texttt{getBpmStep}関数および\texttt{getVolStep}関数について説明する．いずれも\texttt{PotManager.h}内でインライン定義されたゲッター関数であり，外部（\texttt{AccManager}クラス）から現在の段階番号を取得するために用いられる．\texttt{getVolStep}関数では，可変抵抗器を回転させる向きと，音量として直感的に理解しやすい段階の増減方向を一致させるため，\texttt{6 - currentVolStep}という変換を行っている点が\texttt{getBpmStep}関数と異なる．両関数をコード\ref{lst:pot_getters}に示す．
 
 \begin{lstlisting}[caption={PotManager::getBpmStep関数・getVolStep関数}, label={lst:pot_getters}]
 uint8_t getBpmStep() const { return currentBpmStep; }
 uint8_t getVolStep() const { return 6 - currentVolStep; }
 \end{lstlisting}
+
+なお，本節で説明した\texttt{SyncManager}クラスによって送信された演奏開始・終了，BPM，音量の各情報が，中継機デバイス側でどのように受信・反映されるかについては\ref{sec:kan_naibu}項（中継機デバイスの内部設計）で説明する．
+
+
+
 
 
 
