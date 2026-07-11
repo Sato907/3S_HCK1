@@ -1,51 +1,15 @@
 \section{作成したシステムの概要}
 本節では，作成したシステムの概要について説明する．本システムは，ユーザの能動的な動作と連動した観覧車型中継機デバイスの回転およびレーザの発光を通じて，演奏空間全体に多感覚なフィードバックを与えることで，従来の自動演奏技術における演奏インターフェースでは得られない高い没入感をユーザに提供することを目的として設計されている．
-本システムは，指揮デバイス，観覧車型の中継機デバイス，楽器デバイスという３つのデバイスから構成される．
-% まず，本システムの全体の構成図を図\ref{zentai}に示す．ユーザが指揮デバイスに取り付けられたボタンを押下すると，同期開始情報が無線通信によって中継機デバイスおよび楽器デバイスへ送信され，中継機デバイスが作動を開始する．
-演奏開始後，ユーザがスライド式可変抵抗器を操作したうえで指揮デバイスを振ると，加速度センサが振り動作を検知し，中継機デバイスが
-
+まず，本システムの全体の構成図を図\ref{zentai}に示す．本システムは，指揮デバイス，観覧車型の中継機デバイス，楽器デバイスという３つのデバイスから構成される．
+ユーザが指揮デバイスに取り付けられたボタンを押下すると，同期開始情報が無線通信(UDP)によって中継機デバイスおよび楽器デバイスへ送信され，中継機デバイスの回転が開始する．中継機デバイスは常にレーザー光を照射しており，回転するレーザー光を楽器デバイスのCdSセルが受光することで楽器間で同期通信が開始される．
+楽器間の同期通信では，まず各楽器デバイスがレーザー光の受光間隔からBPMを推定し，その推定値が安定するまで待機する．推定が安定すると，ドラムを担当する楽器デバイスをマスター，ピアノ・ストリングス・フルートを担当する楽器デバイスをスレーブとしたUDP通信により，スレーブがマスターへ参加を通知したうえで両者の発音タイミングのずれを相互に送受信し合い，発音タイミングを補正する．全ての楽器デバイス間でこのずれが閾値内に収まり同期が確立すると，各楽器デバイスは自身が保持する楽譜データに基づき，発音タイミングごとにUSBシリアル通信で音程や音量等の発音情報をPCへ送信する．PC上で動作するProcessingは，受信した発音情報に従って実際の演奏音を生成・出力することで，演奏が開始される．なお，この同期通信および発音処理の詳細については\ref{sec:gakki_naibu}項（楽器デバイスの内部設計）で説明する．
+また，演奏開始後にて楽曲のBPMを変更したい場合，ユーザがスライド式可変抵抗器を操作したうえで指揮デバイスを振ると，加速度センサが振り動作を検知し，中継機デバイスへUDP通信がなされ回転速度が変化する．そして，この回転速度に伴い変化した受光間隔によって各楽器デバイスがUSBシリアル通信を行うことで，接続されたPCから演奏されている楽曲のBPMが変更される．
+最後に，演奏開始後にて楽曲の音量を変更したい場合，ユーザがスライド式可変抵抗器を操作してうえで指揮デバイスを振ると，加速度センサが振り動作を検知し，直接楽器デバイスへUDP通信を行い楽曲の音量を変更する．
 ここからは各デバイスの概要について説明する．
 
 \begin{figure}[h]
     \centering
-    \resizebox{0.98\textwidth}{!}{%
-    \begin{tikzpicture}[
-        box/.style={rectangle, draw, fill=cyan!55!blue, text=white, font=\bfseries, minimum width=2.6cm, minimum height=1cm, align=center, rounded corners=1pt},
-        subbox/.style={rectangle, draw, fill=cyan!35!blue, text=white, font=\bfseries\small, minimum width=2.3cm, minimum height=0.9cm, align=center, rounded corners=1pt},
-        groupbox/.style={rectangle, draw, dashed, inner sep=10pt},
-        arr/.style={-{Latex[length=2.5mm]}, thick},
-        biarr/.style={{Latex[length=2.5mm]}-{Latex[length=2.5mm]}, thick},
-        lbl/.style={font=\footnotesize, align=center}
-    ]
-
-        \node[box] (siki) at (0,0.8) {指揮\\デバイス};
-        \node[box] (kan) at (4.6,3.2) {中継機\\デバイス};
-
-
-        \node[subbox] (drum) at (11,3.6) {ドラム\\（マスター）};
-        \node[subbox] (piano) at (9,1.2) {ピアノ\\（スレーブ）};
-        \node[subbox] (strings) at (11,0.2) {ストリングス\\（スレーブ）};
-        \node[subbox] (flute) at (13,1.2) {フルート\\（スレーブ）};
-
-        \node[groupbox, fit=(drum)(piano)(strings)(flute)] (gakki) {};
-        \node[font=\bfseries, above=2pt of gakki.north] {各楽器デバイス};
-
-        \node[box] (pc) at (11,-2.3) {PCから演奏再生\\(Processing)};
-
-
-        \draw[arr] (siki) -- (kan) node[midway, lbl, above, sloped] {UDP\\開始，終了／BPM};
-        \draw[arr] (kan) -- (gakki.north west) node[midway, lbl, above, sloped] {レーザー光\\（BPM推定）};
-        \draw[arr] (siki) -- (piano.west) node[midway, lbl, below, sloped] {UDP\\開始，終了／音量};
-
-
-        \draw[biarr] (drum) -- (piano) node[midway, lbl, sloped, above] {UDP（補正）};
-        \draw[biarr] (drum) -- (strings) node[midway, lbl, right] {UDP（補正）};
-        \draw[biarr] (drum) -- (flute) node[midway, lbl, sloped, above] {UDP（補正）};
-
-
-        \draw[arr] (gakki.south) -- (pc.north) node[midway, lbl, right] {USBシリアル通信\\（各機ごと）};
-    \end{tikzpicture}%
-    }
+    \includegraphics[width=\textwidth]{./figs/zentaigod.png}
     \caption{全体の構成図}
     \label{zentai}
 \end{figure}
@@ -113,6 +77,7 @@
     \caption{指揮デバイスの構成部品}
     \label{table:siki}
     \begin{tabular}{lll} \hline
+      機材&品番&個数[個]\\ \hline
         Arduino UNO R4 WiFi& - & 1 \\ \hline
         スライド式可変抵抗器 10 kΩ &-& 2 \\ \hline
         デジタル3軸加速度センサ & GY-291 & 1 \\ \hline
