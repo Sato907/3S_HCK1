@@ -2,7 +2,56 @@
 \label{sec:jissou}
 
 \subsection{チーム構成と役割分担}
-本プロジェクトは，6名で実施した．このうち報告者は，ハードウェア全体，すなわち指揮デバイスの作成，中継機デバイスの作成，および楽器デバイスの受光部回路の作成を担当した．中継機デバイスについては，報告者が部品選定・回路作成および実装上の調整を行い，本体の実装は山口が担当した．また，ソフトウェア面では，中継機デバイスのLEDマトリクスに現在のBPMを表示するDisplayモジュール（Display.h，Display.cpp）の実装を担当した．Displayモジュールの内部設計は\ref{sec:kan_naibu}項で述べた通りであり，プログラム全文は付録に示す．
+\label{sec:jissou_team}
+本プロジェクトは，6名で実施した．役割分担は，作業分解構造（WBS）に基づき，楽曲表現系（デバイス本体・LEDマトリクス表示）を山口・佐藤，楽曲系（音色合成・発音機能）を梅野・薄井，通信系（通信同期制御）を宇井・菊池がそれぞれペアで担当する構成とした．このうち報告者（佐藤）は，ハードウェア全体，すなわち指揮デバイスの作成，中継機デバイスの作成，および楽器デバイスの受光部回路の作成を担当した．中継機デバイスについては，報告者が部品選定・回路作成および実装上の調整を行い，本体の実装は山口が担当した．また，ソフトウェア面では，中継機デバイスのLEDマトリクスに現在のBPMを表示するDisplayモジュール（Display.h，Display.cpp）の実装を担当した．Displayモジュールの内部設計は\ref{sec:kan_naibu}項で述べた通りであり，プログラム全文は付録に示す．
+
+計画時に策定した実装フェーズ・テストフェーズのスケジュールを，WBSに基づき週単位に要約したガントチャートを図\ref{fig:gantt_plan}に示す．期間は2026年5月22日から6月30日までの6週間であり，W1を5月22日の週とする．実装フェーズでは3週目の途中までに各担当の単体作業を完成させ，単体テストは各項目の完成後に順次実施し，3週目以降に結合テストへ移行して4週目末までに全結合テストを完了させる計画とした．6週目は，遅延が生じた場合に結合テストまでを完了させるための予備期間である．
+
+\begin{figure}[htbp]
+    \begin{center}
+    \begin{ganttchart}[y unit title=0.4cm,
+    y unit chart=0.5cm,
+    vgrid,hgrid,
+    title label anchor/.style={below=-1.6ex},
+    title left shift=.05,
+    title right shift=-.05,
+    title height=1,
+    title/.append style={fill=yellow!10},
+    progress label text={},
+    bar height=0.7,
+    group right shift=0,
+    group top shift=.6,
+    group height=.3]{1}{18}
+    %labels
+    \gantttitle{6 Weeks（2026/5/22〜6/30）}{18} \\
+    \gantttitle{W1}{3}
+    \gantttitle{W2}{3}
+    \gantttitle{W3}{3}
+    \gantttitle{W4}{3}
+    \gantttitle{W5}{3}
+    \gantttitle{W6}{3}\\
+    %tasks
+    \ganttbar[bar/.append style={fill=orange!40}]{指揮デバイスの実装/山口・佐藤}{1}{6} \\%elem0
+    \ganttbar[bar/.append style={fill=orange!40}]{中継機・受光部の実装/山口・佐藤}{1}{6} \\%elem1
+    \ganttbar[bar/.append style={fill=orange!40}]{LEDマトリクス制御の実装/山口・佐藤}{1}{6} \\%elem2
+    \ganttbar[bar/.append style={fill=green!40}]{楽器・譜面の実装/梅野・薄井}{1}{6} \\%elem3
+    \ganttbar[bar/.append style={fill=green!40}]{音色再現・発音機能の実装/梅野・薄井}{1}{7} \\%elem4
+    \ganttbar[bar/.append style={fill=cyan!40}]{通信同期制御の実装/宇井・菊池}{4}{9} \\%elem5
+    \ganttbar[bar/.append style={fill=blue!40}]{単体テスト/全員}{4}{12} \\%elem6
+    \ganttbar[bar/.append style={fill=blue!40}]{結合テスト/全員}{7}{15} \\%elem7
+    \ganttbar[bar/.append style={fill=red!40}]{予備期間/全員}{16}{18}%elem8
+
+    %relations
+    \ganttlink{elem0}{elem6}
+    \ganttlink{elem3}{elem6}
+    \ganttlink{elem5}{elem6}
+    \ganttlink{elem6}{elem7}
+    \ganttlink{elem7}{elem8}
+    \end{ganttchart}
+    \end{center}
+    \caption{計画時のスケジュール（実装フェーズ・テストフェーズの週単位要約）}
+    \label{fig:gantt_plan}
+\end{figure}
 
 \subsection{報告者の担当範囲と技術的課題}
 本節では，報告者が担当したハードウェアの実装について，採用した技術の選定理由を述べたうえで，実装の過程で直面した技術的課題とその解決のために行った技術的貢献を，デバイスごとに説明する．ハードウェア実装における共通の課題は，設計上は動作するはずの回路・機構を，実環境において安定して動作させることであった．具体的には，回転体の質量バランスや軸の摩擦といった機械的な問題，モータの特性変動といった電気的な問題，およびレーザー光の受光精度という光学的な問題が，実装段階ではじめて顕在化した．以下では，これらの課題に対して行った対応を含めて述べる．
