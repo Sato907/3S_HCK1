@@ -115,53 +115,121 @@ print(f"-> figs/mos_median_mode.pdf saved")
 
 # ============================================================
 # 2. ハッカソン参加者共通アンケート（7段階評価）
-#    チーム40（n=26）の統計量は配布された集計シートの値を転記
+#    生データは data/ 内の4教室分CSV（参加者共通アンケートの回答）から読み込む
 # ============================================================
+import csv
+import glob
+
 items = ['没入感・臨場感', '一体感・同期の心地よさ', '演出の華やかさ', '楽しさ・高揚感']
-team_n = 26
-team_mean = [5.54, 5.00, 6.35, 6.27]
-team_sd   = [1.14, 1.60, 0.80, 1.00]
-team_med  = [5.5, 6.0, 6.5, 7.0]
-team_q1   = [5.0, 4.0, 6.0, 6.0]
-team_q3   = [6.75, 6.0, 7.0, 7.0]
-# ひげの端（フェンス内の最小値・最大値）と外れ値（集計シートの外れ値欄と整合）
-team_whislo = [4, 1, 5, 5]
-team_whishi = [7, 7, 7, 7]
-team_fliers = [[], [], [4], [4]]
-# Shapiro-Wilk 検定（集計シートの Python 算出値）
-shapiro_W = [0.8592, 0.8771, 0.7594, 0.7164]
-shapiro_p = [0.0022, 0.0050, 0.00004, 0.000009]
+TEAM = 40
 
-all_n = 1671
-all_mean = [5.03, 5.20, 5.05, 5.21]
-all_sd   = [1.43, 1.40, 1.54, 1.46]
+rows_all, rows_team = [], []
+DATADIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+for f in sorted(glob.glob(os.path.join(DATADIR, '*.csv'))):
+    with open(f, encoding='utf-8-sig') as fh:
+        reader = csv.reader(fh)
+        next(reader)  # ヘッダ
+        for row in reader:
+            if len(row) < 5 or not row[0].strip():
+                continue
+            try:
+                team = int(row[0])
+                vals = [int(row[i]) for i in range(1, 5)]
+            except ValueError:
+                continue
+            rows_all.append(vals)
+            if team == TEAM:
+                rows_team.append(vals)
 
-# ---------- 箱ひげ図（五数要約から作成） ----------
-fig2, ax2 = plt.subplots(figsize=(9, 5))
-bxp_stats = []
+arr_team = np.array(rows_team)   # (26, 4)
+arr_all = np.array(rows_all)     # (1671, 4)
+n_team, n_all = len(arr_team), len(arr_all)
+print()
+print("=" * 70)
+print(f"2. 参加者共通アンケート: チーム{TEAM} n={n_team}, 全教室 n={n_all}")
+print("=" * 70)
+
+# ---------- 記述統計量と Shapiro-Wilk 検定（チーム40，生データから算出） ----------
+print(f"{'評価項目':<14} | 平均 |  SD | 中央値 | 最頻値 | Q1 | Q3 | 歪度 | 尖度 |  W | p値")
 for i, item in enumerate(items):
-    bxp_stats.append({
-        'label': item, 'med': team_med[i], 'q1': team_q1[i], 'q3': team_q3[i],
-        'whislo': team_whislo[i], 'whishi': team_whishi[i], 'fliers': team_fliers[i],
-    })
-ax2.bxp(bxp_stats, showfliers=True, patch_artist=True,
-        boxprops=dict(facecolor='#91bfdb', edgecolor='#4575b4'),
-        medianprops=dict(color='#d73027', linewidth=2),
-        flierprops=dict(marker='o', markerfacecolor='#d73027', markersize=6))
-ax2.set_xticks(range(1, len(items) + 1))
-jp(ax2, '参加者共通アンケートの回答分布（チーム40，$n=26$）', '評価項目', '評価値（7段階）', items)
+    a = arr_team[:, i]
+    counts = np.bincount(a, minlength=8)[1:8]
+    max_c = counts.max()
+    modes = '・'.join(str(k + 1) for k in range(7) if counts[k] == max_c)
+    q1, q3 = np.percentile(a, [25, 75])
+    skew = stats.skew(a, bias=False)
+    kurt = stats.kurtosis(a, bias=False)
+    W, p = stats.shapiro(a)
+    print(f"{item:<14} | {a.mean():.2f} | {a.std(ddof=1):.2f} | {np.median(a):>4} | {modes:>5} | "
+          f"{q1:>4} | {q3:>4} | {skew:>5.2f} | {kurt:>5.2f} | {W:.3f} | {p:.2g}")
+
+# ---------- 箱ひげ図（生データから作成，凡例付き） ----------
+fig2, ax2 = plt.subplots(figsize=(9, 5))
+bp = ax2.boxplot([arr_team[:, i] for i in range(4)], patch_artist=True, widths=0.5,
+                 boxprops=dict(facecolor='#91bfdb', edgecolor='#4575b4'),
+                 medianprops=dict(color='#d73027', linewidth=2),
+                 flierprops=dict(marker='o', markerfacecolor='#d73027', markersize=6,
+                                 markeredgecolor='black'))
+ax2.set_xticks(range(1, 5))
+jp(ax2, f'参加者共通アンケートの回答分布（チーム40，$n={n_team}$）', '評価項目', '評価値（7段階）', items)
 ax2.set_ylim(0.5, 7.5)
 ax2.set_yticks(range(1, 8))
 ax2.yaxis.grid(True, linestyle='--', linewidth=0.5, color='gray', alpha=0.4)
 ax2.set_axisbelow(True)
 ax2.spines['top'].set_visible(False)
 ax2.spines['right'].set_visible(False)
+# 凡例（箱・中央値・ひげ・外れ値の説明）
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+legend_handles = [
+    Patch(facecolor='#91bfdb', edgecolor='#4575b4', label='箱：四分位範囲（$Q_1$〜$Q_3$）'),
+    Line2D([0], [0], color='#d73027', linewidth=2, label='太線：中央値'),
+    Line2D([0], [0], color='black', linewidth=1, label='ひげ：外れ値を除く最小値・最大値'),
+    Line2D([0], [0], marker='o', color='none', markerfacecolor='#d73027',
+           markeredgecolor='black', markersize=6, label='点：外れ値（$Q_1-1.5$IQR未満または$Q_3+1.5$IQR超）'),
+]
+if jp_font:
+    ax2.legend(handles=legend_handles, prop=jp_font, fontsize=9, loc='lower left', framealpha=0.9)
+else:
+    ax2.legend(handles=legend_handles, fontsize=9, loc='lower left', framealpha=0.9)
 plt.tight_layout()
 fig2.savefig(os.path.join(OUTDIR, 'hackathon_boxplot.pdf'), dpi=300, bbox_inches='tight')
 fig2.savefig(os.path.join(OUTDIR, 'hackathon_boxplot.png'), dpi=300, bbox_inches='tight')
 print(f"-> figs/hackathon_boxplot.pdf saved")
 
+# ---------- Q-Qプロット（正規分布との比較，2×2） ----------
+# 横軸: 理論分位数 Φ^{-1}((i-0.5)/n)，縦軸: 順序統計量（実測値を昇順に並べた値）
+fig_qq, axes = plt.subplots(2, 2, figsize=(9, 8))
+for i, item in enumerate(items):
+    ax = axes[i // 2][i % 2]
+    a = np.sort(arr_team[:, i])
+    n = len(a)
+    theo = stats.norm.ppf((np.arange(1, n + 1) - 0.5) / n)
+    ax.scatter(theo, a, color='#4575b4', s=28, zorder=3)
+    # 参照直線: データが正規分布に従う場合の期待直線（平均と標準偏差から構成）
+    ref_x = np.array([theo.min(), theo.max()])
+    ax.plot(ref_x, a.mean() + a.std(ddof=1) * ref_x, color='#d73027', linewidth=1.5, zorder=2)
+    if jp_font:
+        ax.set_title(item, fontproperties=jp_font, fontsize=11, fontweight='bold')
+        ax.set_xlabel('理論分位数', fontproperties=jp_font, fontsize=10)
+        ax.set_ylabel('実測値（順序統計量）', fontproperties=jp_font, fontsize=10)
+    ax.set_ylim(0.5, 7.8)
+    ax.set_yticks(range(1, 8))
+    ax.grid(True, linestyle='--', linewidth=0.5, color='gray', alpha=0.4)
+    ax.set_axisbelow(True)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+plt.tight_layout()
+fig_qq.savefig(os.path.join(OUTDIR, 'hackathon_qq.pdf'), dpi=300, bbox_inches='tight')
+fig_qq.savefig(os.path.join(OUTDIR, 'hackathon_qq.png'), dpi=300, bbox_inches='tight')
+print(f"-> figs/hackathon_qq.pdf saved")
+
 # ---------- チーム40 vs 全教室平均の比較棒グラフ（平均±SD） ----------
+team_mean = arr_team.mean(axis=0)
+team_sd = arr_team.std(axis=0, ddof=1)
+all_mean = arr_all.mean(axis=0)
+all_sd = arr_all.std(axis=0, ddof=1)
+
 fig3, ax3 = plt.subplots(figsize=(9, 5))
 x3 = np.arange(len(items))
 bar_w = 0.32
@@ -177,7 +245,7 @@ jp(ax3, '参加者共通アンケート — チーム40と全教室平均の比�
 ax3.set_ylim(0, 8)
 ax3.set_yticks(range(0, 8))
 if jp_font:
-    ax3.legend([f'チーム40（n={team_n}）', f'全教室（n={all_n}）'],
+    ax3.legend([f'チーム40（n={n_team}）', f'全教室（n={n_all}）'],
                prop=jp_font, fontsize=10, loc='upper left')
 ax3.yaxis.grid(True, linestyle='--', linewidth=0.5, color='gray', alpha=0.4)
 ax3.set_axisbelow(True)
@@ -188,27 +256,47 @@ fig3.savefig(os.path.join(OUTDIR, 'hackathon_compare.pdf'), dpi=300, bbox_inches
 fig3.savefig(os.path.join(OUTDIR, 'hackathon_compare.png'), dpi=300, bbox_inches='tight')
 print(f"-> figs/hackathon_compare.pdf saved")
 
-# ---------- Welchのt検定（要約統計量から）と Cohen の d ----------
+# ---------- チーム40 vs 全教室: Welchのt検定・Cohenのd・Mann-WhitneyのU検定 ----------
 print()
-print("=" * 70)
-print("2. チーム40 vs 全教室: Welchのt検定（要約統計量から算出）・Cohenのd")
-print("=" * 70)
-print(f"{'評価項目':<14} | {'t値':>7} | {'自由度':>7} | {'p値':>10} | {'d':>6}")
+print(f"{'評価項目':<14} | {'t値':>6} | {'自由度':>6} | {'p(Welch)':>9} | {'d':>6} | {'U':>8} | {'p(MW)':>9}")
 for i, item in enumerate(items):
-    m1, s1, n1 = team_mean[i], team_sd[i], team_n
-    m2, s2, n2 = all_mean[i], all_sd[i], all_n
-    se2 = s1**2 / n1 + s2**2 / n2
-    t = (m1 - m2) / math.sqrt(se2)
-    df = se2**2 / ((s1**2 / n1)**2 / (n1 - 1) + (s2**2 / n2)**2 / (n2 - 1))
-    p = 2 * stats.t.sf(abs(t), df)
-    d = (m1 - m2) / s2  # 全教室のSDを基準としたCohenのd
-    print(f"{item:<14} | {t:>7.2f} | {df:>7.1f} | {p:>10.4g} | {d:>6.2f}")
+    a, b = arr_team[:, i], arr_all[:, i]
+    t, p_w = stats.ttest_ind(a, b, equal_var=False)
+    se2 = a.var(ddof=1) / len(a) + b.var(ddof=1) / len(b)
+    df = se2**2 / ((a.var(ddof=1) / len(a))**2 / (len(a) - 1) + (b.var(ddof=1) / len(b))**2 / (len(b) - 1))
+    d = (a.mean() - b.mean()) / b.std(ddof=1)
+    U, p_mw = stats.mannwhitneyu(a, b, alternative='two-sided')
+    print(f"{item:<14} | {t:>6.2f} | {df:>6.1f} | {p_w:>9.3g} | {d:>6.2f} | {U:>8.1f} | {p_mw:>9.3g}")
 
-# ---------- Shapiro-Wilk（転記値の一覧） ----------
+# ---------- 項目間の比較: Friedman検定と事後Wilcoxon符号付き順位検定（Holm補正） ----------
 print()
-print("Shapiro-Wilk検定（チーム40，集計シートより）:")
-for i, item in enumerate(items):
-    print(f"  {item}: W={shapiro_W[i]:.4f}, p={shapiro_p[i]:.2g}")
+chi2, p_fr = stats.friedmanchisquare(*[arr_team[:, i] for i in range(4)])
+print(f"Friedman検定: chi2={chi2:.2f}, df=3, p={p_fr:.2g}")
+
+pairs = [(i, j) for i in range(4) for j in range(i + 1, 4)]
+results = []
+for i, j in pairs:
+    diff = arr_team[:, i] - arr_team[:, j]
+    # 差が0のペアはWilcoxon検定の慣例に従い除外（zero-splitはscipyのデフォルト'wilcox'）
+    try:
+        stat_w, p = stats.wilcoxon(arr_team[:, i], arr_team[:, j])
+    except ValueError:
+        stat_w, p = np.nan, 1.0
+    results.append([i, j, stat_w, p])
+
+# Holm補正: p値を昇順に並べ，k番目のp値に (m-k+1) を乗じる（単調性を保証）
+m = len(results)
+order = np.argsort([r[3] for r in results])
+adj = {}
+running_max = 0.0
+for rank, idx in enumerate(order):
+    p_adj = min(1.0, results[idx][3] * (m - rank))
+    running_max = max(running_max, p_adj)
+    adj[idx] = running_max
+print(f"{'ペア':<30} | {'W':>6} | {'p値':>9} | {'Holm補正p':>10}")
+for idx, (i, j, stat_w, p) in enumerate(results):
+    name = f"{items[i][:3]} vs {items[j][:3]}"
+    print(f"{name:<30} | {stat_w:>6.1f} | {p:>9.3g} | {adj[idx]:>10.3g}")
 
 # ============================================================
 # 3. ボタン押下成功率 158/160 の 95%Wilson信頼区間
