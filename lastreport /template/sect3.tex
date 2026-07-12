@@ -31,23 +31,6 @@
 
 
 
-次に，楽器デバイスが受光するための部品について表\ref{table:ota}に示す．
-光センサモジュールとしてCdSセルを使用する．
-CdSセルにレーザー光が照射された際の出力をArduinoのアナログピンへ接続することで，観覧車デバイスのレーザー光の通過を検知する．
-また，今回はドラム，ピアノ，ストリングス，フルートの4種類の楽器の音色を再現するため
-それぞれにArduinoを使用し，光センサおよびブレッドボードも4台用意する．
-\begin{table}[h]
-    \caption{楽器デバイスに必要な機器}
-    \centering
-    \label{table:ota}
-    \begin{tabular}{llr}\hline
-    機材 & 品番 & 個数 [個] \\ \hline
-    Arduino UNO R4 & -& 4 \\ \hline
-    CdSセル  &GL5516& 4 \\ \hline
-    ブレッドボード & -& 4 \\ \hline
-    ジャンパーワイヤー & - & 適宜 \\ \hline
-    \end{tabular}
-\end{table}
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%
@@ -95,18 +78,18 @@ CdSセルにレーザー光が照射された際の出力をArduinoのアナロ�
 %%%%%%%%%%%%%%%%%%%%%%%
 \FloatBarrier
 
-\subsection{レーザー光送信装置}
-レーザー光送信装置の詳細設計について説明する．図\ref{LED}について，回路図の通りにボタン電池とレーザーをはんだ付けする．これらを観覧車のリングに45度間隔に装着する．
-電源としては図\ref{LED}に示すようにボタン電池からの3V給電を行う．
-ここで，レーザーについて，データシートより定電流源回路を組み込んであるため，現在の設計であれば外部抵抗は必要とせず，素子を安全に利用することができる\cite{laser}．
+% \subsection{レーザー光送信装置}
+% レーザー光送信装置の詳細設計について説明する．図\ref{LED}について，回路図の通りにボタン電池とレーザーをはんだ付けする．これらを観覧車のリングに45度間隔に装着する．
+% 電源としては図\ref{LED}に示すようにボタン電池からの3V給電を行う．
+% ここで，レーザーについて，データシートより定電流源回路を組み込んであるため，現在の設計であれば外部抵抗は必要とせず，素子を安全に利用することができる\cite{laser}．
 
-\begin{figure}[h]
-    \centering
-    \centering
-    \includegraphics[width=5cm]{./figs/LED.png}
-    \caption{レーザー回路図}
-    \label{LED}
-\end{figure}
+% \begin{figure}[h]
+%     \centering
+%     \centering
+%     \includegraphics[width=5cm]{./figs/LED.png}
+%     \caption{レーザー回路図}
+%     \label{LED}
+% \end{figure}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%
@@ -115,19 +98,19 @@ CdSセルにレーザー光が照射された際の出力をArduinoのアナロ�
 
 
 \subsection{楽器デバイス受光部装置}
-楽器デバイスの受光部の回路図を図\ref{fig:kairo_hikari}に示す．
-電源仕様は，PCとのUSB接続から電力を供給する．光センサはArduinoの$\SI{5}{V}$ピンから給電されるため，外部電源は不要である．
-また，光センサが光を受光した瞬間にA0のアナログピンにセンサ値を出力する．
-このセンサ値の変化をArduinoで処理することで光を検知する仕様である．
+% 楽器デバイスの受光部の回路図を図\ref{fig:kairo_hikari}に示す．
+% 電源仕様は，PCとのUSB接続から電力を供給する．光センサはArduinoの$\SI{5}{V}$ピンから給電されるため，外部電源は不要である．
+% また，光センサが光を受光した瞬間にA0のアナログピンにセンサ値を出力する．
+% このセンサ値の変化をArduinoで処理することで光を検知する仕様である．
 
 
-\begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
-        \centering % 中央揃え
-        \includegraphics[width=0.8\columnwidth]{figs/kairo_hikari_cropped.pdf} % 余白をpdfcropでトリミング済み
-        \caption{楽器デバイスの受光部の回路図} % 図の説明
-        \label{fig:kairo_hikari} % 本文中で参照するためのラベル
-\end{figure}
-\FloatBarrier
+% \begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
+%         \centering % 中央揃え
+%         \includegraphics[width=0.8\columnwidth]{figs/kairo_hikari_cropped.pdf} % 余白をpdfcropでトリミング済み
+%         \caption{楽器デバイスの受光部の回路図} % 図の説明
+%         \label{fig:kairo_hikari} % 本文中で参照するためのラベル
+% \end{figure}
+% \FloatBarrier
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%
