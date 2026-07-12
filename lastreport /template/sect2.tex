@@ -209,7 +209,16 @@ button関数はこの1関数のみで構成されるため，以下では処理�
     before_switch_status = switch_status;
 \end{lstlisting}
 
-次に，立下りを検知した際の状態トグルと送信処理について説明する．isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出して演奏を終了し，false（停止中）であれば現在のBPM段階（pot.getBpmStep()）を引数としてsync.sendStart()を呼び出して演奏を開始する．いずれの場合もisButtonPlayingの値を反転させたうえで，delay(300)により\SI{300}{ms}待機することでチャタリングを防止する．該当部分をコード\ref{lst:btn_send}に示す．
+次に，立下りを検知した際の状態トグルと送信処理について説明する．isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出して演奏を終了し，false（停止中）であれば現在のBPM段階（pot.getBpmStep()）を引数としてsync.sendStart()を呼び出して演奏を開始する．いずれの場合もisButtonPlayingの値を反転させたうえで，delay(300)により\SI{300}{ms}待機することでチャタリングを防止する．button関数全体の処理の流れを図\ref{fig:flow_button}に示す．立下りの検知時のみ状態のトグルと送信を行い，それ以外は前回状態の更新のみで終了する．また，該当部分をコード\ref{lst:btn_send}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figs/flow_button.pdf}
+    \caption{button関数の処理フローチャート}
+    \label{fig:flow_button}
+\end{figure}
+\FloatBarrier
+
 
 \begin{lstlisting}[caption={button関数（状態トグルと送信処理部分）}, label={lst:btn_send}]
     if (isButtonPlaying) {
@@ -225,7 +234,16 @@ button関数はこの1関数のみで構成されるため，以下では処理�
 
 なお，sendStart・sendEndの内部では，SyncManagerクラスが複数台のデバイスへラウンドロビン方式による冗長送信を行っている．この通信処理の詳細な実装は付録に示すプログラム全文を参照されたい．
 
-次に，指揮デバイスにおける加速度センサの制御処理について説明する．指揮デバイスは，加速度センサを用いてユーザが指揮棒を振ったことを検知し，演奏情報の更新を行う．センサ値の急激な変化を読み取ることで動作を判定し，誤検知防止機能を設けることで安定した動作を実現している．処理の流れは，差分算出と判定，多重検知の防止，状態の反転，事後処理の4段階に大別される．まず差分算出と判定では，現在の合成加速度currentAccValと前回値lastAccValとの差の絶対値を求める．この差分が検知閾値accThresholdを超過し，かつ前回検知からshakeInterval以上の時間が経過している場合に，指揮棒を振ったと判定する．多重検知の防止では，一度振る動作を検知するとlastDetectTimeを現在時刻に更新し，以降shakeIntervalが経過するまでは加速度の変化を無視することで，一連の動作による複数回の誤検知を防止する．状態の反転では，振る動作を検知するたびにisStartedのbool値を反転させる．事後処理として，次回の判定に備えてcurrentAccValの値をlastAccValへ代入し，前回のサンプリング時刻を更新する．また，振る動作の確定時には，可変抵抗器側で設定値の変更を検知したフラグbpmFragまたはvolFrag（\ref{sec:pot_detail}項で説明する）が有効になっている場合，SyncManagerクラスを介してその情報の送信指示を行う．さらに，I2C通信の異常を検知した場合には自動復旧を行う機能を備えている．加速度センサの制御で使用する変数の仕様を表\ref{table:siki_acc_var}に示す．
+次に，指揮デバイスにおける加速度センサの制御処理について説明する．指揮デバイスは，加速度センサを用いてユーザが指揮棒を振ったことを検知し，演奏情報の更新を行う．センサ値の急激な変化を読み取ることで動作を判定し，誤検知防止機能を設けることで安定した動作を実現している．処理の流れは，差分算出と判定，多重検知の防止，状態の反転，事後処理の4段階に大別される．まず差分算出と判定では，現在の合成加速度currentAccValと前回値lastAccValとの差の絶対値を求める．この差分が検知閾値accThresholdを超過し，かつ前回検知からshakeInterval以上の時間が経過している場合に，指揮棒を振ったと判定する．多重検知の防止では，一度振る動作を検知するとlastDetectTimeを現在時刻に更新し，以降shakeIntervalが経過するまでは加速度の変化を無視することで，一連の動作による複数回の誤検知を防止する．状態の反転では，振る動作を検知するたびにisStartedのbool値を反転させる．事後処理として，次回の判定に備えてcurrentAccValの値をlastAccValへ代入し，前回のサンプリング時刻を更新する．また，振る動作の確定時には，可変抵抗器側で設定値の変更を検知したフラグbpmFragまたはvolFrag（\ref{sec:pot_detail}項で説明する）が有効になっている場合，SyncManagerクラスを介してその情報の送信指示を行う．さらに，I2C通信の異常を検知した場合には自動復旧を行う機能を備えている．update関数の処理の流れを図\ref{fig:flow_acc_update}に示す．サンプリング周期の管理，差分判定，多重検知防止，送信処理という本文で述べた4段階が，1回の呼び出しの中で順に実行される．加速度センサの制御で使用する変数の仕様を表\ref{table:siki_acc_var}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figs/flow_acc_update.pdf}
+    \caption{AccManagerクラスのupdate関数の処理フローチャート}
+    \label{fig:flow_acc_update}
+\end{figure}
+\FloatBarrier
+
 
 \begin{table}[H]
     \caption{加速度センサの制御で使用する変数の仕様一覧}
@@ -332,7 +350,16 @@ float AccManager::readAccMagnitude() {
 }
 \end{lstlisting}
 
-ここで，Wire.endTransmission(false)がエラーを返した場合，またはrequestFromで6バイト読み出せなかった場合には，I2Cバスがロックアップ（スレーブがSDA線を握ったまま停止する現象）していると判断し，recoverI2C関数を呼び出したうえで前回値lastAccValを返すことで，誤ったシェイク検知（ニセshake）を防いでいる．続いて，recoverI2C関数について説明する．この関数は，SCL線を9回手動でトグルさせてSDA線の握りを解放したうえでSTOP条件を生成し，Wireを再初期化してADXL345を再設定することでバスを復旧させる．lastRecoverMsは，この復旧処理およびログ出力が短時間に連続して実行されることを防ぐスロットル用の時刻管理に用いられる．recoverI2C関数をコード\ref{lst:acc_recover}に示す．
+ここで，Wire.endTransmission(false)がエラーを返した場合，またはrequestFromで6バイト読み出せなかった場合には，I2Cバスがロックアップ（スレーブがSDA線を握ったまま停止する現象）していると判断し，recoverI2C関数を呼び出したうえで前回値lastAccValを返すことで，誤ったシェイク検知（ニセshake）を防いでいる．続いて，recoverI2C関数について説明する．この関数は，SCL線を9回手動でトグルさせてSDA線の握りを解放したうえでSTOP条件を生成し，Wireを再初期化してADXL345を再設定することでバスを復旧させる．lastRecoverMsは，この復旧処理およびログ出力が短時間に連続して実行されることを防ぐスロットル用の時刻管理に用いられる．readAccMagnitude関数およびrecoverI2C関数の処理の流れを図\ref{fig:flow_acc_read}に示す．I2C通信の異常はアドレス送信時と読み出し時の2箇所で検出され，いずれの場合も復旧処理を実行したうえで直前値を返す．recoverI2C関数をコード\ref{lst:acc_recover}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figs/flow_acc_read.pdf}
+    \caption{readAccMagnitude関数（左）およびrecoverI2C関数（右）の処理フローチャート}
+    \label{fig:flow_acc_read}
+\end{figure}
+\FloatBarrier
+
 
 \begin{lstlisting}[caption={AccManager::recoverI2C関数}, label={lst:acc_recover}]
 void AccManager::recoverI2C() {
@@ -406,7 +433,16 @@ void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
 \end{lstlisting}
 
 \label{sec:pot_detail}
-最後に，指揮デバイスにおける可変抵抗器を用いたBPM・音量読み取り機能について説明する．指揮デバイスでは，演奏の要素であるBPMと音量を，ユーザが操作できるように可変抵抗器を用いて5段階で調整する．アナログ入力値の特性を考慮したデータ処理を行うことで，安定した制御環境を構築している．アルゴリズムは，サンプリングと移動平均化，範囲分割，パラメータの抽出と出力の3段階に分けられる．サンプリングと移動平均化では，SAMPLE\_INTERVALごとにBPMおよび音量変更用の可変抵抗器の電圧値を，配列bpmSamples・volSamplesにsampleSize分だけ読み取り保存する．このとき，配列の各要素は書き込み位置（bpmReadIndex・volReadIndex）が指す最も古い値から順に上書きされ，上書きの直前に該当要素の値を合計bpmTotal・volTotalからあらかじめ減算し，新たに読み取った値を加算することで，配列全体を読み直すことなく常に最新の合計値を保持する（移動合計）．配列が一巡し全要素が新しい値に更新された時点（bpmBufferFull・volBufferFullがtrueになった時点）以降，この合計値をsampleSizeで除算した移動平均値をaverageBpmVal・averageVolValに格納する．範囲分割では，移動平均化された値をSTEP\_BOUNDARIES[]で定義した4つの閾値と比較し，1〜5の段階番号をcurrentBpmStep・currentVolStepに格納する．パラメータの抽出と出力では，算出した段階が直前の段階（prevBpmStep・prevVolStep）から変化した場合にのみ，公開フラグbpmFrag・volFragを立てる．外部からはgetBpmStep()・getVolStep()を介して現在の段階を取得し，前述の加速度センサ制御における棒振り動作の確定時にこれらのフラグを参照して各楽器デバイスへの送信を行う．なお，音量用可変抵抗器は配線の都合上，回した方向とセンサ値の増減が逆になるため，getVolStep()は6-currentVolStepを返すことで表示上の段階を反転させる．BPM・音量読み取り機能で使用する変数の仕様を表\ref{table:siki_pot_var}に示す．
+最後に，指揮デバイスにおける可変抵抗器を用いたBPM・音量読み取り機能について説明する．指揮デバイスでは，演奏の要素であるBPMと音量を，ユーザが操作できるように可変抵抗器を用いて5段階で調整する．アナログ入力値の特性を考慮したデータ処理を行うことで，安定した制御環境を構築している．アルゴリズムは，サンプリングと移動平均化，範囲分割，パラメータの抽出と出力の3段階に分けられる．サンプリングと移動平均化では，SAMPLE\_INTERVALごとにBPMおよび音量変更用の可変抵抗器の電圧値を，配列bpmSamples・volSamplesにsampleSize分だけ読み取り保存する．このとき，配列の各要素は書き込み位置（bpmReadIndex・volReadIndex）が指す最も古い値から順に上書きされ，上書きの直前に該当要素の値を合計bpmTotal・volTotalからあらかじめ減算し，新たに読み取った値を加算することで，配列全体を読み直すことなく常に最新の合計値を保持する（移動合計）．配列が一巡し全要素が新しい値に更新された時点（bpmBufferFull・volBufferFullがtrueになった時点）以降，この合計値をsampleSizeで除算した移動平均値をaverageBpmVal・averageVolValに格納する．範囲分割では，移動平均化された値をSTEP\_BOUNDARIES[]で定義した4つの閾値と比較し，1〜5の段階番号をcurrentBpmStep・currentVolStepに格納する．パラメータの抽出と出力では，算出した段階が直前の段階（prevBpmStep・prevVolStep）から変化した場合にのみ，公開フラグbpmFrag・volFragを立てる．外部からはgetBpmStep()・getVolStep()を介して現在の段階を取得し，前述の加速度センサ制御における棒振り動作の確定時にこれらのフラグを参照して各楽器デバイスへの送信を行う．なお，音量用可変抵抗器は配線の都合上，回した方向とセンサ値の増減が逆になるため，getVolStep()は6-currentVolStepを返すことで表示上の段階を反転させる．update関数およびbpmUpdatePotentiometers関数の処理の流れを図\ref{fig:flow_pot}に示す．移動合計の差し替えによってバッファ全体の再走査を避けている点，およびバッファが一巡するまで段階判定を行わない点が特徴である．BPM・音量読み取り機能で使用する変数の仕様を表\ref{table:siki_pot_var}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figs/flow_pot.pdf}
+    \caption{PotManagerクラスのupdate関数（BPM系統）の処理フローチャート}
+    \label{fig:flow_pot}
+\end{figure}
+\FloatBarrier
+
 
 \begin{center}
 \begin{longtable}{p{3.9cm}p{3.4cm}p{6.2cm}}
@@ -632,7 +668,7 @@ void SyncManager::begin(const char ssid[], const char pass[]) {
 }
 \end{lstlisting}
 
-次に，sendVolume関数について説明する．この関数は，音量情報（ヘッダ'V'）を全楽器デバイスへ送信する．音量用可変抵抗器は配線の都合上，回した方向とセンサ値の増減が逆になるため，PotManagerクラスのgetVolStep関数と同様に，送信直前に6 - stepNumberという変換を行うことで表示・送信上の段階を反転させている．sendVolume関数をコード\ref{lst:sync_sendvolume}に示す．
+次に，sendVolume関数について説明する．この関数は，音量情報（ヘッダ'V'）を全楽器デバイスへ送信する．この関数の引数には，PotManagerクラスのgetVolStep関数によって既に反転済みの段階番号（6 - currentVolStep）が渡されるため，送信直前に再度6 - stepNumberの変換を適用すると，2回の反転が打ち消し合い，ペイロードには反転前のセンサ値由来の段階番号が格納される．すなわち，受信側の楽器デバイスにはセンサ値の段階がそのまま送信され，表示上の反転はgetVolStep関数を参照する指揮デバイス内でのみ適用される．sendVolume関数をコード\ref{lst:sync_sendvolume}に示す．
 
 \begin{lstlisting}[caption={SyncManager::sendVolume関数}, label={lst:sync_sendvolume}]
 void SyncManager::sendVolume(uint8_t stepNumber){
@@ -642,7 +678,16 @@ void SyncManager::sendVolume(uint8_t stepNumber){
 }
 \end{lstlisting}
 
-最後に，packetRoundRobin関数について説明する．この関数は，sendStart・sendBPM・sendVolume・sendEndの各関数から共通して呼び出される送信処理であり，指定したパケットを全対象（targets）へ1回ずつ送信する動作を1周とし，\SI{20}{ms}の間隔を空けながら3周繰り返すことで，UDP通信のパケットロスに対する耐性を高めている．対象ごとに3連射してから次の対象へ進む方式ではなく，1周ごとに全対象へ送ってから次の周に進む方式を採用しているのは，前者では後方の対象ほど到達が遅れ，機器間で無視できない時間差が生じるためである．packetRoundRobin関数をコード\ref{lst:sync_roundrobin}に示す．
+最後に，packetRoundRobin関数について説明する．この関数は，sendStart・sendBPM・sendVolume・sendEndの各関数から共通して呼び出される送信処理であり，指定したパケットを全対象（targets）へ1回ずつ送信する動作を1周とし，\SI{20}{ms}の間隔を空けながら3周繰り返すことで，UDP通信のパケットロスに対する耐性を高めている．対象ごとに3連射してから次の対象へ進む方式ではなく，1周ごとに全対象へ送ってから次の周に進む方式を採用しているのは，前者では後方の対象ほど到達が遅れ，機器間で無視できない時間差が生じるためである．packetRoundRobin関数の処理の流れを図\ref{fig:flow_roundrobin}に示す．また，packetRoundRobin関数をコード\ref{lst:sync_roundrobin}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.6\textwidth]{figs/flow_roundrobin.pdf}
+    \caption{packetRoundRobin関数の処理フローチャート}
+    \label{fig:flow_roundrobin}
+\end{figure}
+\FloatBarrier
+
 
 \begin{lstlisting}[caption={SyncManager::packetRoundRobin関数}, label={lst:sync_roundrobin}]
 void SyncManager::packetRoundRobin(const uint8_t packet[], uint8_t b, const IPAddress targets[], uint8_t targetCount){
@@ -1101,7 +1146,16 @@ void MotorControl::stopRamp() {
 }
 \end{lstlisting}
 
-次に，changeBPM関数について説明する．この関数は演奏中にBPMの段階が変更された際に呼び出され，stepToNumber関数とupdateStatus関数によって新しい段階の値を求めたうえで，startRamp関数のような段階的な加減速を行わず，目標のpwmValueを即座に出力する．演奏を止めずにテンポを追従させるため，段階的な加減速は行わない仕様としている．changeBPM関数をコード\ref{lst:motor_changebpm}に示す．
+次に，changeBPM関数について説明する．この関数は演奏中にBPMの段階が変更された際に呼び出され，stepToNumber関数とupdateStatus関数によって新しい段階の値を求めたうえで，startRamp関数のような段階的な加減速を行わず，目標のpwmValueを即座に出力する．演奏を止めずにテンポを追従させるため，段階的な加減速は行わない仕様としている．changeBPM関数をコード\ref{lst:motor_changebpm}に示す．また，startRamp・changeBPM・stopRampの3関数の処理の流れを図\ref{fig:flow_motor}に示す．演奏の開始・終了時は段階的な加減速（ランプ制御）を行い，演奏中のBPM変更時のみ即座に出力を切り替えるという役割の違いが対比できる．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figs/flow_motor.pdf}
+    \caption{MotorControlクラスのstartRamp関数（左）・changeBPM関数（中央）・stopRamp関数（右）の処理フローチャート}
+    \label{fig:flow_motor}
+\end{figure}
+\FloatBarrier
+
 
 \begin{lstlisting}[caption={MotorControl::changeBPM関数}, label={lst:motor_changebpm}]
 void MotorControl::changeBPM(uint8_t stepNumber) {
@@ -1219,7 +1273,16 @@ void displaySetup() {
 }
 \end{lstlisting}
 
-次に，displayBPM関数について説明する．この関数は，loop関数から受け取ったBPM段階番号（1〜5）をbpmTable[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．displayBPM関数をコード\ref{lst:disp_displaybpm}に示す．
+次に，displayBPM関数について説明する．この関数は，loop関数から受け取ったBPM段階番号（1〜5）をbpmTable[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．displayBPM関数の処理の流れを図\ref{fig:flow_displaybpm}に示す．また，displayBPM関数をコード\ref{lst:disp_displaybpm}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figs/flow_displaybpm.pdf}
+    \caption{displayBPM関数の処理フローチャート}
+    \label{fig:flow_displaybpm}
+\end{figure}
+\FloatBarrier
+
 
 \begin{lstlisting}[caption={displayBPM関数}, label={lst:disp_displaybpm}]
 void displayBPM(uint8_t stepNumber) {
@@ -1384,7 +1447,16 @@ bool update(int cdsValue, unsigned long nowMs, unsigned long &intervalOut) {
 }
 \end{lstlisting}
 
-最後に，detectLight関数について説明する．この関数は，暗状態の推定値であるbaselineを継続的に追従させながら，値がbaseline+CDS\_MIN\_DELTA相当のonThresholdを上回った瞬間をパルスの立ち上がりとして検知する状態機械である．起動直後はstartupCalibratedフラグがfalseの間，CDS\_STARTUP\_CALIBRATION\_MS（1秒）をかけて最も暗い値をbaselineの初期値として探索し，誤検知を防止する．また，キャリブレーション完了時点でレーザーが既に照射状態であった場合は，waitingForReleaseフラグによって一度非照射状態に戻るまで検知を保留する．パルスの立ち下がり（照射終了）を検知するとregisterPeak関数を呼び出し，しきい値を実測値に基づいて更新する．detectLight関数をコード\ref{lst:laser_detectlight}に示す．
+最後に，detectLight関数について説明する．この関数は，暗状態の推定値であるbaselineを継続的に追従させながら，値がbaseline+CDS\_MIN\_DELTA相当のonThresholdを上回った瞬間をパルスの立ち上がりとして検知する状態機械である．起動直後はstartupCalibratedフラグがfalseの間，CDS\_STARTUP\_CALIBRATION\_MS（1秒）をかけて最も暗い値をbaselineの初期値として探索し，誤検知を防止する．また，キャリブレーション完了時点でレーザーが既に照射状態であった場合は，waitingForReleaseフラグによって一度非照射状態に戻るまで検知を保留する．パルスの立ち下がり（照射終了）を検知するとregisterPeak関数を呼び出し，しきい値を実測値に基づいて更新する．detectLight関数の処理の流れを図\ref{fig:flow_detectlight}に示す．起動時較正・照射解除待ち・baseline追従・立ち上がり／立ち下がり判定という状態機械の分岐構造を表している．また，detectLight関数をコード\ref{lst:laser_detectlight}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figs/flow_detectlight.pdf}
+    \caption{detectLight関数の処理フローチャート}
+    \label{fig:flow_detectlight}
+\end{figure}
+\FloatBarrier
+
 
 \begin{lstlisting}[caption={LaserDetector::detectLight関数}, label={lst:laser_detectlight}]
 bool detectLight(int v, unsigned long nowMs) {
