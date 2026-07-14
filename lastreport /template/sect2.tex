@@ -118,7 +118,8 @@
 まず，指揮デバイス全体の内部動作を明確にするため，シーケンス図を図\ref{fig:jou_siki}に示す．
 ユーザが指揮デバイスを上下に振ると加速度センサが動作を検知しArduinoに送信される．この時，値が閾値を超過した場合，
 中継機デバイスへ演奏情報が無線送信され，中継機デバイスはこの情報を基に回転する．
-また，ボタンを押下した時，各楽器デバイスへ楽曲の初期BPMおよび音量情報が送信されることで演奏が開始される．
+
+% また，ボタンを押下した時，各楽器デバイスへ楽曲の初期BPMおよび音量情報が送信されることで演奏が開始される．
 
 \begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
         \centering % 中央揃え
@@ -144,7 +145,10 @@
     \end{tabular}
 \end{table}
 
-Controller\_simultaneous.inoのloop関数は，ボタン判定を行うbutton関数，可変抵抗器を処理するPotManager，加速度センサを処理するAccManagerを毎ループ順に呼び出す構成となっている．loop関数の処理の流れを図\ref{fig:flow_siki}に示す．また，loop関数をコード\ref{lst:siki_loop}に示す．プログラム全文は付録に示す．
+\iffalse
+Controller\_simultaneous.inoのloop関数の処理の流れを図\ref{fig:flow_siki}に示す．この関数は，ボタン判定を行うbutton関数，可変抵抗器を処理するPotManager，加速度センサを処理するAccManagerを毎ループ順に呼び出す構成となっている．
+% また，loop関数をコード\ref{lst:siki_loop}に示す．プログラム全文は付録に示す．
+
 
 \begin{figure}[htbp]
     \centering
@@ -153,17 +157,26 @@ Controller\_simultaneous.inoのloop関数は，ボタン判定を行うbutton関
     \label{fig:flow_siki}
 \end{figure}
 
-\begin{lstlisting}[caption={Controller\_simultaneous.inoのloop関数}, label={lst:siki_loop}]
-void loop() {
-    button();
-    pot.update();
-    acc.update(sync, pot);
-}
-\end{lstlisting}
+
+
+% \begin{lstlisting}[caption={Controller\_simultaneous.inoのloop関数}, label={lst:siki_loop}]
+% void loop() {
+%     button();
+%     pot.update();
+%     acc.update(sync, pot);
+% }
+% \end{lstlisting}
+
+\fi
 
 ここからは，ボタン入力の判定，加速度センサの制御，可変抵抗器を用いたBPM・音量読み取り機能の順に，使用する変数・関数の仕様と処理内容について説明する．
 
-まず，指揮デバイスにおけるボタン入力の判定処理について説明する．ボタンの誤判定を防ぐため，プルアップ抵抗を用いた回路を構成しており，ボタンが押されていない状態ではデジタルピンに\SI{5}{V}が印加され，押下時には回路がGNDに短絡されることでピンの電位がLOWへ遷移する．指揮デバイスのプログラムでは，このデジタルピンの電圧状態の変化を常時監視することでボタンの押下を判定する．さらに，チャタリングによる誤判定や冗長パケットによる誤作動を防止するため，押下検知後に一定時間の待機処理を設けるとともに，演奏状態管理フラグ（isButtonPlaying）を用いたトグル制御を導入している．これにより，同一の物理ボタンのみで演奏の開始と終了を交互に切り替えることが可能となる．ボタン入力の判定で使用する変数の仕様を表\ref{table:siki_button_var}に示す．
+まず，指揮デバイスにおけるボタン入力の判定処理について説明する．
+ボタンの誤判定を防ぐため，プルアップ抵抗を用いた回路を構成しており，ボタンが押されていない状態ではデジタルピンに\SI{5}{V}が印加され，押下時には回路がGNDに短絡されることでピンの電位がLOWへ遷移する．
+指揮デバイスのプログラムでは，このデジタルピンの電圧状態の変化を常時監視することでボタンの押下を判定する．さらに，チャタリングによる誤判定や冗長パケットによる誤作動を防止するため，押下検知後に一定時間の待機処理を設けるとともに，演奏状態管理フラグを用いたトグル制御を導入している．これにより，同一の物理ボタンのみで演奏の開始と終了を交互に切り替えることが可能となる．
+
+\iffalse
+ボタン入力の判定で使用する変数の仕様を表\ref{table:siki_button_var}に示す．
 
 \begin{table}[H]
     \caption{ボタン入力の判定で使用する変数の仕様一覧}
@@ -183,8 +196,11 @@ void loop() {
     \hline
     \end{tabular}
 \end{table}
+\fi
 
-続いて，ボタン入力の判定で使用する関数の仕様を表\ref{table:siki_button_func}に示す．
+\iffalse
+続いて，ボタン入力の判定で使用する関数buttonについて説明する．この関数は，各楽器デバイス，中継機デバイスへ演奏開始・終了信号を送信する．送信後はチャタリング防止のため，\SI{300}{ms}待機する．
+表\ref{table:siki_button_func}に示す．
 
 \begin{table}[H]
     \caption{ボタン入力の判定で使用する関数の仕様一覧}
@@ -199,49 +215,70 @@ void loop() {
     \end{tabular}
 \end{table}
 
-button関数はこの1関数のみで構成されるため，以下では処理の流れに沿って実際のコードを2箇所に分けて説明する．まず，立下りエッジの検知部分について説明する．switch\_statusに現在のピン状態を読み込み，前回値before\_switch\_statusと比較することで，HIGH→LOWへ変化した瞬間（ボタンが押された瞬間）のみを検知する．該当部分をコード\ref{lst:btn_edge}に示す．
+\fi
 
-\begin{lstlisting}[caption={button関数（立下りエッジの検知部分）}, label={lst:btn_edge}]
-    switch_status = digitalRead(input_PIN);
-    if (switch_status == 0 && before_switch_status == 1) {
-        ...
-    }
-    before_switch_status = switch_status;
-\end{lstlisting}
 
-次に，立下りを検知した際の状態トグルと送信処理について説明する．isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出して演奏を終了し，false（停止中）であれば現在のBPM段階（pot.getBpmStep()）を引数としてsync.sendStart()を呼び出して演奏を開始する．いずれの場合もisButtonPlayingの値を反転させたうえで，delay(300)により\SI{300}{ms}待機することでチャタリングを防止する．button関数全体の処理の流れを図\ref{fig:flow_button}に示す．立下りの検知時のみ状態のトグルと送信を行い，それ以外は前回状態の更新のみで終了する．また，該当部分をコード\ref{lst:btn_send}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.72\textwidth]{figs/flow_button.pdf}
-    \caption{button関数の処理フローチャート}
-    \label{fig:flow_button}
-\end{figure}
+\iffalse
+
+以下では，button関数の処理の流れを2段階に分けて説明する．
+まず，立下りエッジの検知について説明する．switch\_statusに現在のピン状態を読み込み，前回値before\_switch\_statusと比較することで，HIGH→LOWへ変化した瞬間（ボタンが押された瞬間）のみを検知する．
+% 該当部分をコード\ref{lst:btn_edge}に示す．
+
+% \begin{lstlisting}[caption={button関数（立下りエッジの検知部分）}, label={lst:btn_edge}]
+%     switch_status = digitalRead(input_PIN);
+%     if (switch_status == 0 && before_switch_status == 1) {
+%         ...
+%     }
+%     before_switch_status = switch_status;
+% \end{lstlisting}
+
+
+
+次に，立下りを検知した際の状態トグルと送信処理について説明する．
+isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出して演奏を終了し，false（停止中）であれば現在のBPM段階（pot.getBpmStep()）を引数としてsync.sendStart()を呼び出して演奏を開始する．いずれの場合もisButtonPlayingの値を反転させたうえで，delay(300)により\SI{300}{ms}待機することでチャタリングを防止する．立下りの検知時のみ状態のトグルと送信を行い，それ以外は前回状態の更新のみで終了する．
+% button関数全体の処理の流れを図\ref{fig:flow_button}に示す．
+% また，該当部分をコード\ref{lst:btn_send}に示す．
+
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.72\textwidth]{figs/flow_button.pdf}
+%     \caption{button関数の処理フローチャート}
+%     \label{fig:flow_button}
+% \end{figure}
 \FloatBarrier
 
 
-\begin{lstlisting}[caption={button関数（状態トグルと送信処理部分）}, label={lst:btn_send}]
-    if (isButtonPlaying) {
-        sync.sendEnd();
-        isButtonPlaying = false;
-    } else {
-        uint8_t step = pot.getBpmStep();
-        sync.sendStart(step);
-        isButtonPlaying = true;
-    }
-    delay(300); // チャタリング防止
-\end{lstlisting}
+% \begin{lstlisting}[caption={button関数（状態トグルと送信処理部分）}, label={lst:btn_send}]
+%     if (isButtonPlaying) {
+%         sync.sendEnd();
+%         isButtonPlaying = false;
+%     } else {
+%         uint8_t step = pot.getBpmStep();
+%         sync.sendStart(step);
+%         isButtonPlaying = true;
+%     }
+%     delay(300); // チャタリング防止
+% \end{lstlisting}
 
 なお，sendStart・sendEndの内部では，SyncManagerクラスが複数台のデバイスへラウンドロビン方式による冗長送信を行っている．この通信処理の詳細な実装は付録に示すプログラム全文を参照されたい．
+\fi
 
-次に，指揮デバイスにおける加速度センサの制御処理について説明する．指揮デバイスは，加速度センサを用いてユーザが指揮棒を振ったことを検知し，演奏情報の更新を行う．センサ値の急激な変化を読み取ることで動作を判定し，誤検知防止機能を設けることで安定した動作を実現している．処理の流れは，差分算出と判定，多重検知の防止，状態の反転，事後処理の4段階に大別される．まず差分算出と判定では，現在の合成加速度currentAccValと前回値lastAccValとの差の絶対値を求める．この差分が検知閾値accThresholdを超過し，かつ前回検知からshakeInterval以上の時間が経過している場合に，指揮棒を振ったと判定する．多重検知の防止では，一度振る動作を検知するとlastDetectTimeを現在時刻に更新し，以降shakeIntervalが経過するまでは加速度の変化を無視することで，一連の動作による複数回の誤検知を防止する．状態の反転では，振る動作を検知するたびにisStartedのbool値を反転させる．事後処理として，次回の判定に備えてcurrentAccValの値をlastAccValへ代入し，前回のサンプリング時刻を更新する．また，振る動作の確定時には，可変抵抗器側で設定値の変更を検知したフラグbpmFragまたはvolFrag（\ref{sec:pot_detail}項で説明する）が有効になっている場合，SyncManagerクラスを介してその情報の送信指示を行う．さらに，I2C通信の異常を検知した場合には自動復旧を行う機能を備えている．update関数の処理の流れを図\ref{fig:flow_acc_update}に示す．サンプリング周期の管理，差分判定，多重検知防止，送信処理という本文で述べた4段階が，1回の呼び出しの中で順に実行される．加速度センサの制御で使用する変数の仕様を表\ref{table:siki_acc_var}に示す．
+次に，指揮デバイスにおける加速度センサの制御処理について説明する．指揮デバイスは，加速度センサを用いてユーザが指揮デバイスを振ったことを検知し，演奏情報の更新を行う．
+センサ値の急激な変化を読み取ることで動作を判定し，また誤検知防止機能を設けることで安定した動作を実現している．
+処理の流れは，差分算出と判定，多重検知の防止，状態の反転，事後処理の4段階に分類される．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.72\textwidth]{figs/flow_acc_update.pdf}
-    \caption{AccManagerクラスのupdate関数の処理フローチャート}
-    \label{fig:flow_acc_update}
-\end{figure}
+\iffalse
+まず差分算出と判定では，現在の合成加速度currentAccValと前回値lastAccValとの差の絶対値を求める．この差分が検知閾値accThresholdを超過し，かつ前回検知からshakeInterval以上の時間が経過している場合に，指揮棒を振ったと判定する．多重検知の防止では，一度振る動作を検知するとlastDetectTimeを現在時刻に更新し，以降shakeIntervalが経過するまでは加速度の変化を無視することで，一連の動作による複数回の誤検知を防止する．状態の反転では，振る動作を検知するたびにisStartedのbool値を反転させる．事後処理として，次回の判定に備えてcurrentAccValの値をlastAccValへ代入し，前回のサンプリング時刻を更新する．また，振る動作の確定時には，可変抵抗器側で設定値の変更を検知したフラグbpmFragまたはvolFrag（\ref{sec:pot_detail}項で説明する）が有効になっている場合，SyncManagerクラスを介してその情報の送信指示を行う．さらに，I2C通信の異常を検知した場合には自動復旧を行う機能を備えている．サンプリング周期の管理，差分判定，多重検知防止，送信処理という本文で述べた4段階が，1回の呼び出しの中で順に実行される．
+% update関数の処理の流れを図\ref{fig:flow_acc_update}に示す．
+加速度センサの制御で使用する変数の仕様を表\ref{table:siki_acc_var}に示す．
+
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.72\textwidth]{figs/flow_acc_update.pdf}
+%     \caption{AccManagerクラスのupdate関数の処理フローチャート}
+%     \label{fig:flow_acc_update}
+% \end{figure}
 \FloatBarrier
 
 
@@ -282,7 +319,14 @@ button関数はこの1関数のみで構成されるため，以下では処理�
     \end{tabular}
 \end{table}
 
-続いて，加速度センサ制御（AccManagerクラス）で使用する関数の仕様を表\ref{table:siki_acc_func}に示す．
+\fi
+
+
+% 続いて，加速度センサ制御（AccManagerクラス）で使用する関数の仕様を説明する．
+
+
+\iffalse
+表\ref{table:siki_acc_func}に示す．
 
 \begin{table}[H]
     \caption{加速度センサ制御（AccManagerクラス）で使用する関数の仕様一覧}
@@ -305,149 +349,170 @@ button関数はこの1関数のみで構成されるため，以下では処理�
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:siki_acc_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，setupADXL345関数について説明する．この関数は，Wire.beginによるI2C通信の開始後，ADXL345のPOWER\_CTLレジスタにMeasureビットを書き込むことでセンサを測定モードへ移行させ，DATA\_FORMATレジスタを初期値のまま設定する．setupADXL345関数をコード\ref{lst:acc_setup}に示す．
+\fi
 
-\begin{lstlisting}[caption={AccManager::setupADXL345関数}, label={lst:acc_setup}]
-void AccManager::setupADXL345() {
-  Wire.begin();
 
-  Wire.beginTransmission(ADXL345_ADDR);
-  Wire.write(REG_POWER_CTL);
-  Wire.write(0x08); // Measure bit ON
-  Wire.endTransmission();
+\iffalse
+以下では，表\ref{table:siki_acc_func}に示した順に，各関数の処理内容を説明する．
+はじめに，setupADXL345関数について説明する．この関数は，Wire.beginによるI2C通信の開始後，ADXL345のPOWER\_CTLレジスタにMeasureビットを書き込むことでセンサを測定モードへ移行させ，DATA\_FORMATレジスタを初期値のまま設定する．
+% setupADXL345関数をコード\ref{lst:acc_setup}に示す．
 
-  Wire.beginTransmission(ADXL345_ADDR);
-  Wire.write(REG_DATA_FORMAT);
-  Wire.write(0x00);
-  Wire.endTransmission();
+% \begin{lstlisting}[caption={AccManager::setupADXL345関数}, label={lst:acc_setup}]
+% void AccManager::setupADXL345() {
+%   Wire.begin();
+% 
+%   Wire.beginTransmission(ADXL345_ADDR);
+%   Wire.write(REG_POWER_CTL);
+%   Wire.write(0x08); // Measure bit ON
+%   Wire.endTransmission();
+% 
+%   Wire.beginTransmission(ADXL345_ADDR);
+%   Wire.write(REG_DATA_FORMAT);
+%   Wire.write(0x00);
+%   Wire.endTransmission();
+% 
+%   lastAccVal = readAccMagnitude();
+% }
+% \end{lstlisting}
 
-  lastAccVal = readAccMagnitude();
-}
-\end{lstlisting}
+次に，加速度の実測値を取得するreadAccMagnitude関数について説明する．この関数は，DATAX0レジスタから連続する6バイト（X, Y, Z軸それぞれ2バイトの符号付き整数）をrequestFromで読み出し，3軸のベクトル合成値（合成加速度）を平方根の計算により求めて返り値とする．
+% readAccMagnitude関数をコード\ref{lst:acc_read}に示す．
 
-次に，加速度の実測値を取得するreadAccMagnitude関数について説明する．この関数は，DATAX0レジスタから連続する6バイト（X, Y, Z軸それぞれ2バイトの符号付き整数）をrequestFromで読み出し，3軸のベクトル合成値（合成加速度）を平方根の計算により求めて返り値とする．readAccMagnitude関数をコード\ref{lst:acc_read}に示す．
+% \begin{lstlisting}[caption={AccManager::readAccMagnitude関数}, label={lst:acc_read}]
+% float AccManager::readAccMagnitude() {
+%   Wire.beginTransmission(ADXL345_ADDR);
+%   Wire.write(REG_DATAX0);
+%   if (Wire.endTransmission(false) != 0) {
+%     recoverI2C();
+%     return lastAccVal;
+%   }
+% 
+%   uint8_t n = Wire.requestFrom(ADXL345_ADDR, (uint8_t)6, (uint8_t)true);
+%   if (n < 6) {
+%     recoverI2C();
+%     return lastAccVal;
+%   }
+% 
+%   int16_t rawX = (int16_t)((Wire.read()) | (Wire.read() << 8));
+%   int16_t rawY = (int16_t)((Wire.read()) | (Wire.read() << 8));
+%   int16_t rawZ = (int16_t)((Wire.read()) | (Wire.read() << 8));
+% 
+%   return sqrtf((float)rawX*rawX + (float)rawY*rawY + (float)rawZ*rawZ);
+% }
+% \end{lstlisting}
 
-\begin{lstlisting}[caption={AccManager::readAccMagnitude関数}, label={lst:acc_read}]
-float AccManager::readAccMagnitude() {
-  Wire.beginTransmission(ADXL345_ADDR);
-  Wire.write(REG_DATAX0);
-  if (Wire.endTransmission(false) != 0) {
-    recoverI2C();
-    return lastAccVal;
-  }
+ここで，Wire.endTransmission(false)がエラーを返した場合，またはrequestFromで6バイト読み出せなかった場合には，I2Cバスがロックアップ（スレーブがSDA線を握ったまま停止する現象）していると判断し，recoverI2C関数を呼び出したうえで前回値lastAccValを返すことで，誤ったシェイク検知（ニセshake）を防いでいる．続いて，recoverI2C関数について説明する．この関数は，SCL線を9回手動でトグルさせてSDA線の握りを解放したうえでSTOP条件を生成し，Wireを再初期化してADXL345を再設定することでバスを復旧させる．lastRecoverMsは，この復旧処理およびログ出力が短時間に連続して実行されることを防ぐスロットル用の時刻管理に用いられる．I2C通信の異常はアドレス送信時と読み出し時の2箇所で検出され，いずれの場合も復旧処理を実行したうえで直前値を返す．
+% readAccMagnitude関数の処理の流れを図\ref{fig:flow_acc_read}に，recoverI2C関数の処理の流れを図\ref{fig:flow_recoveri2c}に示す．
+% recoverI2C関数をコード\ref{lst:acc_recover}に示す．
 
-  uint8_t n = Wire.requestFrom(ADXL345_ADDR, (uint8_t)6, (uint8_t)true);
-  if (n < 6) {
-    recoverI2C();
-    return lastAccVal;
-  }
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.72\textwidth]{figs/flow_acc_read.pdf}
+%     \caption{readAccMagnitude関数の処理フローチャート}
+%     \label{fig:flow_acc_read}
+% \end{figure}
 
-  int16_t rawX = (int16_t)((Wire.read()) | (Wire.read() << 8));
-  int16_t rawY = (int16_t)((Wire.read()) | (Wire.read() << 8));
-  int16_t rawZ = (int16_t)((Wire.read()) | (Wire.read() << 8));
-
-  return sqrtf((float)rawX*rawX + (float)rawY*rawY + (float)rawZ*rawZ);
-}
-\end{lstlisting}
-
-ここで，Wire.endTransmission(false)がエラーを返した場合，またはrequestFromで6バイト読み出せなかった場合には，I2Cバスがロックアップ（スレーブがSDA線を握ったまま停止する現象）していると判断し，recoverI2C関数を呼び出したうえで前回値lastAccValを返すことで，誤ったシェイク検知（ニセshake）を防いでいる．続いて，recoverI2C関数について説明する．この関数は，SCL線を9回手動でトグルさせてSDA線の握りを解放したうえでSTOP条件を生成し，Wireを再初期化してADXL345を再設定することでバスを復旧させる．lastRecoverMsは，この復旧処理およびログ出力が短時間に連続して実行されることを防ぐスロットル用の時刻管理に用いられる．readAccMagnitude関数の処理の流れを図\ref{fig:flow_acc_read}に，recoverI2C関数の処理の流れを図\ref{fig:flow_recoveri2c}に示す．I2C通信の異常はアドレス送信時と読み出し時の2箇所で検出され，いずれの場合も復旧処理を実行したうえで直前値を返す．recoverI2C関数をコード\ref{lst:acc_recover}に示す．
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.72\textwidth]{figs/flow_acc_read.pdf}
-    \caption{readAccMagnitude関数の処理フローチャート}
-    \label{fig:flow_acc_read}
-\end{figure}
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.62\textwidth]{figs/flow_recoveri2c.pdf}
-    \caption{recoverI2C関数の処理フローチャート}
-    \label{fig:flow_recoveri2c}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.62\textwidth]{figs/flow_recoveri2c.pdf}
+%     \caption{recoverI2C関数の処理フローチャート}
+%     \label{fig:flow_recoveri2c}
+% \end{figure}
 \FloatBarrier
 
 
-\begin{lstlisting}[caption={AccManager::recoverI2C関数}, label={lst:acc_recover}]
-void AccManager::recoverI2C() {
-  unsigned long now = millis();
-  if (now - lastRecoverMs >= 1000) {   // ログのスロットル
-    lastRecoverMs = now;
-  }
+% \begin{lstlisting}[caption={AccManager::recoverI2C関数}, label={lst:acc_recover}]
+% void AccManager::recoverI2C() {
+%   unsigned long now = millis();
+%   if (now - lastRecoverMs >= 1000) {   // ログのスロットル
+%     lastRecoverMs = now;
+%   }
+% 
+%   Wire.end();
+% 
+%   // バスクリア: SCLを9クロック叩いて握られたSDAを解放
+%   pinMode(SDA, INPUT_PULLUP);
+%   pinMode(SCL, OUTPUT);
+%   for (int i = 0; i < 9; i++) {
+%     digitalWrite(SCL, LOW);  delayMicroseconds(5);
+%     digitalWrite(SCL, HIGH); delayMicroseconds(5);
+%   }
+%   // STOP条件 (SDA: LOW→HIGH while SCL HIGH)
+%   pinMode(SDA, OUTPUT);
+%   digitalWrite(SDA, LOW);  delayMicroseconds(5);
+%   digitalWrite(SCL, HIGH); delayMicroseconds(5);
+%   digitalWrite(SDA, HIGH); delayMicroseconds(5);
+% 
+%   // Wire再初期化＆センサ再設定
+%   Wire.begin();
+%   Wire.beginTransmission(ADXL345_ADDR);
+%   Wire.write(REG_POWER_CTL);   Wire.write(0x08);
+%   Wire.endTransmission();
+%   Wire.beginTransmission(ADXL345_ADDR);
+%   Wire.write(REG_DATA_FORMAT); Wire.write(0x00);
+%   Wire.endTransmission();
+% }
+% \end{lstlisting}
 
-  Wire.end();
+次に，update関数について説明する．この関数はloop内で毎回呼び出され，ACC\_SAMPLE\_INTERVAL（\SI{20}{ms}）ごとに加速度の実測値を取得し，前回値との差diffを求める．diffが検知閾値accThresholdを超過し，かつ前回検知からshakeInterval（\SI{750}{ms}，多重検知防止用）が経過している場合にのみ，振り動作として検知しupdateShakedInfo関数を呼び出す．
+% update関数をコード\ref{lst:acc_update}に示す．
 
-  // バスクリア: SCLを9クロック叩いて握られたSDAを解放
-  pinMode(SDA, INPUT_PULLUP);
-  pinMode(SCL, OUTPUT);
-  for (int i = 0; i < 9; i++) {
-    digitalWrite(SCL, LOW);  delayMicroseconds(5);
-    digitalWrite(SCL, HIGH); delayMicroseconds(5);
-  }
-  // STOP条件 (SDA: LOW→HIGH while SCL HIGH)
-  pinMode(SDA, OUTPUT);
-  digitalWrite(SDA, LOW);  delayMicroseconds(5);
-  digitalWrite(SCL, HIGH); delayMicroseconds(5);
-  digitalWrite(SDA, HIGH); delayMicroseconds(5);
+% \begin{lstlisting}[caption={AccManager::update関数}, label={lst:acc_update}]
+% void AccManager::update(SyncManager& sync, PotManager& pot) {
+%   unsigned long now = millis();
+%   if (now - lastSampleTime >= ACC_SAMPLE_INTERVAL) {
+%     lastSampleTime = now;
+%     currentAccVal = readAccMagnitude();
+%     float diff = fabsf(currentAccVal - lastAccVal);
+% 
+%     bool overThreshold  = (diff > accThreshold);
+%     bool intervalPassed = ((now - lastDetectTime) >= shakeInterval);
+% 
+%     if (overThreshold && intervalPassed) {
+%       lastDetectTime = now;
+%       isStarted = !isStarted;
+%       updateShakedInfo(sync, pot);
+%     }
+%     lastAccVal = currentAccVal;
+%   }
+% }
+% \end{lstlisting}
 
-  // Wire再初期化＆センサ再設定
-  Wire.begin();
-  Wire.beginTransmission(ADXL345_ADDR);
-  Wire.write(REG_POWER_CTL);   Wire.write(0x08);
-  Wire.endTransmission();
-  Wire.beginTransmission(ADXL345_ADDR);
-  Wire.write(REG_DATA_FORMAT); Wire.write(0x00);
-  Wire.endTransmission();
-}
-\end{lstlisting}
+最後に，updateShakedInfo関数について説明する．この関数は，振り動作の検知をトリガとして，PotManagerが保持するbpmFrag・volFragフラグ（可変抵抗器の値が変化した場合に立つフラグ．\ref{sec:pot_detail}項で説明する）を確認し，フラグが立っている項目についてのみSyncManager経由でBPMまたは音量の変更情報を送信する．すなわち，実際に無線送信が発生するのは，可変抵抗器を操作した後にデバイスを振った場合に限られる．
+% updateShakedInfo関数をコード\ref{lst:acc_shaked}に示す．
 
-次に，update関数について説明する．この関数はloop内で毎回呼び出され，ACC\_SAMPLE\_INTERVAL（\SI{20}{ms}）ごとに加速度の実測値を取得し，前回値との差diffを求める．diffが検知閾値accThresholdを超過し，かつ前回検知からshakeInterval（\SI{750}{ms}，多重検知防止用）が経過している場合にのみ，振り動作として検知しupdateShakedInfo関数を呼び出す．update関数をコード\ref{lst:acc_update}に示す．
+% \begin{lstlisting}[caption={AccManager::updateShakedInfo関数}, label={lst:acc_shaked}]
+% void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
+%   if (pot.bpmFrag) {
+%     sync.sendBPM(pot.getBpmStep());
+%     pot.bpmFrag = false;
+%   }
+%   if (pot.volFrag) {
+%     sync.sendVolume(pot.getVolStep());
+%     pot.volFrag = false;
+%   }
+% }
+% \end{lstlisting}
 
-\begin{lstlisting}[caption={AccManager::update関数}, label={lst:acc_update}]
-void AccManager::update(SyncManager& sync, PotManager& pot) {
-  unsigned long now = millis();
-  if (now - lastSampleTime >= ACC_SAMPLE_INTERVAL) {
-    lastSampleTime = now;
-    currentAccVal = readAccMagnitude();
-    float diff = fabsf(currentAccVal - lastAccVal);
+\fi
 
-    bool overThreshold  = (diff > accThreshold);
-    bool intervalPassed = ((now - lastDetectTime) >= shakeInterval);
 
-    if (overThreshold && intervalPassed) {
-      lastDetectTime = now;
-      isStarted = !isStarted;
-      updateShakedInfo(sync, pot);
-    }
-    lastAccVal = currentAccVal;
-  }
-}
-\end{lstlisting}
-
-最後に，updateShakedInfo関数について説明する．この関数は，振り動作の検知をトリガとして，PotManagerが保持するbpmFrag・volFragフラグ（可変抵抗器の値が変化した場合に立つフラグ．\ref{sec:pot_detail}項で説明する）を確認し，フラグが立っている項目についてのみSyncManager経由でBPMまたは音量の変更情報を送信する．すなわち，実際に無線送信が発生するのは，可変抵抗器を操作した後にデバイスを振った場合に限られる．updateShakedInfo関数をコード\ref{lst:acc_shaked}に示す．
-
-\begin{lstlisting}[caption={AccManager::updateShakedInfo関数}, label={lst:acc_shaked}]
-void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
-  if (pot.bpmFrag) {
-    sync.sendBPM(pot.getBpmStep());
-    pot.bpmFrag = false;
-  }
-  if (pot.volFrag) {
-    sync.sendVolume(pot.getVolStep());
-    pot.volFrag = false;
-  }
-}
-\end{lstlisting}
 
 \label{sec:pot_detail}
-最後に，指揮デバイスにおける可変抵抗器を用いたBPM・音量読み取り機能について説明する．指揮デバイスでは，演奏の要素であるBPMと音量を，ユーザが操作できるように可変抵抗器を用いて5段階で調整する．アナログ入力値の特性を考慮したデータ処理を行うことで，安定した制御環境を構築している．アルゴリズムは，サンプリングと移動平均化，範囲分割，パラメータの抽出と出力の3段階に分けられる．サンプリングと移動平均化では，SAMPLE\_INTERVALごとにBPMおよび音量変更用の可変抵抗器の電圧値を，配列bpmSamples・volSamplesにsampleSize分だけ読み取り保存する．このとき，配列の各要素は書き込み位置（bpmReadIndex・volReadIndex）が指す最も古い値から順に上書きされ，上書きの直前に該当要素の値を合計bpmTotal・volTotalからあらかじめ減算し，新たに読み取った値を加算することで，配列全体を読み直すことなく常に最新の合計値を保持する（移動合計）．配列が一巡し全要素が新しい値に更新された時点（bpmBufferFull・volBufferFullがtrueになった時点）以降，この合計値をsampleSizeで除算した移動平均値をaverageBpmVal・averageVolValに格納する．範囲分割では，移動平均化された値をSTEP\_BOUNDARIES[]で定義した4つの閾値と比較し，1〜5の段階番号をcurrentBpmStep・currentVolStepに格納する．パラメータの抽出と出力では，算出した段階が直前の段階（prevBpmStep・prevVolStep）から変化した場合にのみ，公開フラグbpmFrag・volFragを立てる．外部からはgetBpmStep()・getVolStep()を介して現在の段階を取得し，前述の加速度センサ制御における棒振り動作の確定時にこれらのフラグを参照して各楽器デバイスへの送信を行う．なお，音量用可変抵抗器は配線の都合上，回した方向とセンサ値の増減が逆になるため，getVolStep()は6-currentVolStepを返すことで表示上の段階を反転させる．update関数およびbpmUpdatePotentiometers関数の処理の流れを図\ref{fig:flow_pot}に示す．移動合計の差し替えによってバッファ全体の再走査を避けている点，およびバッファが一巡するまで段階判定を行わない点が特徴である．BPM・音量読み取り機能で使用する変数の仕様を表\ref{table:siki_pot_var}に示す．
+最後に，指揮デバイスにおけるスライド式可変抵抗器を用いたBPM・音量読み取り機能について説明する．
+指揮デバイスでは，演奏の要素であるBPMと音量を，ユーザが操作できるようにスライド式可変抵抗器を用いて5段階で調整する．本プログラムは，アナログ入力値の特性を考慮したデータ処理を行うことで，安定した制御環境を構築している．アルゴリズムは，サンプリングと移動平均化，範囲分割，パラメータの抽出と出力の3段階に分けられる．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.72\textwidth]{figs/flow_pot.pdf}
-    \caption{PotManagerクラスのupdate関数（BPM系統）の処理フローチャート}
-    \label{fig:flow_pot}
-\end{figure}
+
+% サンプリングと移動平均化では，SAMPLE\_INTERVALごとにBPMおよび音量変更用の可変抵抗器の電圧値を，配列bpmSamples・volSamplesにsampleSize分だけ読み取り保存する．このとき，配列の各要素は書き込み位置（bpmReadIndex・volReadIndex）が指す最も古い値から順に上書きされ，上書きの直前に該当要素の値を合計bpmTotal・volTotalからあらかじめ減算し，新たに読み取った値を加算することで，配列全体を読み直すことなく常に最新の合計値を保持する（移動合計）．配列が一巡し全要素が新しい値に更新された時点（bpmBufferFull・volBufferFullがtrueになった時点）以降，この合計値をsampleSizeで除算した移動平均値をaverageBpmVal・averageVolValに格納する．範囲分割では，移動平均化された値をSTEP\_BOUNDARIES[]で定義した4つの閾値と比較し，1〜5の段階番号をcurrentBpmStep・currentVolStepに格納する．パラメータの抽出と出力では，算出した段階が直前の段階（prevBpmStep・prevVolStep）から変化した場合にのみ，公開フラグbpmFrag・volFragを立てる．外部からはgetBpmStep()・getVolStep()を介して現在の段階を取得し，前述の加速度センサ制御における棒振り動作の確定時にこれらのフラグを参照して各楽器デバイスへの送信を行う．なお，音量用可変抵抗器は配線の都合上，回した方向とセンサ値の増減が逆になるため，getVolStep()は6-currentVolStepを返すことで表示上の段階を反転させる．update関数およびbpmUpdatePotentiometers関数の処理の流れを図\ref{fig:flow_pot}に示す．移動合計の差し替えによってバッファ全体の再走査を避けている点，およびバッファが一巡するまで段階判定を行わない点が特徴である．BPM・音量読み取り機能で使用する変数の仕様を表\ref{table:siki_pot_var}に示す．
+
+\iffalse
+
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.72\textwidth]{figs/flow_pot.pdf}
+%     \caption{PotManagerクラスのupdate関数（BPM系統）の処理フローチャート}
+%     \label{fig:flow_pot}
+% \end{figure}
 \FloatBarrier
 
 
@@ -515,6 +580,8 @@ void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
 \end{longtable}
 \end{center}
 
+
+
 続いて，可変抵抗器読み取り機能（PotManagerクラス）で使用する関数の仕様を表\ref{table:siki_pot_func}に示す．
 
 \begin{table}[H]
@@ -540,81 +607,91 @@ void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:siki_pot_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，update関数について説明する．この関数はloop内で毎回呼び出され，SAMPLE\_INTERVAL（\SI{20}{\micro\second}）ごとにbpmUpdatePotentiometers関数とvolUpdatePotentiometers関数を呼び出す．update関数をコード\ref{lst:pot_update}に示す．
+\fi
 
-\begin{lstlisting}[caption={PotManager::update関数}, label={lst:pot_update}]
-void PotManager::update() {
-  unsigned long now = micros();
-  if (now - lastSampleTime >= SAMPLE_INTERVAL) {
-    lastSampleTime = now;
-    if (bpmUpdatePotentiometers()) bpmFrag = true;
-    if (volUpdatePotentiometers()) volFrag = true;
-  }
-}
-\end{lstlisting}
+\iffalse
 
-次に，bpmUpdatePotentiometers関数について説明する．この関数は，リングバッファ（配列bpmSamples，添字bpmReadIndex）を用いた移動平均処理により，analogReadで取得したアナログ値のノイズを平滑化する．具体的には，配列の最も古いサンプルを合計値bpmTotalから減算し，新たに取得した値を加算したうえで書き込み位置を進める．sampleSize（10サンプル）分のバッファが一巡した時点から，合計値をサンプル数で割った移動平均averageBpmValを算出し，calcStep関数で段階へ変換したうえで，前回段階から変化していればtrueを返す．bpmUpdatePotentiometers関数をコード\ref{lst:pot_bpm}に示す．
 
-\begin{lstlisting}[caption={PotManager::bpmUpdatePotentiometers関数}, label={lst:pot_bpm}]
-bool PotManager::bpmUpdatePotentiometers() {
-  bpmTotal -= bpmSamples[bpmReadIndex];
-  bpmSamples[bpmReadIndex] = analogRead(PIN_BPM);
-  bpmTotal += bpmSamples[bpmReadIndex];
-  bpmReadIndex = (bpmReadIndex + 1) % sampleSize;
-  if (bpmReadIndex == 0) bpmBufferFull = true;
-  if (!bpmBufferFull) return false;
+以下では，表\ref{table:siki_pot_func}に示した順に，各関数の処理内容を説明する．はじめに，update関数について説明する．この関数はloop内で毎回呼び出され，SAMPLE\_INTERVAL（\SI{20}{\micro\second}）ごとにbpmUpdatePotentiometers関数とvolUpdatePotentiometers関数を呼び出す．
+% update関数をコード\ref{lst:pot_update}に示す．
 
-  averageBpmVal = (float)bpmTotal / sampleSize;
-  currentBpmStep = calcStep(averageBpmVal);
+% \begin{lstlisting}[caption={PotManager::update関数}, label={lst:pot_update}]
+% void PotManager::update() {
+%   unsigned long now = micros();
+%   if (now - lastSampleTime >= SAMPLE_INTERVAL) {
+%     lastSampleTime = now;
+%     if (bpmUpdatePotentiometers()) bpmFrag = true;
+%     if (volUpdatePotentiometers()) volFrag = true;
+%   }
+% }
+% \end{lstlisting}
 
-  if (currentBpmStep != prevBpmStep) {
-    prevBpmStep = currentBpmStep;
-    return true;
-  }
-  return false;
-}
-\end{lstlisting}
+次に，bpmUpdatePotentiometers関数について説明する．この関数は，リングバッファ（配列bpmSamples，添字bpmReadIndex）を用いた移動平均処理により，analogReadで取得したアナログ値のノイズを平滑化する．具体的には，配列の最も古いサンプルを合計値bpmTotalから減算し，新たに取得した値を加算したうえで書き込み位置を進める．sampleSize（10サンプル）分のバッファが一巡した時点から，合計値をサンプル数で割った移動平均averageBpmValを算出し，calcStep関数で段階へ変換したうえで，前回段階から変化していればtrueを返す．
+% bpmUpdatePotentiometers関数をコード\ref{lst:pot_bpm}に示す．
 
-続いて，calcStep関数について説明する．この関数は，bpmUpdatePotentiometers関数およびvolUpdatePotentiometers関数から呼び出され，得られた移動平均値を1〜5の5段階に離散化する．STEP\_BOUNDARIES配列（300, 500, 650, 818）に対する大小比較によって段階を決定しており，境界値の間隔を均等にしていない理由は，可変抵抗器の実測特性に合わせて各段階の操作しやすさを調整しているためである．calcStep関数をコード\ref{lst:pot_calc}に示す．
+% \begin{lstlisting}[caption={PotManager::bpmUpdatePotentiometers関数}, label={lst:pot_bpm}]
+% bool PotManager::bpmUpdatePotentiometers() {
+%   bpmTotal -= bpmSamples[bpmReadIndex];
+%   bpmSamples[bpmReadIndex] = analogRead(PIN_BPM);
+%   bpmTotal += bpmSamples[bpmReadIndex];
+%   bpmReadIndex = (bpmReadIndex + 1) % sampleSize;
+%   if (bpmReadIndex == 0) bpmBufferFull = true;
+%   if (!bpmBufferFull) return false;
+% 
+%   averageBpmVal = (float)bpmTotal / sampleSize;
+%   currentBpmStep = calcStep(averageBpmVal);
+% 
+%   if (currentBpmStep != prevBpmStep) {
+%     prevBpmStep = currentBpmStep;
+%     return true;
+%   }
+%   return false;
+% }
+% \end{lstlisting}
 
-\begin{lstlisting}[caption={PotManager::calcStep関数}, label={lst:pot_calc}]
-int PotManager::calcStep(float val) {
-  if      (val <= STEP_BOUNDARIES[0]) return 1;
-  else if (val <= STEP_BOUNDARIES[1]) return 2;
-  else if (val <= STEP_BOUNDARIES[2]) return 3;
-  else if (val <= STEP_BOUNDARIES[3]) return 4;
-  else                                return 5;
-}
-\end{lstlisting}
+続いて，calcStep関数について説明する．この関数は，bpmUpdatePotentiometers関数およびvolUpdatePotentiometers関数から呼び出され，得られた移動平均値を1〜5の5段階に離散化する．STEP\_BOUNDARIES配列（300, 500, 650, 818）に対する大小比較によって段階を決定しており，境界値の間隔を均等にしていない理由は，可変抵抗器の実測特性に合わせて各段階の操作しやすさを調整しているためである．
+% calcStep関数をコード\ref{lst:pot_calc}に示す．
 
-次に，volUpdatePotentiometers関数について説明する．この関数はbpmUpdatePotentiometers関数と同様の移動平均処理を行うが，対象のピンおよび内部変数が音量用（PIN\_VOL，volSamples等）に置き換わっている点のみが異なり，処理の骨格は共通している．volUpdatePotentiometers関数をコード\ref{lst:pot_vol}に示す．
+% \begin{lstlisting}[caption={PotManager::calcStep関数}, label={lst:pot_calc}]
+% int PotManager::calcStep(float val) {
+%   if      (val <= STEP_BOUNDARIES[0]) return 1;
+%   else if (val <= STEP_BOUNDARIES[1]) return 2;
+%   else if (val <= STEP_BOUNDARIES[2]) return 3;
+%   else if (val <= STEP_BOUNDARIES[3]) return 4;
+%   else                                return 5;
+% }
+% \end{lstlisting}
 
-\begin{lstlisting}[caption={PotManager::volUpdatePotentiometers関数}, label={lst:pot_vol}]
-bool PotManager::volUpdatePotentiometers() {
-  volTotal -= volSamples[volReadIndex];
-  volSamples[volReadIndex] = analogRead(PIN_VOL);
-  volTotal += volSamples[volReadIndex];
-  volReadIndex = (volReadIndex + 1) % sampleSize;
-  if (volReadIndex == 0) volBufferFull = true;
-  if (!volBufferFull) return false;
+次に，volUpdatePotentiometers関数について説明する．この関数はbpmUpdatePotentiometers関数と同様の移動平均処理を行うが，対象のピンおよび内部変数が音量用（PIN\_VOL，volSamples等）に置き換わっている点のみが異なり，処理の骨格は共通している．
+% volUpdatePotentiometers関数をコード\ref{lst:pot_vol}に示す．
 
-  averageVolVal = (float)volTotal / sampleSize;
-  currentVolStep = calcStep(averageVolVal);
+% \begin{lstlisting}[caption={PotManager::volUpdatePotentiometers関数}, label={lst:pot_vol}]
+% bool PotManager::volUpdatePotentiometers() {
+%   volTotal -= volSamples[volReadIndex];
+%   volSamples[volReadIndex] = analogRead(PIN_VOL);
+%   volTotal += volSamples[volReadIndex];
+%   volReadIndex = (volReadIndex + 1) % sampleSize;
+%   if (volReadIndex == 0) volBufferFull = true;
+%   if (!volBufferFull) return false;
+% 
+%   averageVolVal = (float)volTotal / sampleSize;
+%   currentVolStep = calcStep(averageVolVal);
+% 
+%   if (currentVolStep != prevVolStep) {
+%     prevVolStep = currentVolStep;
+%     return true;
+%   }
+%   return false;
+% }
+% \end{lstlisting}
 
-  if (currentVolStep != prevVolStep) {
-    prevVolStep = currentVolStep;
-    return true;
-  }
-  return false;
-}
-\end{lstlisting}
+最後に，getBpmStep関数およびgetVolStep関数について説明する．いずれもPotManager.h内でインライン定義されたゲッター関数であり，外部（AccManagerクラス）から現在の段階番号を取得するために用いられる．getVolStep関数では，可変抵抗器を操作する向きと音量の段階が増減する向きを一致させるため，6 - currentVolStepという変換を行っている点がgetBpmStep関数と異なる．
+% 両関数をコード\ref{lst:pot_getters}に示す．
 
-最後に，getBpmStep関数およびgetVolStep関数について説明する．いずれもPotManager.h内でインライン定義されたゲッター関数であり，外部（AccManagerクラス）から現在の段階番号を取得するために用いられる．getVolStep関数では，可変抵抗器を操作する向きと音量の段階が増減する向きを一致させるため，6 - currentVolStepという変換を行っている点がgetBpmStep関数と異なる．両関数をコード\ref{lst:pot_getters}に示す．
-
-\begin{lstlisting}[caption={PotManager::getBpmStep関数・getVolStep関数}, label={lst:pot_getters}]
-uint8_t getBpmStep() const { return currentBpmStep; }
-uint8_t getVolStep() const { return 6 - currentVolStep; }
-\end{lstlisting}
+% \begin{lstlisting}[caption={PotManager::getBpmStep関数・getVolStep関数}, label={lst:pot_getters}]
+% uint8_t getBpmStep() const { return currentBpmStep; }
+% uint8_t getVolStep() const { return 6 - currentVolStep; }
+% \end{lstlisting}
 
 最後に，各デバイスへの無線送信を担うSyncManagerクラスについて説明する．本クラスは，Wi-FiおよびUDP通信の初期化と，演奏開始・終了，BPM，音量の各情報を対象デバイスへ送信する機能を提供する．送信先のIPアドレスは，楽器デバイス4台・中継機デバイス1台のユニキャストアドレスとしてあらかじめグローバル変数に定義されており，送信する情報の種類に応じて対象となるデバイスが選択される．SyncManagerクラスで使用する主な変数の仕様を表\ref{table:siki_sync_var}に示す．
 
@@ -664,52 +741,56 @@ uint8_t getVolStep() const { return 6 - currentVolStep; }
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:siki_sync_func}に示した関数のうち，begin関数，sendVolume関数，packetRoundRobin関数について，実際のコードとともに説明する．はじめに，begin関数について説明する．この関数は，WiFi.begin関数でWi-Fi接続を開始したうえで，接続状態がWL\_CONNECTEDになるまでループで待機し，接続確立後にUdp.begin関数でLOCAL\_PORTを開放する．begin関数をコード\ref{lst:sync_begin}に示す．
+以下では，表\ref{table:siki_sync_func}に示した関数のうち，begin関数，sendVolume関数，packetRoundRobin関数について説明する．はじめに，begin関数について説明する．この関数は，WiFi.begin関数でWi-Fi接続を開始したうえで，接続状態がWL\_CONNECTEDになるまでループで待機し，接続確立後にUdp.begin関数でLOCAL\_PORTを開放する．
+% begin関数をコード\ref{lst:sync_begin}に示す．
 
-\begin{lstlisting}[caption={SyncManager::begin関数}, label={lst:sync_begin}]
-void SyncManager::begin(const char ssid[], const char pass[]) {
-    WiFi.begin(ssid, pass);
-    while (WiFi.status() != WL_CONNECTED) {
-    }
-    Udp.begin(LOCAL_PORT);
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={SyncManager::begin関数}, label={lst:sync_begin}]
+% void SyncManager::begin(const char ssid[], const char pass[]) {
+%     WiFi.begin(ssid, pass);
+%     while (WiFi.status() != WL_CONNECTED) {
+%     }
+%     Udp.begin(LOCAL_PORT);
+% }
+% \end{lstlisting}
 
-次に，sendVolume関数について説明する．この関数は，音量情報（ヘッダ'V'）を全楽器デバイスへ送信する．この関数の引数には，PotManagerクラスのgetVolStep関数によって既に反転済みの段階番号（6 - currentVolStep）が渡されるため，送信直前に再度6 - stepNumberの変換を適用すると，2回の反転が打ち消し合い，ペイロードには反転前のセンサ値由来の段階番号が格納される．すなわち，受信側の楽器デバイスにはセンサ値の段階がそのまま送信され，表示上の反転はgetVolStep関数を参照する指揮デバイス内でのみ適用される．sendVolume関数をコード\ref{lst:sync_sendvolume}に示す．
+次に，sendVolume関数について説明する．この関数は，音量情報（ヘッダ'V'）を全楽器デバイスへ送信する．この関数の引数には，PotManagerクラスのgetVolStep関数によって既に反転済みの段階番号（6 - currentVolStep）が渡されるため，送信直前に再度6 - stepNumberの変換を適用すると，2回の反転が打ち消し合い，ペイロードには反転前のセンサ値由来の段階番号が格納される．すなわち，受信側の楽器デバイスにはセンサ値の段階がそのまま送信され，表示上の反転はgetVolStep関数を参照する指揮デバイス内でのみ適用される．
+% sendVolume関数をコード\ref{lst:sync_sendvolume}に示す．
 
-\begin{lstlisting}[caption={SyncManager::sendVolume関数}, label={lst:sync_sendvolume}]
-void SyncManager::sendVolume(uint8_t stepNumber){
-    uint8_t volumePacket[2] = {'V',(uint8_t)(6 - stepNumber)};
-    IPAddress targets[] = {fluteIP, pianoIP, stringsIP, drumIP};
-    packetRoundRobin(volumePacket, 2, targets, 4);
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={SyncManager::sendVolume関数}, label={lst:sync_sendvolume}]
+% void SyncManager::sendVolume(uint8_t stepNumber){
+%     uint8_t volumePacket[2] = {'V',(uint8_t)(6 - stepNumber)};
+%     IPAddress targets[] = {fluteIP, pianoIP, stringsIP, drumIP};
+%     packetRoundRobin(volumePacket, 2, targets, 4);
+% }
+% \end{lstlisting}
 
-最後に，packetRoundRobin関数について説明する．この関数は，sendStart・sendBPM・sendVolume・sendEndの各関数から共通して呼び出される送信処理であり，指定したパケットを全対象（targets）へ1回ずつ送信する動作を1周とし，\SI{20}{ms}の間隔を空けながら3周繰り返すことで，UDP通信のパケットロスに対する耐性を高めている．対象ごとに3連射してから次の対象へ進む方式ではなく，1周ごとに全対象へ送ってから次の周に進む方式を採用しているのは，前者では後方の対象ほど到達が遅れ，機器間で無視できない時間差が生じるためである．packetRoundRobin関数の処理の流れを図\ref{fig:flow_roundrobin}に示す．また，packetRoundRobin関数をコード\ref{lst:sync_roundrobin}に示す．
+最後に，packetRoundRobin関数について説明する．この関数は，sendStart・sendBPM・sendVolume・sendEndの各関数から共通して呼び出される送信処理であり，指定したパケットを全対象（targets）へ1回ずつ送信する動作を1周とし，\SI{20}{ms}の間隔を空けながら3周繰り返すことで，UDP通信のパケットロスに対する耐性を高めている．対象ごとに3連射してから次の対象へ進む方式ではなく，1周ごとに全対象へ送ってから次の周に進む方式を採用しているのは，前者では後方の対象ほど到達が遅れ，機器間で無視できない時間差が生じるためである．
+% packetRoundRobin関数の処理の流れを図\ref{fig:flow_roundrobin}に示す．
+% また，packetRoundRobin関数をコード\ref{lst:sync_roundrobin}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.6\textwidth]{figs/flow_roundrobin.pdf}
-    \caption{packetRoundRobin関数の処理フローチャート}
-    \label{fig:flow_roundrobin}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.6\textwidth]{figs/flow_roundrobin.pdf}
+%     \caption{packetRoundRobin関数の処理フローチャート}
+%     \label{fig:flow_roundrobin}
+% \end{figure}
 \FloatBarrier
 
 
-\begin{lstlisting}[caption={SyncManager::packetRoundRobin関数}, label={lst:sync_roundrobin}]
-void SyncManager::packetRoundRobin(const uint8_t packet[], uint8_t b, const IPAddress targets[], uint8_t targetCount){
-    for (int round = 0; round < 3; round++) {
-        for (uint8_t t = 0; t < targetCount; t++) {
-            Udp.beginPacket(targets[t], TARGET_PORT);
-            Udp.write(packet, b);
-            Udp.endPacket();
-        }
-        if (round < 2) {
-            delay(20);
-        }
-    }
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={SyncManager::packetRoundRobin関数}, label={lst:sync_roundrobin}]
+% void SyncManager::packetRoundRobin(const uint8_t packet[], uint8_t b, const IPAddress targets[], uint8_t targetCount){
+%     for (int round = 0; round < 3; round++) {
+%         for (uint8_t t = 0; t < targetCount; t++) {
+%             Udp.beginPacket(targets[t], TARGET_PORT);
+%             Udp.write(packet, b);
+%             Udp.endPacket();
+%         }
+%         if (round < 2) {
+%             delay(20);
+%         }
+%     }
+% }
+% \end{lstlisting}
 
 なお，本節で説明したSyncManagerクラスによって送信された演奏開始・終了，BPM，音量の各情報が，中継機デバイス側でどのように受信・反映されるかについては\ref{sec:kan_naibu}項（中継機デバイスの内部設計）で説明する．
 
@@ -722,7 +803,7 @@ void SyncManager::packetRoundRobin(const uint8_t packet[], uint8_t b, const IPAd
     \label{fig:siki_kan_class}
 \end{figure}
 
-
+\fi
 
 
 
@@ -928,7 +1009,8 @@ void SyncManager::packetRoundRobin(const uint8_t packet[], uint8_t b, const IPAd
     \end{tabular}
 \end{table}
 
-FerrisWheel.inoのloop関数は，Udp.parsePacket()でパケットの到着を監視し，届いていればuint8\_t packetBuffer[10]として2バイト分を読み取る．先頭バイトpacketBuffer[0]をヘッダ文字として判定し，ヘッダが'S'（演奏開始）の場合はmotor.startRamp()とdisplayBPM()を，'B'（BPM変更）の場合はmotor.changeBPM()とdisplayBPM()を，'E'（演奏終了）の場合はmotor.stopRamp()とclearDisplay()を，2バイト目のペイロード（BPM段階番号）を引数として呼び出す構成となっている．loop関数の処理の流れを図\ref{fig:flow_kan}に示す．また，loop関数をコード\ref{lst:kan_loop}に示す．
+FerrisWheel.inoのloop関数は，Udp.parsePacket()でパケットの到着を監視し，届いていればuint8\_t packetBuffer[10]として2バイト分を読み取る．先頭バイトpacketBuffer[0]をヘッダ文字として判定し，ヘッダが'S'（演奏開始）の場合はmotor.startRamp()とdisplayBPM()を，'B'（BPM変更）の場合はmotor.changeBPM()とdisplayBPM()を，'E'（演奏終了）の場合はmotor.stopRamp()とclearDisplay()を，2バイト目のペイロード（BPM段階番号）を引数として呼び出す構成となっている．loop関数の処理の流れを図\ref{fig:flow_kan}に示す．
+% また，loop関数をコード\ref{lst:kan_loop}に示す．
 
 \begin{figure}[htbp]
     \centering
@@ -937,38 +1019,38 @@ FerrisWheel.inoのloop関数は，Udp.parsePacket()でパケットの到着を�
     \label{fig:flow_kan}
 \end{figure}
 
-\begin{lstlisting}[caption={FerrisWheel.inoのloop関数}, label={lst:kan_loop}]
-void loop() {
-    uint8_t packetSize = Udp.parsePacket();
-    if (packetSize <= 0) return;
-    if (packetSize != 2) {
-        while (Udp.available()) Udp.read();
-        return;
-    }
-
-    Udp.read(packetBuffer, sizeof(packetBuffer));
-    char    header  = packetBuffer[0];
-    uint8_t payload = packetBuffer[1];
-
-    switch (header) {
-        case 'S':
-            running = true;
-            motor.startRamp(payload);
-            displayBPM(payload);
-            break;
-        case 'B':
-            if (!running) break;
-            motor.changeBPM(payload);
-            displayBPM(payload);
-            break;
-        case 'E':
-            running = false;
-            motor.stopRamp();
-            clearDisplay();
-            break;
-    }
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={FerrisWheel.inoのloop関数}, label={lst:kan_loop}]
+% void loop() {
+%     uint8_t packetSize = Udp.parsePacket();
+%     if (packetSize <= 0) return;
+%     if (packetSize != 2) {
+%         while (Udp.available()) Udp.read();
+%         return;
+%     }
+% 
+%     Udp.read(packetBuffer, sizeof(packetBuffer));
+%     char    header  = packetBuffer[0];
+%     uint8_t payload = packetBuffer[1];
+% 
+%     switch (header) {
+%         case 'S':
+%             running = true;
+%             motor.startRamp(payload);
+%             displayBPM(payload);
+%             break;
+%         case 'B':
+%             if (!running) break;
+%             motor.changeBPM(payload);
+%             displayBPM(payload);
+%             break;
+%         case 'E':
+%             running = false;
+%             motor.stopRamp();
+%             clearDisplay();
+%             break;
+%     }
+% }
+% \end{lstlisting}
 
 続いて，Main（FerrisWheel.ino）で使用する変数の仕様を表\ref{table:kan_main_var}に示す．
 
@@ -1109,117 +1191,126 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:kan_motor_func}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，begin関数について説明する．この関数は，setup内で一度だけ呼び出され，モータドライバーへ接続されたPIN\_MOTOR\_PWMを出力ピンとして初期化したうえで，出力を0にリセットする．begin関数をコード\ref{lst:motor_begin}に示す．
+以下では，表\ref{table:kan_motor_func}に示した順に，各関数の処理内容を説明する．はじめに，begin関数について説明する．この関数は，setup内で一度だけ呼び出され，モータドライバーへ接続されたPIN\_MOTOR\_PWMを出力ピンとして初期化したうえで，出力を0にリセットする．
+% begin関数をコード\ref{lst:motor_begin}に示す．
 
-\begin{lstlisting}[caption={MotorControl::begin関数}, label={lst:motor_begin}]
-void MotorControl::begin() {
-    pinMode(PIN_MOTOR_PWM, OUTPUT);
-    analogWrite(PIN_MOTOR_PWM, 0);
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={MotorControl::begin関数}, label={lst:motor_begin}]
+% void MotorControl::begin() {
+%     pinMode(PIN_MOTOR_PWM, OUTPUT);
+%     analogWrite(PIN_MOTOR_PWM, 0);
+% }
+% \end{lstlisting}
 
-次に，createRpmTable関数について説明する．この関数もsetup内で一度だけ呼び出され，bpmTableの各要素を16で除算することでrpmTableを生成する．createRpmTable関数をコード\ref{lst:motor_createrpm}に示す．
+次に，createRpmTable関数について説明する．この関数もsetup内で一度だけ呼び出され，bpmTableの各要素を16で除算することでrpmTableを生成する．
+% createRpmTable関数をコード\ref{lst:motor_createrpm}に示す．
 
-\begin{lstlisting}[caption={MotorControl::createRpmTable関数}, label={lst:motor_createrpm}]
-void MotorControl::createRpmTable() {
-    for (uint8_t i = 0; i < 5; i++) {
-        rpmTable[i] = bpmTable[i] / 16.0f;
-    }
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={MotorControl::createRpmTable関数}, label={lst:motor_createrpm}]
+% void MotorControl::createRpmTable() {
+%     for (uint8_t i = 0; i < 5; i++) {
+%         rpmTable[i] = bpmTable[i] / 16.0f;
+%     }
+% }
+% \end{lstlisting}
 
-次に，startRamp関数について説明する．この関数は，まずstepToNumber関数によって目標のpwmValueを求めたうえで，出力値を0からpwmValueまで5刻みで増加させながら\SI{40}{ms}ずつ待機することで，モータを段階的に加速させる．startRamp関数の処理の流れを図\ref{fig:flow_startramp}に示す．また，startRamp関数をコード\ref{lst:motor_startramp}に示す．
+次に，startRamp関数について説明する．この関数は，まずstepToNumber関数によって目標のpwmValueを求めたうえで，出力値を0からpwmValueまで5刻みで増加させながら\SI{40}{ms}ずつ待機することで，モータを段階的に加速させる．
+% startRamp関数の処理の流れを図\ref{fig:flow_startramp}に示す．
+% また，startRamp関数をコード\ref{lst:motor_startramp}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.62\textwidth]{figs/flow_startramp.pdf}
-    \caption{startRamp関数の処理フローチャート}
-    \label{fig:flow_startramp}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.62\textwidth]{figs/flow_startramp.pdf}
+%     \caption{startRamp関数の処理フローチャート}
+%     \label{fig:flow_startramp}
+% \end{figure}
 \FloatBarrier
 
 
-\begin{lstlisting}[caption={MotorControl::startRamp関数}, label={lst:motor_startramp}]
-void MotorControl::startRamp(uint8_t stepNumber) {
-    stepToNumber(stepNumber);
-    for (int i = 0; i <= pwmValue; i += 5) {
-        analogWrite(PIN_MOTOR_PWM, i);
-        delay(40);
-    }
-    analogWrite(PIN_MOTOR_PWM, pwmValue);
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={MotorControl::startRamp関数}, label={lst:motor_startramp}]
+% void MotorControl::startRamp(uint8_t stepNumber) {
+%     stepToNumber(stepNumber);
+%     for (int i = 0; i <= pwmValue; i += 5) {
+%         analogWrite(PIN_MOTOR_PWM, i);
+%         delay(40);
+%     }
+%     analogWrite(PIN_MOTOR_PWM, pwmValue);
+% }
+% \end{lstlisting}
 
-次に，stopRamp関数について説明する．この関数はstartRamp関数と対になる処理であり，現在のpwmValueから0まで5刻みで減少させながら\SI{40}{ms}ずつ待機することで，モータを段階的に減速・停止させる．stopRamp関数の処理の流れを図\ref{fig:flow_stopramp}に示す．また，stopRamp関数をコード\ref{lst:motor_stopramp}に示す．
+次に，stopRamp関数について説明する．この関数はstartRamp関数と対になる処理であり，現在のpwmValueから0まで5刻みで減少させながら\SI{40}{ms}ずつ待機することで，モータを段階的に減速・停止させる．
+% stopRamp関数の処理の流れを図\ref{fig:flow_stopramp}に示す．
+% また，stopRamp関数をコード\ref{lst:motor_stopramp}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.62\textwidth]{figs/flow_stopramp.pdf}
-    \caption{stopRamp関数の処理フローチャート}
-    \label{fig:flow_stopramp}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.62\textwidth]{figs/flow_stopramp.pdf}
+%     \caption{stopRamp関数の処理フローチャート}
+%     \label{fig:flow_stopramp}
+% \end{figure}
 \FloatBarrier
 
 
-\begin{lstlisting}[caption={MotorControl::stopRamp関数}, label={lst:motor_stopramp}]
-void MotorControl::stopRamp() {
-    for (int i = pwmValue; i >= 0; i -= 5) {
-        analogWrite(PIN_MOTOR_PWM, i);
-        delay(40);
-    }
-    analogWrite(PIN_MOTOR_PWM, 0);
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={MotorControl::stopRamp関数}, label={lst:motor_stopramp}]
+% void MotorControl::stopRamp() {
+%     for (int i = pwmValue; i >= 0; i -= 5) {
+%         analogWrite(PIN_MOTOR_PWM, i);
+%         delay(40);
+%     }
+%     analogWrite(PIN_MOTOR_PWM, 0);
+% }
+% \end{lstlisting}
 
-次に，changeBPM関数について説明する．この関数は演奏中にBPMの段階が変更された際に呼び出され，stepToNumber関数とupdateStatus関数によって新しい段階の値を求めたうえで，startRamp関数のような段階的な加減速を行わず，目標のpwmValueを即座に出力する．演奏を止めずにテンポを追従させるため，段階的な加減速は行わない仕様としている．changeBPM関数の処理の流れを図\ref{fig:flow_changebpm}に示す．また，changeBPM関数をコード\ref{lst:motor_changebpm}に示す．
+次に，changeBPM関数について説明する．この関数は演奏中にBPMの段階が変更された際に呼び出され，stepToNumber関数とupdateStatus関数によって新しい段階の値を求めたうえで，startRamp関数のような段階的な加減速を行わず，目標のpwmValueを即座に出力する．演奏を止めずにテンポを追従させるため，段階的な加減速は行わない仕様としている．
+% changeBPM関数の処理の流れを図\ref{fig:flow_changebpm}に示す．
+% また，changeBPM関数をコード\ref{lst:motor_changebpm}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.62\textwidth]{figs/flow_changebpm.pdf}
-    \caption{changeBPM関数の処理フローチャート}
-    \label{fig:flow_changebpm}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.62\textwidth]{figs/flow_changebpm.pdf}
+%     \caption{changeBPM関数の処理フローチャート}
+%     \label{fig:flow_changebpm}
+% \end{figure}
 \FloatBarrier
 
 
-\begin{lstlisting}[caption={MotorControl::changeBPM関数}, label={lst:motor_changebpm}]
-void MotorControl::changeBPM(uint8_t stepNumber) {
-    stepToNumber(stepNumber);
-    updateStatus();
-    analogWrite(PIN_MOTOR_PWM, pwmValue);
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={MotorControl::changeBPM関数}, label={lst:motor_changebpm}]
+% void MotorControl::changeBPM(uint8_t stepNumber) {
+%     stepToNumber(stepNumber);
+%     updateStatus();
+%     analogWrite(PIN_MOTOR_PWM, pwmValue);
+% }
+% \end{lstlisting}
 
-最後に，stepToNumber関数とupdateStatus関数について説明する．stepToNumber関数は，受信した段階番号(1〜5)が範囲内であることを確認したうえで，bpmTable・pwmTable・rpmTableの該当インデックスからcurrentBPM・pwmValue・RPMをそれぞれ求める．updateStatus関数は，このRPMおよびpwmValueを基に，(\ref{eq:average})式に相当する計算によってomegaとV\_averageを算出する．両関数をコード\ref{lst:motor_steptonumber}に示す．
+最後に，stepToNumber関数とupdateStatus関数について説明する．stepToNumber関数は，受信した段階番号(1〜5)が範囲内であることを確認したうえで，bpmTable・pwmTable・rpmTableの該当インデックスからcurrentBPM・pwmValue・RPMをそれぞれ求める．updateStatus関数は，このRPMおよびpwmValueを基に，(\ref{eq:average})式に相当する計算によってomegaとV\_averageを算出する．
+% 両関数をコード\ref{lst:motor_steptonumber}に示す．
 
-\begin{lstlisting}[caption={MotorControl::stepToNumber関数・updateStatus関数}, label={lst:motor_steptonumber}]
-void MotorControl::stepToNumber(uint8_t stepNumber) {
-    if (stepNumber < 1 || stepNumber > 5) return;
-    currentBPM = bpmTable[stepNumber - 1];
-    pwmValue   = pwmTable[stepNumber - 1];
-    RPM        = rpmTable[stepNumber - 1];
-}
-
-void MotorControl::updateStatus() {
-    omega     = 2.0 * PI * RPM / 60.0f;
-    V_average = VCC * (pwmValue / 256.0f);
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={MotorControl::stepToNumber関数・updateStatus関数}, label={lst:motor_steptonumber}]
+% void MotorControl::stepToNumber(uint8_t stepNumber) {
+%     if (stepNumber < 1 || stepNumber > 5) return;
+%     currentBPM = bpmTable[stepNumber - 1];
+%     pwmValue   = pwmTable[stepNumber - 1];
+%     RPM        = rpmTable[stepNumber - 1];
+% }
+% 
+% void MotorControl::updateStatus() {
+%     omega     = 2.0 * PI * RPM / 60.0f;
+%     V_average = VCC * (pwmValue / 256.0f);
+% }
+% \end{lstlisting}
 
 次に，中継機デバイスにおけるLEDMatrix表示処理について説明する．今回のシステムでは表示用のマトリクスとして，Arduino Uno R4 WiFi付属のマトリクスを使用する．
 このマトリクスを用いて，FerrisWheel.inoのloop関数から受信したBPM段階番号を数値変換し，独自定義したフォント配列を用いて表示を行う．
 ここで，今回利用するArduinoのマトリクスは縦12横8の範囲で構成されている．
 この時，通常で定義されている文字列では文字の間隔が短くなることや，それに付随した可読性の低下が考えられる．
 よって，今回は1文字を縦5横3で再定義することにより文字同士の間隔を開け，可読性の担保を目指す．
-例として数字0のドットパターンをコード\ref{lst:font0}に示す．
+% 例として数字0のドットパターンをコード\ref{lst:font0}に示す．
 
-\begin{lstlisting}[caption={font3x5配列における数字0のドットパターン定義}, label={lst:font0}]
-    {1,1,1,
-    1,0,1,
-    1,0,1,
-    1,0,1,
-    1,1,1}
-\end{lstlisting}
+% \begin{lstlisting}[caption={font3x5配列における数字0のドットパターン定義}, label={lst:font0}]
+%     {1,1,1,
+%     1,0,1,
+%     1,0,1,
+%     1,0,1,
+%     1,1,1}
+% \end{lstlisting}
 
 また，LEDマトリクスの描画処理は，受信した段階番号からBPM値を参照し，整数を各桁に分割した後，独自定義した3×5のフォント配列を用いてフレームバッファに書き込むことで行う．続いて，LEDMatrix表示（Displayモジュール）で使用する変数・定数の仕様を表\ref{table:kan_disp_var}に示す．
 
@@ -1287,98 +1378,103 @@ LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りで�
     \label{matcla}
 \end{figure}
 
-以下では，表\ref{tab:func1}に示した順に，各関数の処理内容を実際のコードとともに説明する．はじめに，displaySetup関数について説明する．この関数は，matrix.begin()を呼び出した後，消灯フレームを一度描画してから\SI{200}{ms}待機する．これは，begin()直後の最初のloadFrame()は反映されない場合があるための対策である．displaySetup関数をコード\ref{lst:disp_setup}に示す．
+以下では，表\ref{tab:func1}に示した順に，各関数の処理内容を説明する．はじめに，displaySetup関数について説明する．この関数は，matrix.begin()を呼び出した後，消灯フレームを一度描画してから\SI{200}{ms}待機する．これは，begin()直後の最初のloadFrame()は反映されない場合があるための対策である．
+% displaySetup関数をコード\ref{lst:disp_setup}に示す．
 
-\begin{lstlisting}[caption={displaySetup関数}, label={lst:disp_setup}]
-void displaySetup() {
-    matrix.begin();
-    uint32_t warmUp[3] = {0, 0, 0};
-    matrix.loadFrame(warmUp);
-    delay(200);
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={displaySetup関数}, label={lst:disp_setup}]
+% void displaySetup() {
+%     matrix.begin();
+%     uint32_t warmUp[3] = {0, 0, 0};
+%     matrix.loadFrame(warmUp);
+%     delay(200);
+% }
+% \end{lstlisting}
 
-次に，displayBPM関数について説明する．この関数は，loop関数から受け取ったBPM段階番号（1〜5）をbpmTable[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．displayBPM関数の処理の流れを図\ref{fig:flow_displaybpm}に示す．また，displayBPM関数をコード\ref{lst:disp_displaybpm}に示す．
+次に，displayBPM関数について説明する．この関数は，loop関数から受け取ったBPM段階番号（1〜5）をbpmTable[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．
+% displayBPM関数の処理の流れを図\ref{fig:flow_displaybpm}に示す．
+% また，displayBPM関数をコード\ref{lst:disp_displaybpm}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.72\textwidth]{figs/flow_displaybpm.pdf}
-    \caption{displayBPM関数の処理フローチャート}
-    \label{fig:flow_displaybpm}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.72\textwidth]{figs/flow_displaybpm.pdf}
+%     \caption{displayBPM関数の処理フローチャート}
+%     \label{fig:flow_displaybpm}
+% \end{figure}
 \FloatBarrier
 
 
-\begin{lstlisting}[caption={displayBPM関数}, label={lst:disp_displaybpm}]
-void displayBPM(uint8_t stepNumber) {
-    if (stepNumber < 1 || stepNumber > 5) return;
-    uint8_t bpm = bpmTable[stepNumber - 1];
+% \begin{lstlisting}[caption={displayBPM関数}, label={lst:disp_displaybpm}]
+% void displayBPM(uint8_t stepNumber) {
+%     if (stepNumber < 1 || stepNumber > 5) return;
+%     uint8_t bpm = bpmTable[stepNumber - 1];
+% 
+%     memset(frameBuffer, 0, sizeof(frameBuffer));
+% 
+%     int digits[3];
+%     int numDigits;
+%     if (bpm >= 100) {
+%         numDigits = 3;
+%         digits[0] = bpm / 100;
+%         digits[1] = (bpm / 10) % 10;
+%         digits[2] = bpm % 10;
+%     } else if (bpm >= 10) {
+%         numDigits = 2;
+%         digits[0] = bpm / 10;
+%         digits[1] = bpm % 10;
+%     } else {
+%         numDigits = 1;
+%         digits[0] = bpm;
+%     }
+% 
+%     int totalWidth = numDigits * FONT_WIDTH + (numDigits - 1) * 1;
+%     int startX     = (MATRIX_COLS - totalWidth) / 2;
+% 
+%     for (int i = 0; i < numDigits; i++) {
+%         drawDigit(digits[i], startX + i * (FONT_WIDTH + 1));
+%     }
+% 
+%     uint32_t bitmap[3] = {0, 0, 0};
+%     for (int row = 0; row < MATRIX_ROWS; row++) {
+%         for (int col = 0; col < MATRIX_COLS; col++) {
+%             if (frameBuffer[row][col]) {
+%                 int n = row * MATRIX_COLS + col;
+%                 bitmap[n / 32] |= (1UL << (31 - (n % 32)));
+%             }
+%         }
+%     }
+%     matrix.loadFrame(bitmap);
+% }
+% \end{lstlisting}
 
-    memset(frameBuffer, 0, sizeof(frameBuffer));
+次に，drawDigit関数について説明する．この関数は，引数の数字が0から9の範囲内であるかを確認した後，縦方向の中央寄せオフセットを算出し，独自フォント配列から該当する数字のドットパターンを1ドットずつ読み取ってフレームバッファの指定位置に書き込む．
+% drawDigit関数をコード\ref{lst:disp_drawdigit}に示す．
 
-    int digits[3];
-    int numDigits;
-    if (bpm >= 100) {
-        numDigits = 3;
-        digits[0] = bpm / 100;
-        digits[1] = (bpm / 10) % 10;
-        digits[2] = bpm % 10;
-    } else if (bpm >= 10) {
-        numDigits = 2;
-        digits[0] = bpm / 10;
-        digits[1] = bpm % 10;
-    } else {
-        numDigits = 1;
-        digits[0] = bpm;
-    }
+% \begin{lstlisting}[caption={drawDigit関数}, label={lst:disp_drawdigit}]
+% void drawDigit(int digit, int x_offset) {
+%     if (digit < 0 || digit > 9) return;
+%     const int y_offset = (MATRIX_ROWS - FONT_HEIGHT) / 2;
+%     for (int y = 0; y < FONT_HEIGHT; y++) {
+%         for (int x = 0; x < FONT_WIDTH; x++) {
+%             int col = x_offset + x;
+%             int row = y_offset + y;
+%             if (col >= 0 && col < MATRIX_COLS && row >= 0 && row < MATRIX_ROWS) {
+%                 frameBuffer[row][col] = font3x5[digit][y * FONT_WIDTH + x];
+%             }
+%         }
+%     }
+% }
+% \end{lstlisting}
 
-    int totalWidth = numDigits * FONT_WIDTH + (numDigits - 1) * 1;
-    int startX     = (MATRIX_COLS - totalWidth) / 2;
+最後に，clearDisplay関数について説明する．この関数は，BPM値を初期値(-1)にリセットし，全消灯フレームをmatrix.loadFrame()で描画して表示のリセットを行う．
+% clearDisplay関数をコード\ref{lst:disp_cleardisplay}に示す．
 
-    for (int i = 0; i < numDigits; i++) {
-        drawDigit(digits[i], startX + i * (FONT_WIDTH + 1));
-    }
-
-    uint32_t bitmap[3] = {0, 0, 0};
-    for (int row = 0; row < MATRIX_ROWS; row++) {
-        for (int col = 0; col < MATRIX_COLS; col++) {
-            if (frameBuffer[row][col]) {
-                int n = row * MATRIX_COLS + col;
-                bitmap[n / 32] |= (1UL << (31 - (n % 32)));
-            }
-        }
-    }
-    matrix.loadFrame(bitmap);
-}
-\end{lstlisting}
-
-次に，drawDigit関数について説明する．この関数は，引数の数字が0から9の範囲内であるかを確認した後，縦方向の中央寄せオフセットを算出し，独自フォント配列から該当する数字のドットパターンを1ドットずつ読み取ってフレームバッファの指定位置に書き込む．drawDigit関数をコード\ref{lst:disp_drawdigit}に示す．
-
-\begin{lstlisting}[caption={drawDigit関数}, label={lst:disp_drawdigit}]
-void drawDigit(int digit, int x_offset) {
-    if (digit < 0 || digit > 9) return;
-    const int y_offset = (MATRIX_ROWS - FONT_HEIGHT) / 2;
-    for (int y = 0; y < FONT_HEIGHT; y++) {
-        for (int x = 0; x < FONT_WIDTH; x++) {
-            int col = x_offset + x;
-            int row = y_offset + y;
-            if (col >= 0 && col < MATRIX_COLS && row >= 0 && row < MATRIX_ROWS) {
-                frameBuffer[row][col] = font3x5[digit][y * FONT_WIDTH + x];
-            }
-        }
-    }
-}
-\end{lstlisting}
-
-最後に，clearDisplay関数について説明する．この関数は，BPM値を初期値(-1)にリセットし，全消灯フレームをmatrix.loadFrame()で描画して表示のリセットを行う．clearDisplay関数をコード\ref{lst:disp_cleardisplay}に示す．
-
-\begin{lstlisting}[caption={clearDisplay関数}, label={lst:disp_cleardisplay}]
-void clearDisplay() {
-    currentBPM = -1;
-    uint32_t blank[3] = {0, 0, 0};
-    matrix.loadFrame(blank);
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={clearDisplay関数}, label={lst:disp_cleardisplay}]
+% void clearDisplay() {
+%     currentBPM = -1;
+%     uint32_t blank[3] = {0, 0, 0};
+%     matrix.loadFrame(blank);
+% }
+% \end{lstlisting}
 
 最後に，中継機デバイスのモータ回転速度を実測するために用いたプログラムであるLaserIntervalTestについて説明する．このプログラムは中継機デバイス本体には搭載せず，開発段階で観覧車に設置したレーザーとCdSセルを用いて，各PWM出力値における実際の回転周期を計測するために使用したものであり，表\ref{tab:pwm_lut}に示した実測周期の値はこのプログラムによって得られている．
 本プログラムは，CdSセルの出力値を監視し，レーザー光の通過（パルス）を検知するたびに，直前のパルス検知からの経過時間（interval）をシリアルモニタへ出力する．周囲光量やレーザーの取り付け誤差による検知レベルのばらつきに対応するため，固定閾値ではなく，起動直後のキャリブレーションと直近のピーク値履歴に基づいて検知しきい値を継続的に調整する適応しきい値方式を採用している．LaserIntervalTestで使用する主な定数の仕様を表\ref{table:laser_const}に示す．
@@ -1434,106 +1530,110 @@ void clearDisplay() {
     \end{tabular}
 \end{table}
 
-以下では，表\ref{table:laser_func}に示した主要な関数のうち，公開インタフェースであるupdate関数と，検知処理の中心であるdetectLight関数について，実際のコードとともに説明する．なお，registerPeak関数・updateFallbackThresholds関数・limitStep関数の詳細な実装は付録に示すプログラム全文を参照されたい．
+以下では，表\ref{table:laser_func}に示した主要な関数のうち，公開インタフェースであるupdate関数と，検知処理の中心であるdetectLight関数について説明する．なお，registerPeak関数・updateFallbackThresholds関数・limitStep関数の詳細な実装は付録に示すプログラム全文を参照されたい．
 
-はじめに，setup関数とloop関数について説明する．setup関数ではシリアル通信を開始するのみであり，loop関数ではCdSセルの値を毎回取得し，LaserDetectorのupdate関数へ渡している．新しいパルスが検知された場合は，得られたinterval[ms]をシリアルモニタへ出力する．setup関数・loop関数をコード\ref{lst:laser_setuploop}に示す．
+はじめに，setup関数とloop関数について説明する．setup関数ではシリアル通信を開始するのみであり，loop関数ではCdSセルの値を毎回取得し，LaserDetectorのupdate関数へ渡している．新しいパルスが検知された場合は，得られたinterval[ms]をシリアルモニタへ出力する．
+% setup関数・loop関数をコード\ref{lst:laser_setuploop}に示す．
 
-\begin{lstlisting}[caption={LaserIntervalTest.inoのsetup関数・loop関数}, label={lst:laser_setuploop}]
-void setup() {
-  Serial.begin(115200);
-  Serial.println("--- レーザー間隔計測 Setup Started ---");
-}
+% \begin{lstlisting}[caption={LaserIntervalTest.inoのsetup関数・loop関数}, label={lst:laser_setuploop}]
+% void setup() {
+%   Serial.begin(115200);
+%   Serial.println("--- レーザー間隔計測 Setup Started ---");
+% }
+% 
+% void loop() {
+%   unsigned long now      = millis();
+%   int           cdsValue = analogRead(CDS_PIN);
+%   unsigned long interval = 0;
+% 
+%   if (detector.update(cdsValue, now, interval)) {
+%     Serial.print("[interval] ");
+%     Serial.print(interval);
+%     Serial.println(" ms");
+%   }
+% }
+% \end{lstlisting}
 
-void loop() {
-  unsigned long now      = millis();
-  int           cdsValue = analogRead(CDS_PIN);
-  unsigned long interval = 0;
+次に，LaserDetectorクラスのupdate関数について説明する．この関数は，detectLight関数によってパルスの立ち上がりが検知され，かつ前回検知からDEBOUNCE\_MS（\SI{200}{ms}）以上が経過している場合にのみ，trueを返してinterval（前回検知時刻との差）を書き込む．
+% update関数をコード\ref{lst:laser_update}に示す．
 
-  if (detector.update(cdsValue, now, interval)) {
-    Serial.print("[interval] ");
-    Serial.print(interval);
-    Serial.println(" ms");
-  }
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={LaserDetector::update関数}, label={lst:laser_update}]
+% bool update(int cdsValue, unsigned long nowMs, unsigned long &intervalOut) {
+%     if (calibrationStartMs == 0) calibrationStartMs = nowMs;
+%     if (!detectLight(cdsValue, nowMs)) return false;
+%     if (nowMs - lastDetectTime < DEBOUNCE_MS) return false;
+% 
+%     intervalOut = (lastDetectTime != 0) ? (nowMs - lastDetectTime) : 0;
+%     bool hasInterval = (lastDetectTime != 0);
+%     lastDetectTime = nowMs;
+%     return hasInterval;
+% }
+% \end{lstlisting}
 
-次に，LaserDetectorクラスのupdate関数について説明する．この関数は，detectLight関数によってパルスの立ち上がりが検知され，かつ前回検知からDEBOUNCE\_MS（\SI{200}{ms}）以上が経過している場合にのみ，trueを返してinterval（前回検知時刻との差）を書き込む．update関数をコード\ref{lst:laser_update}に示す．
+最後に，detectLight関数について説明する．この関数は，暗状態の推定値であるbaselineを継続的に追従させながら，値がbaseline+CDS\_MIN\_DELTA相当のonThresholdを上回った瞬間をパルスの立ち上がりとして検知する状態機械である．起動直後はstartupCalibratedフラグがfalseの間，CDS\_STARTUP\_CALIBRATION\_MS（1秒）をかけて最も暗い値をbaselineの初期値として探索し，誤検知を防止する．また，キャリブレーション完了時点でレーザーが既に照射状態であった場合は，waitingForReleaseフラグによって一度非照射状態に戻るまで検知を保留する．パルスの立ち下がり（照射終了）を検知するとregisterPeak関数を呼び出し，しきい値を実測値に基づいて更新する．起動時較正・照射解除待ち・baseline追従・立ち上がり／立ち下がり判定という状態機械の分岐構造を表している．
+% detectLight関数の処理の流れを図\ref{fig:flow_detectlight}に示す．
+% また，detectLight関数をコード\ref{lst:laser_detectlight}に示す．
 
-\begin{lstlisting}[caption={LaserDetector::update関数}, label={lst:laser_update}]
-bool update(int cdsValue, unsigned long nowMs, unsigned long &intervalOut) {
-    if (calibrationStartMs == 0) calibrationStartMs = nowMs;
-    if (!detectLight(cdsValue, nowMs)) return false;
-    if (nowMs - lastDetectTime < DEBOUNCE_MS) return false;
-
-    intervalOut = (lastDetectTime != 0) ? (nowMs - lastDetectTime) : 0;
-    bool hasInterval = (lastDetectTime != 0);
-    lastDetectTime = nowMs;
-    return hasInterval;
-}
-\end{lstlisting}
-
-最後に，detectLight関数について説明する．この関数は，暗状態の推定値であるbaselineを継続的に追従させながら，値がbaseline+CDS\_MIN\_DELTA相当のonThresholdを上回った瞬間をパルスの立ち上がりとして検知する状態機械である．起動直後はstartupCalibratedフラグがfalseの間，CDS\_STARTUP\_CALIBRATION\_MS（1秒）をかけて最も暗い値をbaselineの初期値として探索し，誤検知を防止する．また，キャリブレーション完了時点でレーザーが既に照射状態であった場合は，waitingForReleaseフラグによって一度非照射状態に戻るまで検知を保留する．パルスの立ち下がり（照射終了）を検知するとregisterPeak関数を呼び出し，しきい値を実測値に基づいて更新する．detectLight関数の処理の流れを図\ref{fig:flow_detectlight}に示す．起動時較正・照射解除待ち・baseline追従・立ち上がり／立ち下がり判定という状態機械の分岐構造を表している．また，detectLight関数をコード\ref{lst:laser_detectlight}に示す．
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\textwidth]{figs/flow_detectlight.pdf}
-    \caption{detectLight関数の処理フローチャート}
-    \label{fig:flow_detectlight}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{figs/flow_detectlight.pdf}
+%     \caption{detectLight関数の処理フローチャート}
+%     \label{fig:flow_detectlight}
+% \end{figure}
 \FloatBarrier
 
 
-\begin{lstlisting}[caption={LaserDetector::detectLight関数}, label={lst:laser_detectlight}]
-bool detectLight(int v, unsigned long nowMs) {
-    if (!baselineReady) {
-      baseline = v;
-      startupMin = v;
-      baselineReady = true;
-      updateFallbackThresholds();
-    }
-
-    if (!startupCalibrated) {
-      if (v < startupMin) startupMin = v;
-      baseline = startupMin;
-      updateFallbackThresholds();
-      if (nowMs - calibrationStartMs < CDS_STARTUP_CALIBRATION_MS) return false;
-      startupCalibrated = true;
-      waitingForRelease = (v >= onThreshold);
-      releaseThreshold = (baseline > 1023 - CDS_MIN_DELTA) ? baseline - CDS_MIN_DELTA : offThreshold;
-      return false;
-    }
-
-    if (waitingForRelease) {
-      if (v <= releaseThreshold) {
-        baseline = v;
-        updateFallbackThresholds();
-        waitingForRelease = false;
-      }
-      return false;
-    }
-
-    if (!laserOn) {
-      if (v < baseline) baseline = v;
-      else baseline = (baseline * 31 + v) / 32;
-      if (!calibrated) updateFallbackThresholds();
-    }
-
-    if (!laserOn && v >= onThreshold) {
-      laserOn = true;
-      pulsePeak = v;
-      return true;
-    }
-
-    if (laserOn) {
-      if (v > pulsePeak) pulsePeak = v;
-      if (v <= offThreshold) {
-        laserOn = false;
-        registerPeak(pulsePeak);
-      }
-    }
-    return false;
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={LaserDetector::detectLight関数}, label={lst:laser_detectlight}]
+% bool detectLight(int v, unsigned long nowMs) {
+%     if (!baselineReady) {
+%       baseline = v;
+%       startupMin = v;
+%       baselineReady = true;
+%       updateFallbackThresholds();
+%     }
+% 
+%     if (!startupCalibrated) {
+%       if (v < startupMin) startupMin = v;
+%       baseline = startupMin;
+%       updateFallbackThresholds();
+%       if (nowMs - calibrationStartMs < CDS_STARTUP_CALIBRATION_MS) return false;
+%       startupCalibrated = true;
+%       waitingForRelease = (v >= onThreshold);
+%       releaseThreshold = (baseline > 1023 - CDS_MIN_DELTA) ? baseline - CDS_MIN_DELTA : offThreshold;
+%       return false;
+%     }
+% 
+%     if (waitingForRelease) {
+%       if (v <= releaseThreshold) {
+%         baseline = v;
+%         updateFallbackThresholds();
+%         waitingForRelease = false;
+%       }
+%       return false;
+%     }
+% 
+%     if (!laserOn) {
+%       if (v < baseline) baseline = v;
+%       else baseline = (baseline * 31 + v) / 32;
+%       if (!calibrated) updateFallbackThresholds();
+%     }
+% 
+%     if (!laserOn && v >= onThreshold) {
+%       laserOn = true;
+%       pulsePeak = v;
+%       return true;
+%     }
+% 
+%     if (laserOn) {
+%       if (v > pulsePeak) pulsePeak = v;
+%       if (v <= offThreshold) {
+%         laserOn = false;
+%         registerPeak(pulsePeak);
+%       }
+%     }
+%     return false;
+% }
+% \end{lstlisting}
 
 プログラム全文は付録に示す．
 
@@ -1665,16 +1765,18 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
 
 ここからは，シリアル通信によるArduinoとの連携，LUTデータの管理（DataUtils），発音命令の委譲（InstrumentPlayer），残響エフェクト（AddEffect），デバッグ用自動演奏（NoteSampler），各楽器クラスによる音色合成の順に，使用する変数・関数の仕様と処理内容について説明する．
 
-まず，Arduinoとのシリアル通信および発音ディスパッチについて説明する．setup関数のフローチャートを図\ref{fig:gakki_setup}に示す．
+まず，Arduinoとのシリアル通信および発音ディスパッチについて説明する．
+% setup関数のフローチャートを図\ref{fig:gakki_setup}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.5\linewidth]{figs/SC_setup.pdf}
-    \caption{setup関数のフローチャート}
-    \label{fig:gakki_setup}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{figs/SC_setup.pdf}
+%     \caption{setup関数のフローチャート}
+%     \label{fig:gakki_setup}
+% \end{figure}
 
-図\ref{fig:gakki_setup}に示すように，SoundProcessingCode.pdeのsetup関数では，Minimライブラリの初期化，残響用バス（longOut・shortOut）の生成，InstrumentPlayerおよびDataUtilsの初期化，そしてシリアルポートの初期化を行う．楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，定数arduinoNumberによって，このProcessingインスタンスがどの楽器として動作するかを切り替える．Main（SoundProcessingCode.pde）で使用する主な変数の仕様を表\ref{table:gakki_main_var}に示す．
+楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，定数arduinoNumberによって，このProcessingインスタンスがどの楽器として動作するかを切り替える．Main（SoundProcessingCode.pde）で使用する主な変数の仕様を表\ref{table:gakki_main_var}に示す．
+% 図\ref{fig:gakki_setup}に示すように，SoundProcessingCode.pdeのsetup関数では，Minimライブラリの初期化，残響用バス（longOut・shortOut）の生成，InstrumentPlayerおよびDataUtilsの初期化，そしてシリアルポートの初期化を行う．
 
 \begin{table}[H]
     \caption{Main（SoundProcessingCode.pde）で使用する主な変数の仕様一覧}
@@ -1724,78 +1826,84 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
     \end{tabular}
 \end{table}
 
-続いて，draw関数について説明する．draw関数のフローチャートを図\ref{fig:gakki_draw}に示す．
+続いて，draw関数について説明する．
+% draw関数のフローチャートを図\ref{fig:gakki_draw}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.5\linewidth]{figs/SC_draw.pdf}
-    \caption{draw関数のフローチャート}
-    \label{fig:gakki_draw}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{figs/SC_draw.pdf}
+%     \caption{draw関数のフローチャート}
+%     \label{fig:gakki_draw}
+% \end{figure}
 
-図\ref{fig:gakki_draw}に示すように，draw関数は，Minimライブラリが提供するオシロスコープ波形とFFTスペクトルアナライザを毎フレーム描画する関数であり，\SI{20}{\hertz}〜\SI{20000}{\hertz}の範囲を対数スケールに変換したうえでスペクトルの線を描画し，最後にX軸・Y軸の目盛りとラベルを描画する．なお，この描画処理はデバッグ時の音色確認を目的としたものであり，発音タイミング自体には関与しない．
+なお，この描画処理はデバッグ時の音色確認を目的としたものであり，発音タイミング自体には関与しない．
+% 図\ref{fig:gakki_draw}に示すように，draw関数は，Minimライブラリが提供するオシロスコープ波形とFFTスペクトルアナライザを毎フレーム描画する関数であり，\SI{20}{\hertz}〜\SI{20000}{\hertz}の範囲を対数スケールに変換したうえでスペクトルの線を描画し，最後にX軸・Y軸の目盛りとラベルを描画する．
 
-以下では，表\ref{table:gakki_main_func}に示した関数のうち，実際の演奏に用いられるserialEvent関数について，実際のコードとともに説明する．serialEvent関数のフローチャートを図\ref{fig:gakki_serialevent}に示す．
+以下では，表\ref{table:gakki_main_func}に示した関数のうち，実際の演奏に用いられるserialEvent関数について説明する．
+% serialEvent関数のフローチャートを図\ref{fig:gakki_serialevent}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.6\linewidth]{figs/SC_serialEvent.pdf}
-    \caption{serialEvent関数のフローチャート}
-    \label{fig:gakki_serialevent}
-\end{figure}
-この関数は，Arduinoから届いた1行のデータをカンマで分割し，先頭要素をヘッダとして判定する．ヘッダが'N'（発音指示）の場合，5個1組（音程・長さ・開始ベロシティ・終了ベロシティ・種別）のデータを順に読み取り，durationにはBPMに応じた時間換算（$60000 \div (\text{BPM} \times 24)$）を施したうえで，arduinoNumberに応じた楽器のPlay関数を呼び出す．serialEvent関数の発音指示部分をコード\ref{lst:gakki_serial}に示す．
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.6\linewidth]{figs/SC_serialEvent.pdf}
+%     \caption{serialEvent関数のフローチャート}
+%     \label{fig:gakki_serialevent}
+% \end{figure}
+この関数は，Arduinoから届いた1行のデータをカンマで分割し，先頭要素をヘッダとして判定する．ヘッダが'N'（発音指示）の場合，5個1組（音程・長さ・開始ベロシティ・終了ベロシティ・種別）のデータを順に読み取り，durationにはBPMに応じた時間換算（$60000 \div (\text{BPM} \times 24)$）を施したうえで，arduinoNumberに応じた楽器のPlay関数を呼び出す．
+% serialEvent関数の発音指示部分をコード\ref{lst:gakki_serial}に示す．
 
-\begin{lstlisting}[caption={serialEvent関数（発音指示'N'の処理部分）}, label={lst:gakki_serial}]
-case "N" :
-  if (listLength % 5 != 0) break;
-  for (int i = 5; i <= listLength; i += 5) {
-    float pitch, duration, startVel, endVel, type;
-    try {
-      pitch    = float(list[i-4]);
-      duration = float(list[i-3]) * (2.5f / musicBPM); // 60000÷(BPM*24)
-      startVel = float(list[i-2]);
-      endVel   = float(list[i-1]);
-      type     = int(list[i]);
-    } catch (NumberFormatException e) {
-      continue;
-    }
-
-    switch (arduinoNumber) {
-      case 1 :
-        player.PlayFlute(pitch, duration, startVel, endVel, currentMasterVolume);
-        break;
-      case 2 :
-        player.PlayStrings(pitch, duration, startVel, endVel, currentMasterVolume);
-        break;
-      case 3 :
-        if      (type == 0) player.PlayPiano(pitch, duration, startVel, currentMasterVolume);
-        else if (type == 1) player.PlayTrumpet(pitch, duration, startVel, endVel, currentMasterVolume);
-        else if (type == 2) player.PlayHorn(pitch, duration, startVel, endVel, currentMasterVolume);
-        break;
-      case 4 :
-        int a = int(list[i-4]) % 12;
-        if      (a == 0) player.PlayKick(currentMasterVolume, startVel);
-        else if (a == 3) player.PlaySnare(currentMasterVolume, startVel, endVel);
-        else if (a == 4) player.PlayHiHat(currentMasterVolume, startVel);
-        break;
-      default: break;
-    }
-  }
-  break;
-\end{lstlisting}
+% \begin{lstlisting}[caption={serialEvent関数（発音指示'N'の処理部分）}, label={lst:gakki_serial}]
+% case "N" :
+%   if (listLength % 5 != 0) break;
+%   for (int i = 5; i <= listLength; i += 5) {
+%     float pitch, duration, startVel, endVel, type;
+%     try {
+%       pitch    = float(list[i-4]);
+%       duration = float(list[i-3]) * (2.5f / musicBPM); // 60000÷(BPM*24)
+%       startVel = float(list[i-2]);
+%       endVel   = float(list[i-1]);
+%       type     = int(list[i]);
+%     } catch (NumberFormatException e) {
+%       continue;
+%     }
+% 
+%     switch (arduinoNumber) {
+%       case 1 :
+%         player.PlayFlute(pitch, duration, startVel, endVel, currentMasterVolume);
+%         break;
+%       case 2 :
+%         player.PlayStrings(pitch, duration, startVel, endVel, currentMasterVolume);
+%         break;
+%       case 3 :
+%         if      (type == 0) player.PlayPiano(pitch, duration, startVel, currentMasterVolume);
+%         else if (type == 1) player.PlayTrumpet(pitch, duration, startVel, endVel, currentMasterVolume);
+%         else if (type == 2) player.PlayHorn(pitch, duration, startVel, endVel, currentMasterVolume);
+%         break;
+%       case 4 :
+%         int a = int(list[i-4]) % 12;
+%         if      (a == 0) player.PlayKick(currentMasterVolume, startVel);
+%         else if (a == 3) player.PlaySnare(currentMasterVolume, startVel, endVel);
+%         else if (a == 4) player.PlayHiHat(currentMasterVolume, startVel);
+%         break;
+%       default: break;
+%     }
+%   }
+%   break;
+% \end{lstlisting}
 
 ここで，種別typeによる分岐について述べる．計画書当初の音源構成はストリングス・フルート・ピアノ・ドラム類のみであり，この分岐は存在しなかった．しかし，演奏する楽曲の編成に金管パートを加え，楽曲表現の幅を広げるため，開発の後半でトランペット（TrumpetInstrument）とホルン（HornInstrument）を追加しており，これに伴い楽譜データ上で発音する楽器の種類を判別する本分岐を新設した．また，ヘッダが'B'（BPM変更）の場合はmusicBPMを60〜180の範囲に制限して更新し，ヘッダが'V'（マスターボリューム変更）の場合はcurrentMasterVolumeを0.2〜1.0の範囲に写像して更新する．
 
-続いて，Play/keyPressed関数について説明する．Play関数のフローチャートを図\ref{fig:gakki_play}に示す．
+続いて，Play/keyPressed関数について説明する．
+% Play関数のフローチャートを図\ref{fig:gakki_play}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.9\linewidth]{figs/SC_Play.pdf}
-    \caption{Play関数のフローチャート}
-    \label{fig:gakki_play}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.9\linewidth]{figs/SC_Play.pdf}
+%     \caption{Play関数のフローチャート}
+%     \label{fig:gakki_play}
+% \end{figure}
 
-図\ref{fig:gakki_play}に示すように，この関数は，isDebugModeが有効な場合にのみキー入力から呼び出される，Arduino未接続でも単体で音色を試奏するための関数であり，キー操作によってあらかじめ設定された音程・強弱等（soundOctave，soundDoReMi，soundStartVelocity，soundEndVelocity）をもとに，変数timbreが示す楽器（Flute／Strings／Piano／Drum等）に応じたInstrumentPlayerのPlayXxx関数を呼び出す．Drumが選択されている場合は，さらにsoundDoReMiの値によってPlayKick／PlaySnare／PlayHiHatのいずれかへ分岐する．
+Drumが選択されている場合は，さらにsoundDoReMiの値によってPlayKick／PlaySnare／PlayHiHatのいずれかへ分岐する．
+% 図\ref{fig:gakki_play}に示すように，この関数は，isDebugModeが有効な場合にのみキー入力から呼び出される，Arduino未接続でも単体で音色を試奏するための関数であり，キー操作によってあらかじめ設定された音程・強弱等（soundOctave，soundDoReMi，soundStartVelocity，soundEndVelocity）をもとに，変数timbreが示す楽器（Flute／Strings／Piano／Drum等）に応じたInstrumentPlayerのPlayXxx関数を呼び出す．
 
 次に，楽器デバイスにおけるLUTデータの管理（DataUtilsクラス）について説明する．計画書当初は，倍音の周波数と振幅を数式によって機械的に算出し合成する設計を検討していたが，低音域や高音域において実在の楽器との音色の再現度が低下するという問題が生じたため，実際はアイオワ大学等が公開する実楽器の音声データをFFT解析し，各音程・各強弱（pp/mf/ff）ごとの「周波数と振幅のペア」を抽出してJSON形式のLUTとして事前に用意しておく設計に変更した．DataUtilsクラスは，このLUTの読み込みと，発音時のピッチ・ベロシティに応じた倍音プロファイルの動的な取得を担う．DataUtilsクラスで使用する主な変数の仕様を表\ref{table:gakki_utils_var}に示す．
 
@@ -1841,145 +1949,154 @@ case "N" :
     \end{tabular}
 \end{table}
 
-続いて，DataUtilsクラスのコンストラクタについて説明する．コンストラクタのフローチャートを図\ref{fig:gakki_datautils_ctor}に示す．
+続いて，DataUtilsクラスのコンストラクタについて説明する．
+% コンストラクタのフローチャートを図\ref{fig:gakki_datautils_ctor}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.4\linewidth]{figs/DU_DataUtils.pdf}
-    \caption{DataUtilsクラスのコンストラクタのフローチャート}
-    \label{fig:gakki_datautils_ctor}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.4\linewidth]{figs/DU_DataUtils.pdf}
+%     \caption{DataUtilsクラスのコンストラクタのフローチャート}
+%     \label{fig:gakki_datautils_ctor}
+% \end{figure}
 
-図\ref{fig:gakki_datautils_ctor}に示すように，コンストラクタでは，Load2LUT関数を用いて楽譜データやピアノ・ドラムの特殊データ等の2次元LUTを読み込んだうえで，Load3LUT関数を用いて各楽器・各強弱ごとの波形データ（3次元LUT）を読み込むことで，DataUtilsが保持する全LUTデータの初期化を行う．
+% 図\ref{fig:gakki_datautils_ctor}に示すように，コンストラクタでは，Load2LUT関数を用いて楽譜データやピアノ・ドラムの特殊データ等の2次元LUTを読み込んだうえで，Load3LUT関数を用いて各楽器・各強弱ごとの波形データ（3次元LUT）を読み込むことで，DataUtilsが保持する全LUTデータの初期化を行う．
 
-次に，Load2LUT関数およびLoad3LUT関数について説明する．両関数のフローチャートを図\ref{fig:gakki_loadlut}に示す．
+次に，Load2LUT関数およびLoad3LUT関数について説明する．
+% 両関数のフローチャートを図\ref{fig:gakki_loadlut}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.55\linewidth]{figs/DU_LoadLUT.pdf}
-    \caption{Load2LUT関数・Load3LUT関数のフローチャート}
-    \label{fig:gakki_loadlut}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.55\linewidth]{figs/DU_LoadLUT.pdf}
+%     \caption{Load2LUT関数・Load3LUT関数のフローチャート}
+%     \label{fig:gakki_loadlut}
+% \end{figure}
 
-図\ref{fig:gakki_loadlut}に示すように，両関数はいずれもJSONファイルを1行ずつ読み込み，各行のデータが2次元か3次元かに応じて，Load2LUTはfloat配列として，Load3LUTは[周波数, 振幅]のペア配列（float[][2]）として格納する．読み込み対象のデータが存在しない場合は，データ欠損として扱い該当要素をnullのまま格納する．
+読み込み対象のデータが存在しない場合は，データ欠損として扱い該当要素をnullのまま格納する．
+% 図\ref{fig:gakki_loadlut}に示すように，両関数はいずれもJSONファイルを1行ずつ読み込み，各行のデータが2次元か3次元かに応じて，Load2LUTはfloat配列として，Load3LUTは[周波数, 振幅]のペア配列（float[][2]）として格納する．
 
-次に，GetLUT関数について説明する．GetLUT関数のフローチャートを図\ref{fig:gakki_getlut}に示す．
+次に，GetLUT関数について説明する．
+% GetLUT関数のフローチャートを図\ref{fig:gakki_getlut}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.5\linewidth]{figs/DU_GetLUT.pdf}
-    \caption{GetLUT関数のフローチャート}
-    \label{fig:gakki_getlut}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{figs/DU_GetLUT.pdf}
+%     \caption{GetLUT関数のフローチャート}
+%     \label{fig:gakki_getlut}
+% \end{figure}
 
-図\ref{fig:gakki_getlut}に示すように，この関数は，引数typeに指定された文字列に応じて，NoteSamplerが参照する試奏用楽譜データ，ピアノ専用の減衰特性等のLUT，およびドラム各パート（Kick／Snare／HiHat）のLUTのいずれかを返す統合ゲッターであり，該当する種別が存在しない場合はエラーを出力してnullを返す．
+% 図\ref{fig:gakki_getlut}に示すように，この関数は，引数typeに指定された文字列に応じて，NoteSamplerが参照する試奏用楽譜データ，ピアノ専用の減衰特性等のLUT，およびドラム各パート（Kick／Snare／HiHat）のLUTのいずれかを返す統合ゲッターであり，該当する種別が存在しない場合はエラーを出力してnullを返す．
 
-以下では，表\ref{table:gakki_utils_func}に示した関数のうち，本デバイスの音色再現の核となるGetProfileForPitch関数とGetDynamicProfile関数について，実際のコードとともに説明する．はじめに，GetProfileForPitch関数について説明する．GetProfileForPitch関数のフローチャートを図\ref{fig:gakki_getprofile}に示す．
+以下では，表\ref{table:gakki_utils_func}に示した関数のうち，本デバイスの音色再現の核となるGetProfileForPitch関数とGetDynamicProfile関数について説明する．はじめに，GetProfileForPitch関数について説明する．
+% GetProfileForPitch関数のフローチャートを図\ref{fig:gakki_getprofile}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.5\linewidth]{figs/DU_GetProfileForPitch.pdf}
-    \caption{GetProfileForPitch関数のフローチャート}
-    \label{fig:gakki_getprofile}
-\end{figure}
-この関数は，要求されたピッチに最も近い有効なサンプルインデックスをLUTから探索し，そのサンプルが本来持つ基準音程（sourceMidi）と要求ピッチとの半音差から求めた倍率（pitchShiftFactor）を，実測された周波数構造にそのまま乗算することで，インハーモニシティ（倍音の非整数性）のデコボコを保持したまま滑らかにピッチをスケーリングする．GetProfileForPitch関数の要部をコード\ref{lst:gakki_getprofile}に示す．
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{figs/DU_GetProfileForPitch.pdf}
+%     \caption{GetProfileForPitch関数のフローチャート}
+%     \label{fig:gakki_getprofile}
+% \end{figure}
+この関数は，要求されたピッチに最も近い有効なサンプルインデックスをLUTから探索し，そのサンプルが本来持つ基準音程（sourceMidi）と要求ピッチとの半音差から求めた倍率（pitchShiftFactor）を，実測された周波数構造にそのまま乗算することで，インハーモニシティ（倍音の非整数性）のデコボコを保持したまま滑らかにピッチをスケーリングする．
+% GetProfileForPitch関数の要部をコード\ref{lst:gakki_getprofile}に示す．
 
-\begin{lstlisting}[caption={DataUtils::GetProfileForPitch関数（要部）}, label={lst:gakki_getprofile}]
-float[][] GetProfileForPitch(float pitch, float[][][] lut, int baseMidiNote) {
-  float originalPitch = pitch;
-  float maxMidiNote = baseMidiNote + lut.length - 1;
-  float searchPitch = constrain(pitch, baseMidiNote, maxMidiNote);
+% \begin{lstlisting}[caption={DataUtils::GetProfileForPitch関数（要部）}, label={lst:gakki_getprofile}]
+% float[][] GetProfileForPitch(float pitch, float[][][] lut, int baseMidiNote) {
+%   float originalPitch = pitch;
+%   float maxMidiNote = baseMidiNote + lut.length - 1;
+%   float searchPitch = constrain(pitch, baseMidiNote, maxMidiNote);
+% 
+%   int targetIndex = round(searchPitch) - baseMidiNote;
+%   targetIndex = constrain(targetIndex, 0, lut.length - 1);
+% 
+%   // targetIndexがnull（データ欠損）の場合は、最も近い有効なインデックスを探索する
+%   int finalIndex = targetIndex;
+%   // (探索処理は省略。詳細は付録のプログラム全文を参照)
+% 
+%   float[][] sourceProfile = lut[finalIndex];
+%   int numPeaks = sourceProfile.length;
+%   float[][] result = new float[numPeaks][2];
+% 
+%   // 流用元サンプルの基準MIDIノート番号を逆算
+%   float sourceMidi = finalIndex + baseMidiNote;
+%   // 要求ピッチと流用元との半音差から、周波数の倍率を算出
+%   float pitchShiftFactor = pow(2.0f, (originalPitch - sourceMidi) / 12.0f);
+% 
+%   for (int h = 0; h < numPeaks; h++) {
+%     result[h][0] = sourceProfile[h][0] * pitchShiftFactor; // 実測周波数構造をそのままスケーリング
+%     result[h][1] = sourceProfile[h][1]; // 振幅はそのままコピー
+%   }
+%   return result;
+% }
+% \end{lstlisting}
 
-  int targetIndex = round(searchPitch) - baseMidiNote;
-  targetIndex = constrain(targetIndex, 0, lut.length - 1);
+次に，GetDynamicProfile関数について説明する．
+% GetDynamicProfile関数のフローチャートを図\ref{fig:gakki_getdynamic}に示す．
 
-  // targetIndexがnull（データ欠損）の場合は、最も近い有効なインデックスを探索する
-  int finalIndex = targetIndex;
-  // (探索処理は省略。詳細は付録のプログラム全文を参照)
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{figs/DU_GetDynamicProfile.pdf}
+%     \caption{GetDynamicProfile関数のフローチャート}
+%     \label{fig:gakki_getdynamic}
+% \end{figure}
 
-  float[][] sourceProfile = lut[finalIndex];
-  int numPeaks = sourceProfile.length;
-  float[][] result = new float[numPeaks][2];
+この関数は，まずpp/mf/ffの3つの強弱プロファイルをGetProfileForPitch関数で取得したうえで，ベロシティを0〜1に正規化し，あらかじめ定めた3つの閾値（32/80/112 を127で除した値）と比較して，隣接する2つの強弱のうちベロシティに近い方のプロファイル形状を採用する．続いて，振幅0.05未満の微小なピークを除去したうえで，採用した各ピークの振幅の2乗和（エネルギー）に対する目標音量の比からゲインを算出し，全ピークへ一括で乗算することで最終的な音量を決定する．
+% GetDynamicProfile関数の要部をコード\ref{lst:gakki_getdynamic}に示す．
 
-  // 流用元サンプルの基準MIDIノート番号を逆算
-  float sourceMidi = finalIndex + baseMidiNote;
-  // 要求ピッチと流用元との半音差から、周波数の倍率を算出
-  float pitchShiftFactor = pow(2.0f, (originalPitch - sourceMidi) / 12.0f);
+% \begin{lstlisting}[caption={DataUtils::GetDynamicProfile関数（要部）}, label={lst:gakki_getdynamic}]
+% float[][] GetDynamicProfile(float pitch, float velocity, String type, int baseMidiNote, float basePower) {
+%   float[][] profilePP, profileMF, profileFF;
+%   // switch(type)によりPP/MF/FFの各LUTからGetProfileForPitchで取得（詳細略）
+% 
+%   float normVel = constrain(velocity, 0, 127) / 127.0f;
+%   float thresholdPP = 32.0f / 127.0f;
+%   float thresholdMF = 80.0f / 127.0f;
+%   float thresholdFF = 112.0f / 127.0f;
+% 
+%   float[][] baseProfile;
+%   float t = 0;
+%   if (normVel <= thresholdPP) {
+%     baseProfile = profilePP;
+%   } else if (normVel <= thresholdMF) {
+%     t = map(normVel, thresholdPP, thresholdMF, 0.0f, 1.0f);
+%     baseProfile = (t < 0.5f) ? profilePP : profileMF;
+%   } else if (normVel <= thresholdFF) {
+%     t = map(normVel, thresholdMF, thresholdFF, 0.0f, 1.0f);
+%     baseProfile = (t < 0.5f) ? profileMF : profileFF;
+%   } else {
+%     baseProfile = profileFF;
+%   }
+% 
+%   int numPeaks = baseProfile.length;
+%   float ampThreshold = 0.05f;
+%   int validPeakCount = 0;
+%   float energy = 0;
+%   float[][] finalProfile = new float[numPeaks][2]; // 実際は有効数分で確保
+% 
+%   for (int h = 0; h < numPeaks; h++) {
+%     if (baseProfile[h][1] < ampThreshold) continue; // 微小ピークは除去
+%     finalProfile[validPeakCount][0] = baseProfile[h][0];
+%     finalProfile[validPeakCount][1] = baseProfile[h][1];
+%     energy += baseProfile[h][1] * baseProfile[h][1];
+%     validPeakCount++;
+%   }
+% 
+%   float targetVolume = basePower * pow(normVel, 0.9f);
+%   float gain = targetVolume / sqrt(energy + 1e-9f);
+%   for (int i = 0; i < validPeakCount; i++) {
+%     finalProfile[i][1] *= gain; // エネルギー正規化ゲインを適用
+%   }
+%   return finalProfile;
+% }
+% \end{lstlisting}
 
-  for (int h = 0; h < numPeaks; h++) {
-    result[h][0] = sourceProfile[h][0] * pitchShiftFactor; // 実測周波数構造をそのままスケーリング
-    result[h][1] = sourceProfile[h][1]; // 振幅はそのままコピー
-  }
-  return result;
-}
-\end{lstlisting}
+次に，発音命令の委譲を行うInstrumentPlayerクラスについて説明する．
+% InstrumentPlayerクラスのコンストラクタおよびPlayXxx関数のフローチャートを図\ref{fig:gakki_instplayer}に示す．
 
-次に，GetDynamicProfile関数について説明する．GetDynamicProfile関数のフローチャートを図\ref{fig:gakki_getdynamic}に示す．
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.5\linewidth]{figs/DU_GetDynamicProfile.pdf}
-    \caption{GetDynamicProfile関数のフローチャート}
-    \label{fig:gakki_getdynamic}
-\end{figure}
-
-この関数は，まずpp/mf/ffの3つの強弱プロファイルをGetProfileForPitch関数で取得したうえで，ベロシティを0〜1に正規化し，あらかじめ定めた3つの閾値（32/80/112 を127で除した値）と比較して，隣接する2つの強弱のうちベロシティに近い方のプロファイル形状を採用する．続いて，振幅0.05未満の微小なピークを除去したうえで，採用した各ピークの振幅の2乗和（エネルギー）に対する目標音量の比からゲインを算出し，全ピークへ一括で乗算することで最終的な音量を決定する．GetDynamicProfile関数の要部をコード\ref{lst:gakki_getdynamic}に示す．
-
-\begin{lstlisting}[caption={DataUtils::GetDynamicProfile関数（要部）}, label={lst:gakki_getdynamic}]
-float[][] GetDynamicProfile(float pitch, float velocity, String type, int baseMidiNote, float basePower) {
-  float[][] profilePP, profileMF, profileFF;
-  // switch(type)によりPP/MF/FFの各LUTからGetProfileForPitchで取得（詳細略）
-
-  float normVel = constrain(velocity, 0, 127) / 127.0f;
-  float thresholdPP = 32.0f / 127.0f;
-  float thresholdMF = 80.0f / 127.0f;
-  float thresholdFF = 112.0f / 127.0f;
-
-  float[][] baseProfile;
-  float t = 0;
-  if (normVel <= thresholdPP) {
-    baseProfile = profilePP;
-  } else if (normVel <= thresholdMF) {
-    t = map(normVel, thresholdPP, thresholdMF, 0.0f, 1.0f);
-    baseProfile = (t < 0.5f) ? profilePP : profileMF;
-  } else if (normVel <= thresholdFF) {
-    t = map(normVel, thresholdMF, thresholdFF, 0.0f, 1.0f);
-    baseProfile = (t < 0.5f) ? profileMF : profileFF;
-  } else {
-    baseProfile = profileFF;
-  }
-
-  int numPeaks = baseProfile.length;
-  float ampThreshold = 0.05f;
-  int validPeakCount = 0;
-  float energy = 0;
-  float[][] finalProfile = new float[numPeaks][2]; // 実際は有効数分で確保
-
-  for (int h = 0; h < numPeaks; h++) {
-    if (baseProfile[h][1] < ampThreshold) continue; // 微小ピークは除去
-    finalProfile[validPeakCount][0] = baseProfile[h][0];
-    finalProfile[validPeakCount][1] = baseProfile[h][1];
-    energy += baseProfile[h][1] * baseProfile[h][1];
-    validPeakCount++;
-  }
-
-  float targetVolume = basePower * pow(normVel, 0.9f);
-  float gain = targetVolume / sqrt(energy + 1e-9f);
-  for (int i = 0; i < validPeakCount; i++) {
-    finalProfile[i][1] *= gain; // エネルギー正規化ゲインを適用
-  }
-  return finalProfile;
-}
-\end{lstlisting}
-
-次に，発音命令の委譲を行うInstrumentPlayerクラスについて説明する．InstrumentPlayerクラスのコンストラクタおよびPlayXxx関数のフローチャートを図\ref{fig:gakki_instplayer}に示す．
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.95\linewidth]{figs/InstrumentPlayer.pdf}
-    \caption{InstrumentPlayerクラスのフローチャート}
-    \label{fig:gakki_instplayer}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.95\linewidth]{figs/InstrumentPlayer.pdf}
+%     \caption{InstrumentPlayerクラスのフローチャート}
+%     \label{fig:gakki_instplayer}
+% \end{figure}
 
 このクラスは，AudioOutputへの参照を保持し，各PlayXxx関数が呼び出されるたびに，対応する楽器クラスのインスタンスをその場で生成してout.playNote関数へ渡すという単純な委譲処理のみを行う．InstrumentPlayerクラスで使用する主な関数の仕様を表\ref{table:gakki_player_func}に示す．
 
@@ -2000,66 +2117,71 @@ float[][] GetDynamicProfile(float pitch, float velocity, String type, int baseMi
     \end{tabular}
 \end{table}
 
-InstrumentPlayerクラスのPlayFlute関数をコード\ref{lst:gakki_player}に示す．他のPlayXxx関数も，生成するInstrumentクラスが異なるのみで，同様の構造となっている．
+他のPlayXxx関数も，生成するInstrumentクラスが異なるのみで，同様の構造となっている．
+% InstrumentPlayerクラスのPlayFlute関数をコード\ref{lst:gakki_player}に示す．
 
-\begin{lstlisting}[caption={InstrumentPlayer::PlayFlute関数}, label={lst:gakki_player}]
-void PlayFlute(float midiNote, float duration, float startVel, float endVel, float masterVol) {
-  out.playNote(0.0f, duration,
-    new FluteInstrument(midiNote, duration, startVel, endVel, masterVol));
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={InstrumentPlayer::PlayFlute関数}, label={lst:gakki_player}]
+% void PlayFlute(float midiNote, float duration, float startVel, float endVel, float masterVol) {
+%   out.playNote(0.0f, duration,
+%     new FluteInstrument(midiNote, duration, startVel, endVel, masterVol));
+% }
+% \end{lstlisting}
 
-次に，残響エフェクトを付加するAddEffect.pdeのAddReverbクラスについて説明する．AddReverbクラスのコンストラクタおよびuGenerate関数のフローチャートを図\ref{fig:gakki_addreverb}に示す．
+次に，残響エフェクトを付加するAddEffect.pdeのAddReverbクラスについて説明する．
+% AddReverbクラスのコンストラクタおよびuGenerate関数のフローチャートを図\ref{fig:gakki_addreverb}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{figs/AE_AddReverb.pdf}
-    \caption{AddReverbクラスのフローチャート}
-    \label{fig:gakki_addreverb}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.8\linewidth]{figs/AE_AddReverb.pdf}
+%     \caption{AddReverbクラスのフローチャート}
+%     \label{fig:gakki_addreverb}
+% \end{figure}
 
-このクラスはMinimライブラリのUGenを継承しており，講義で扱われたたたみ込み積分（コンボリューション）を，指数関数的に減衰するランダムノイズを疑似的なインパルス応答として用いることで実装している．左右のチャンネルの記憶バッファ（historyBufferL・historyBufferR）を独立させることで，ステレオ音場に対応している．AddReverbクラスの心臓部であるuGenerate関数をコード\ref{lst:gakki_reverb}に示す．
+このクラスはMinimライブラリのUGenを継承しており，講義で扱われたたたみ込み積分（コンボリューション）を，指数関数的に減衰するランダムノイズを疑似的なインパルス応答として用いることで実装している．左右のチャンネルの記憶バッファ（historyBufferL・historyBufferR）を独立させることで，ステレオ音場に対応している．
+% AddReverbクラスの心臓部であるuGenerate関数をコード\ref{lst:gakki_reverb}に示す．
 
-\begin{lstlisting}[caption={AddReverb::uGenerate関数}, label={lst:gakki_reverb}]
-protected void uGenerate(float[] channels) {
-  float[] inputs = audio.getLastValues();
-  float inL = inputs[0];
-  float inR = (inputs.length > 1) ? inputs[1] : inL;
-
-  historyBufferL[bufferIndex] = inL;
-  historyBufferR[bufferIndex] = inR;
-
-  float outL = 0;
-  float outR = 0;
-  for (int j = 0; j < kernelSize; j++) {
-    int idx = (bufferIndex - j + kernelSize) % kernelSize;
-    outL += historyBufferL[idx] * impulseResponse[j];
-    outR += historyBufferR[idx] * impulseResponse[j];
-  }
-
-  bufferIndex = (bufferIndex + 1) % kernelSize;
-
-  if (channels.length == 1) {
-    channels[0] = inL + outL;
-  } else if (channels.length >= 2) {
-    channels[0] = inL + outL;
-    channels[1] = inR + outR;
-  }
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={AddReverb::uGenerate関数}, label={lst:gakki_reverb}]
+% protected void uGenerate(float[] channels) {
+%   float[] inputs = audio.getLastValues();
+%   float inL = inputs[0];
+%   float inR = (inputs.length > 1) ? inputs[1] : inL;
+% 
+%   historyBufferL[bufferIndex] = inL;
+%   historyBufferR[bufferIndex] = inR;
+% 
+%   float outL = 0;
+%   float outR = 0;
+%   for (int j = 0; j < kernelSize; j++) {
+%     int idx = (bufferIndex - j + kernelSize) % kernelSize;
+%     outL += historyBufferL[idx] * impulseResponse[j];
+%     outR += historyBufferR[idx] * impulseResponse[j];
+%   }
+% 
+%   bufferIndex = (bufferIndex + 1) % kernelSize;
+% 
+%   if (channels.length == 1) {
+%     channels[0] = inL + outL;
+%   } else if (channels.length >= 2) {
+%     channels[0] = inL + outL;
+%     channels[1] = inR + outR;
+%   }
+% }
+% \end{lstlisting}
 
 setup関数内では，持続音向けの残響バスlongOut（カーネルサイズ15000，レベル0.20）と，打撃音向けの残響バスshortOut（カーネルサイズ2000，レベル0.25）の2種類のAddReverbが生成されており，各楽器クラスはnoteOn関数内でmasterEnvをこのいずれかへパッチすることで，音色に適した残響を選択している．
 
-次に，デバッグ用の自動演奏機能を提供するNoteSampler.pdeについて説明する．本機能は，指揮デバイスや中継機デバイスが未接続の状態でもPC単体で音色の検証を行えるようにするためのものであり，Processingの標準描画ループ（draw）に依存すると波形描画の負荷でタイミングがずれるため，音楽専用のスレッド（audioThread）を用いて高精度にタイミングを管理している．audioThreadの処理ループおよびSoundPlay関数のフローチャートを図\ref{fig:gakki_soundplay_thread}に示す．
+次に，デバッグ用の自動演奏機能を提供するNoteSampler.pdeについて説明する．本機能は，指揮デバイスや中継機デバイスが未接続の状態でもPC単体で音色の検証を行えるようにするためのものであり，Processingの標準描画ループ（draw）に依存すると波形描画の負荷でタイミングがずれるため，音楽専用のスレッド（audioThread）を用いて高精度にタイミングを管理している．
+% audioThreadの処理ループおよびSoundPlay関数のフローチャートを図\ref{fig:gakki_soundplay_thread}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.45\linewidth]{figs/SC_SoundPlay.pdf}
-    \caption{audioThreadの処理ループおよびSoundPlay関数のフローチャート}
-    \label{fig:gakki_soundplay_thread}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.45\linewidth]{figs/SC_SoundPlay.pdf}
+%     \caption{audioThreadの処理ループおよびSoundPlay関数のフローチャート}
+%     \label{fig:gakki_soundplay_thread}
+% \end{figure}
 
-図\ref{fig:gakki_soundplay_thread}に示すように，スレッドはisPlayingおよびisDebugModeが共に有効な間，一定のインターバルごとにSoundPlay関数を呼び出し，現在のtickに該当する音符をNote配列から取得して各楽器のPlayメソッドを呼び出したうえで，次の音符のtickへ進む．NoteSampler.pdeで使用する主な変数の仕様を表\ref{table:gakki_sampler_var}に示す．
+NoteSampler.pdeで使用する主な変数の仕様を表\ref{table:gakki_sampler_var}に示す．
+% 図\ref{fig:gakki_soundplay_thread}に示すように，スレッドはisPlayingおよびisDebugModeが共に有効な間，一定のインターバルごとにSoundPlay関数を呼び出し，現在のtickに該当する音符をNote配列から取得して各楽器のPlayメソッドを呼び出したうえで，次の音符のtickへ進む．
 
 \begin{table}[H]
     \caption{NoteSampler.pdeで使用する主な変数の仕様一覧}
@@ -2103,49 +2225,50 @@ setup関数内では，持続音向けの残響バスlongOut（カーネルサ�
     \end{tabular}
 \end{table}
 
-SoundPlay関数をコード\ref{lst:gakki_soundplay}に示す．
+% SoundPlay関数をコード\ref{lst:gakki_soundplay}に示す．
 
-\begin{lstlisting}[caption={SoundPlay関数}, label={lst:gakki_soundplay}]
-void SoundPlay() {
-  if (tick == returnTick[returnIndex][0]) {
-    tick = returnTick[returnIndex][1];
-    noteIndex = returnTick[returnIndex][2];
-    returnIndex ++;
-    if (returnIndex == returnTick.length) returnIndex = 0;
-  }
+% \begin{lstlisting}[caption={SoundPlay関数}, label={lst:gakki_soundplay}]
+% void SoundPlay() {
+%   if (tick == returnTick[returnIndex][0]) {
+%     tick = returnTick[returnIndex][1];
+%     noteIndex = returnTick[returnIndex][2];
+%     returnIndex ++;
+%     if (returnIndex == returnTick.length) returnIndex = 0;
+%   }
+% 
+%   if (noteIndex < Note.length) {
+%     float durationTuning = interval / 1000000000.0f;
+%     while (Note[noteIndex][0] == tick) {
+%       float duration = float(Note[noteIndex][1]) * durationTuning;
+%       float pitch = float(Note[noteIndex][2]);
+%       float startVelocity = float(Note[noteIndex][3]);
+%       float endVelocity = float(Note[noteIndex][4]);
+%       float type = (Note[noteIndex].length == 6) ? float(Note[noteIndex][5]) : 0;
+%       switch (timbre) {
+%         case "Flute": case "Flute2":
+%           player.PlayFlute(pitch, duration, startVelocity, endVelocity, 1.0f);
+%           break;
+%         // 以下、Strings/Piano/Drum/Horn/Trumpetも同様に分岐（詳細は付録参照）
+%       }
+%       noteIndex ++;
+%       if (noteIndex == Note.length) break;
+%     }
+%   }
+% }
+% \end{lstlisting}
 
-  if (noteIndex < Note.length) {
-    float durationTuning = interval / 1000000000.0f;
-    while (Note[noteIndex][0] == tick) {
-      float duration = float(Note[noteIndex][1]) * durationTuning;
-      float pitch = float(Note[noteIndex][2]);
-      float startVelocity = float(Note[noteIndex][3]);
-      float endVelocity = float(Note[noteIndex][4]);
-      float type = (Note[noteIndex].length == 6) ? float(Note[noteIndex][5]) : 0;
-      switch (timbre) {
-        case "Flute": case "Flute2":
-          player.PlayFlute(pitch, duration, startVelocity, endVelocity, 1.0f);
-          break;
-        // 以下、Strings/Piano/Drum/Horn/Trumpetも同様に分岐（詳細は付録参照）
-      }
-      noteIndex ++;
-      if (noteIndex == Note.length) break;
-    }
-  }
-}
-\end{lstlisting}
-
-最後に，各楽器クラスによる音色合成について説明する．いずれの楽器クラスも，コンストラクタ内でDataUtilsから取得した倍音プロファイルをもとに正弦波（Oscil）を加算合成し，ADSR（Attack, Decay, Sustain, Release）エンベロープおよびLineによる時間変化を付加したうえでミキサー（Summer）へ結線し，noteOn関数でエンベロープとLineを一斉に起動する，という共通の設計に従っている．以下では，各楽器クラスに特有の合成技法について，実際のコードとともに説明する．
+最後に，各楽器クラスによる音色合成について説明する．いずれの楽器クラスも，コンストラクタ内でDataUtilsから取得した倍音プロファイルをもとに正弦波（Oscil）を加算合成し，ADSR（Attack, Decay, Sustain, Release）エンベロープおよびLineによる時間変化を付加したうえでミキサー（Summer）へ結線し，noteOn関数でエンベロープとLineを一斉に起動する，という共通の設計に従っている．以下では，各楽器クラスに特有の合成技法について説明する．
 
 \paragraph{フルート（FluteInstrument）}
-まず，フルートの音色合成について説明する．FluteInstrumentコンストラクタのフローチャートを図\ref{fig:gakki_flute}に示す．
+まず，フルートの音色合成について説明する．
+% FluteInstrumentコンストラクタのフローチャートを図\ref{fig:gakki_flute}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.5\linewidth]{figs/FI_FluteInstrument.pdf}
-    \caption{FluteInstrumentコンストラクタのフローチャート}
-    \label{fig:gakki_flute}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{figs/FI_FluteInstrument.pdf}
+%     \caption{FluteInstrumentコンストラクタのフローチャート}
+%     \label{fig:gakki_flute}
+% \end{figure}
 
 FluteInstrumentクラスは，DataUtilsから取得した倍音プロファイルをもとに正弦波を加算合成する層と，息が管に吹き込まれる音（Chiff）を再現するノイズ層の2層構造で構成される．加算合成の各倍音には，globalBreathSpeedという1つの共通の乱数速度で駆動されるビブラート（FM変調）と，倍音ごとに個別の深さを持つ音量の呼吸的揺らぎ（AM変調）が付加されている．FluteInstrumentクラスで使用する主な変数の仕様を表\ref{table:gakki_flute_var}に示す．
 
@@ -2191,77 +2314,80 @@ FluteInstrumentクラスは，DataUtilsから取得した倍音プロファイ�
     \end{tabular}
 \end{table}
 
-以下では，コンストラクタとnoteOn関数について，実際のコードとともに説明する．まず，加算合成部分について説明する．各倍音についてOscilを生成し，位相をランダムに散らしたうえで，ビブラート用のOscil（freqController）を周波数へ，音量揺らぎ用のOscil（ampLFO）を振幅へそれぞれパッチしている．加算合成部分をコード\ref{lst:gakki_flute_ctor}に示す．
+以下では，コンストラクタとnoteOn関数について説明する．まず，加算合成部分について説明する．各倍音についてOscilを生成し，位相をランダムに散らしたうえで，ビブラート用のOscil（freqController）を周波数へ，音量揺らぎ用のOscil（ampLFO）を振幅へそれぞれパッチしている．
+% 加算合成部分をコード\ref{lst:gakki_flute_ctor}に示す．
 
-\begin{lstlisting}[caption={FluteInstrumentコンストラクタ（加算合成部分）}, label={lst:gakki_flute_ctor}]
-for (int i = 0; i < numHarmonics; i++) {
-  float targetFreq = startProfile[i][0];
-  Oscil osc = new Oscil(targetFreq, 0.0f, Waves.SINE);
-  osc.setPhase(random(1.0f)); // アタック音の機械的な均一さを防ぐ
+% \begin{lstlisting}[caption={FluteInstrumentコンストラクタ（加算合成部分）}, label={lst:gakki_flute_ctor}]
+% for (int i = 0; i < numHarmonics; i++) {
+%   float targetFreq = startProfile[i][0];
+%   Oscil osc = new Oscil(targetFreq, 0.0f, Waves.SINE);
+%   osc.setPhase(random(1.0f)); // アタック音の機械的な均一さを防ぐ
+% 
+%   float baseAmp = startProfile[i][1] * volFactor;
+%   startAmps[i] = baseAmp * startGainFactor;
+%   endAmps[i]   = baseAmp * endGainFactor;
+% 
+%   // ビブラート（FM変調）
+%   float vibDepthHz = targetFreq * 0.0015f;
+%   Oscil freqController = new Oscil(globalBreathSpeed, vibDepthHz/10, Waves.SINE);
+%   freqController.offset.setLastValue(targetFreq);
+%   freqController.patch(osc.frequency);
+% 
+%   // 音量揺らぎ（AM変調）：ウナリ自体をフェードさせる
+%   wobbleFactors[i] = wobbleDepths[i];
+%   wobbleLines[i] = new Line();
+%   Oscil ampLFO = new Oscil(globalBreathSpeed, 0.0f, Waves.SINE);
+%   ampLFO.setPhase(random(1.0f));
+%   wobbleLines[i].patch(ampLFO.amplitude);
+%   ampLFO.patch(osc.amplitude);
+% 
+%   ampLines[i] = new Line();
+%   ampLines[i].patch(osc.amplitude);
+% 
+%   float attackTime = (i == baseWaveNum) ? 0.058f : 0.395f;
+%   harmonicEnvs[i] = new ADSR(1.0f, attackTime/3, 1.0f, 0.7f, 10.0f);
+%   osc.patch(harmonicEnvs[i]);
+%   harmonicEnvs[i].patch(mixer);
+% }
+% \end{lstlisting}
 
-  float baseAmp = startProfile[i][1] * volFactor;
-  startAmps[i] = baseAmp * startGainFactor;
-  endAmps[i]   = baseAmp * endGainFactor;
+次に，息のノイズ（Chiff）部分について説明する．ホワイトノイズをバンドパスフィルター（MoogFilter）に通すことで，息が管に吹き込まれる瞬間の「シュッ」という音のみを抽出している．
+% 息ノイズ部分をコード\ref{lst:gakki_flute_breath}に示す．
 
-  // ビブラート（FM変調）
-  float vibDepthHz = targetFreq * 0.0015f;
-  Oscil freqController = new Oscil(globalBreathSpeed, vibDepthHz/10, Waves.SINE);
-  freqController.offset.setLastValue(targetFreq);
-  freqController.patch(osc.frequency);
+% \begin{lstlisting}[caption={FluteInstrumentコンストラクタ（息ノイズ部分）}, label={lst:gakki_flute_breath}]
+% float startNorm = constrain(startVel, 0, 127) / 127.0f;
+% float attackNoiseVol = masterVol * 0.008f * pow(startNorm, 0.9f);
+% Noise breathNoise = new Noise(attackNoiseVol, Noise.Tint.WHITE);
+% 
+% MoogFilter breathFilter = new MoogFilter(581.4f, 0.15f);
+% breathFilter.type = MoogFilter.Type.BP;
+% 
+% breathEnv = new ADSR(1.0f, 0.001f, 0.2f, 0.0f, 0.0f);
+% breathNoise.patch(breathFilter);
+% breathFilter.patch(breathEnv);
+% breathEnv.patch(mixer);
+% \end{lstlisting}
 
-  // 音量揺らぎ（AM変調）：ウナリ自体をフェードさせる
-  wobbleFactors[i] = wobbleDepths[i];
-  wobbleLines[i] = new Line();
-  Oscil ampLFO = new Oscil(globalBreathSpeed, 0.0f, Waves.SINE);
-  ampLFO.setPhase(random(1.0f));
-  wobbleLines[i].patch(ampLFO.amplitude);
-  ampLFO.patch(osc.amplitude);
+最後に，noteOn関数について説明する．この関数は，masterEnvとharmonicEnvsを起動したうえで，ampLines（ベース音量）とwobbleLines（揺らぎの深さ）を，音符の長さに0.5秒の余裕を加えたsafeDurにわたって開始値から終了値へフェードさせる．
+% noteOn関数をコード\ref{lst:gakki_flute_noteon}に示す．
 
-  ampLines[i] = new Line();
-  ampLines[i].patch(osc.amplitude);
-
-  float attackTime = (i == baseWaveNum) ? 0.058f : 0.395f;
-  harmonicEnvs[i] = new ADSR(1.0f, attackTime/3, 1.0f, 0.7f, 10.0f);
-  osc.patch(harmonicEnvs[i]);
-  harmonicEnvs[i].patch(mixer);
-}
-\end{lstlisting}
-
-次に，息のノイズ（Chiff）部分について説明する．ホワイトノイズをバンドパスフィルター（MoogFilter）に通すことで，息が管に吹き込まれる瞬間の「シュッ」という音のみを抽出している．息ノイズ部分をコード\ref{lst:gakki_flute_breath}に示す．
-
-\begin{lstlisting}[caption={FluteInstrumentコンストラクタ（息ノイズ部分）}, label={lst:gakki_flute_breath}]
-float startNorm = constrain(startVel, 0, 127) / 127.0f;
-float attackNoiseVol = masterVol * 0.008f * pow(startNorm, 0.9f);
-Noise breathNoise = new Noise(attackNoiseVol, Noise.Tint.WHITE);
-
-MoogFilter breathFilter = new MoogFilter(581.4f, 0.15f);
-breathFilter.type = MoogFilter.Type.BP;
-
-breathEnv = new ADSR(1.0f, 0.001f, 0.2f, 0.0f, 0.0f);
-breathNoise.patch(breathFilter);
-breathFilter.patch(breathEnv);
-breathEnv.patch(mixer);
-\end{lstlisting}
-
-最後に，noteOn関数について説明する．この関数は，masterEnvとharmonicEnvsを起動したうえで，ampLines（ベース音量）とwobbleLines（揺らぎの深さ）を，音符の長さに0.5秒の余裕を加えたsafeDurにわたって開始値から終了値へフェードさせる．noteOn関数をコード\ref{lst:gakki_flute_noteon}に示す．
-
-\begin{lstlisting}[caption={FluteInstrument::noteOn関数}, label={lst:gakki_flute_noteon}]
-void noteOn(float dur) {
-  masterEnv.noteOn();
-  float safeDur = dur + 0.5f;
-
-  for(int i = 0; i < numHarmonics; i++) {
-    harmonicEnvs[i].noteOn();
-    ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
-    if (wobbleLines[i] != null) {
-      float factor = wobbleFactors[i];
-      wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
-    }
-  }
-  breathEnv.noteOn();
-  masterEnv.patch(longOut);
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={FluteInstrument::noteOn関数}, label={lst:gakki_flute_noteon}]
+% void noteOn(float dur) {
+%   masterEnv.noteOn();
+%   float safeDur = dur + 0.5f;
+% 
+%   for(int i = 0; i < numHarmonics; i++) {
+%     harmonicEnvs[i].noteOn();
+%     ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
+%     if (wobbleLines[i] != null) {
+%       float factor = wobbleFactors[i];
+%       wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
+%     }
+%   }
+%   breathEnv.noteOn();
+%   masterEnv.patch(longOut);
+% }
+% \end{lstlisting}
 
 \paragraph{ストリングス（StringsInstrument）}
 次に，ストリングスの音色合成について説明する．StringsInstrumentクラスは，単一の楽器データではなく，コントラバス・チェロ・ビオラ・バイオリンの4種類のLUTを音程に応じてクロスフェード（混合）させることで，低音から高音まで滑らかに音色が変化する弦楽器群を表現している点が最大の特徴である．音程が低いほどコントラバスの比率が高く，音程が上がるにつれてチェロ・ビオラ・バイオリンへと比率が滑らかに移行する．StringsInstrumentクラスで使用する主な変数・関数の仕様を表\ref{table:gakki_strings}に示す．
@@ -2285,73 +2411,76 @@ void noteOn(float dur) {
     \end{tabular}
 \end{table}
 
-まず，楽器ブレンド比率の算出について説明する．音程（midiNote）の値に応じて，隣接する2楽器間の比率をmap関数で線形補間する．ブレンド比率の算出部分をコード\ref{lst:gakki_strings_blend}に示す．
+まず，楽器ブレンド比率の算出について説明する．音程（midiNote）の値に応じて，隣接する2楽器間の比率をmap関数で線形補間する．
+% ブレンド比率の算出部分をコード\ref{lst:gakki_strings_blend}に示す．
 
-\begin{lstlisting}[caption={StringsInstrumentコンストラクタ（楽器ブレンド比率の算出）}, label={lst:gakki_strings_blend}]
-float baseBassRatio = 0.0f, baseCelloRatio = 0.0f, baseViolaRatio = 0.0f, baseViolinRatio = 0.0f;
+% \begin{lstlisting}[caption={StringsInstrumentコンストラクタ（楽器ブレンド比率の算出）}, label={lst:gakki_strings_blend}]
+% float baseBassRatio = 0.0f, baseCelloRatio = 0.0f, baseViolaRatio = 0.0f, baseViolinRatio = 0.0f;
+% 
+% if (midiNote <= 36) {
+%   baseBassRatio = 1.0f;
+% } else if (midiNote <= 48) {
+%   baseBassRatio = map(midiNote, 36, 48, 1.0f, 0.0f);
+%   baseCelloRatio = 1.0f - baseBassRatio;
+% } else if (midiNote <= 60) {
+%   baseCelloRatio = map(midiNote, 48, 60, 1.0f, 0.0f);
+%   baseViolaRatio = 1.0f - baseCelloRatio;
+% } else if (midiNote <= 72) {
+%   baseViolaRatio = map(midiNote, 60, 72, 1.0f, 0.0f);
+%   baseViolinRatio = 1.0f - baseViolaRatio;
+% } else {
+%   baseViolinRatio = 1.0f;
+% }
+% \end{lstlisting}
 
-if (midiNote <= 36) {
-  baseBassRatio = 1.0f;
-} else if (midiNote <= 48) {
-  baseBassRatio = map(midiNote, 36, 48, 1.0f, 0.0f);
-  baseCelloRatio = 1.0f - baseBassRatio;
-} else if (midiNote <= 60) {
-  baseCelloRatio = map(midiNote, 48, 60, 1.0f, 0.0f);
-  baseViolaRatio = 1.0f - baseCelloRatio;
-} else if (midiNote <= 72) {
-  baseViolaRatio = map(midiNote, 60, 72, 1.0f, 0.0f);
-  baseViolinRatio = 1.0f - baseViolaRatio;
-} else {
-  baseViolinRatio = 1.0f;
-}
-\end{lstlisting}
+次に，createInstrumentOscillators関数について説明する．この関数は，指定された楽器のLUTプロファイルを振幅の大きい順にソートしたうえで上限本数（maxPeaks）まで選別し，周波数の低い順に並べ直してからOscilとして生成する．これにより，計算負荷を抑えつつ音色に対する寄与の大きい成分を優先的に採用している．
+% createInstrumentOscillators関数の要部をコード\ref{lst:gakki_strings_create}に示す．
 
-次に，createInstrumentOscillators関数について説明する．この関数は，指定された楽器のLUTプロファイルを振幅の大きい順にソートしたうえで上限本数（maxPeaks）まで選別し，周波数の低い順に並べ直してからOscilとして生成する．これにより，計算負荷を抑えつつ音色に対する寄与の大きい成分を優先的に採用している．createInstrumentOscillators関数の要部をコード\ref{lst:gakki_strings_create}に示す．
-
-\begin{lstlisting}[caption={StringsInstrument::createInstrumentOscillators関数（要部）}, label={lst:gakki_strings_create}]
-private void createInstrumentOscillators(final float[][] profile, float blendRatio, int maxPeaks,
-    float volFactor, float globalVibSpeed, float fmDepthCents, Summer mixer,
-    float startGainFactor, float endGainFactor) {
-  if (profile == null || profile.length == 0) return;
-
-  // 振幅の大きい順にインデックスをソートし、上位limitPeaks個を抽出（詳細は付録参照）
-  // その後、周波数の低い順に並べ直す
-
-  for (int h = 0; h < limitPeaks; h++) {
-    if (totalActiveOscils >= maxTotalOscils) break;
-
-    float targetFreq = filteredProfile[h][0];
-    float rawAmp     = filteredProfile[h][1];
-    if (targetFreq > 14000.0f) continue;
-
-    // 7000Hz〜17000Hzにかけて振幅を滑らかに減衰させる高域フィルター
-    if (targetFreq > 7000.0f) {
-      float filterFactor = map(targetFreq, 7000.0f, 17000.0f, 1.0f, 0.0f);
-      rawAmp *= constrain(filterFactor, 0.0f, 1.0f);
-    }
-
-    float baseAmp = rawAmp * volFactor * blendRatio;
-    int idx = totalActiveOscils;
-    startAmps[idx] = baseAmp * startGainFactor;
-    endAmps[idx]   = baseAmp * endGainFactor;
-
-    oscils[idx] = new Oscil(targetFreq, 0.0f, Waves.SINE);
-    oscils[idx].setPhase(random(1.0f));
-    oscils[idx].patch(mixer);
-    totalActiveOscils++;
-  }
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={StringsInstrument::createInstrumentOscillators関数（要部）}, label={lst:gakki_strings_create}]
+% private void createInstrumentOscillators(final float[][] profile, float blendRatio, int maxPeaks,
+%     float volFactor, float globalVibSpeed, float fmDepthCents, Summer mixer,
+%     float startGainFactor, float endGainFactor) {
+%   if (profile == null || profile.length == 0) return;
+% 
+%   // 振幅の大きい順にインデックスをソートし、上位limitPeaks個を抽出（詳細は付録参照）
+%   // その後、周波数の低い順に並べ直す
+% 
+%   for (int h = 0; h < limitPeaks; h++) {
+%     if (totalActiveOscils >= maxTotalOscils) break;
+% 
+%     float targetFreq = filteredProfile[h][0];
+%     float rawAmp     = filteredProfile[h][1];
+%     if (targetFreq > 14000.0f) continue;
+% 
+%     // 7000Hz〜17000Hzにかけて振幅を滑らかに減衰させる高域フィルター
+%     if (targetFreq > 7000.0f) {
+%       float filterFactor = map(targetFreq, 7000.0f, 17000.0f, 1.0f, 0.0f);
+%       rawAmp *= constrain(filterFactor, 0.0f, 1.0f);
+%     }
+% 
+%     float baseAmp = rawAmp * volFactor * blendRatio;
+%     int idx = totalActiveOscils;
+%     startAmps[idx] = baseAmp * startGainFactor;
+%     endAmps[idx]   = baseAmp * endGainFactor;
+% 
+%     oscils[idx] = new Oscil(targetFreq, 0.0f, Waves.SINE);
+%     oscils[idx].setPhase(random(1.0f));
+%     oscils[idx].patch(mixer);
+%     totalActiveOscils++;
+%   }
+% }
+% \end{lstlisting}
 
 \paragraph{ピアノ（PianoInstrument）}
-次に，ピアノの音色合成について説明する．PianoInstrumentコンストラクタのフローチャートを図\ref{fig:gakki_piano}に示す．
+次に，ピアノの音色合成について説明する．
+% PianoInstrumentコンストラクタのフローチャートを図\ref{fig:gakki_piano}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.5\linewidth]{figs/PI_PianoInstrument.pdf}
-    \caption{PianoInstrumentコンストラクタのフローチャート}
-    \label{fig:gakki_piano}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{figs/PI_PianoInstrument.pdf}
+%     \caption{PianoInstrumentコンストラクタのフローチャート}
+%     \label{fig:gakki_piano}
+% \end{figure}
 
 PianoInstrumentクラスは，1つの音に対して2本の弦をわずかにデチューン（周波数をずらす）して重ねる「デュアル・ストリング構造」により，時間が経つにつれて自然に生じる音のうなり（Beat）を再現している点が特徴である．また，実測データ（LUT）が存在しない倍音・音域については，ピアノの物理特性の傾向を数式化した近似モデルで補完するハイブリッド方式を採用している．PianoInstrumentクラスで使用する主な変数・関数の仕様を表\ref{table:gakki_piano}に示す．
 
@@ -2376,50 +2505,53 @@ PianoInstrumentクラスは，1つの音に対して2本の弦をわずかにデ
     \end{tabular}
 \end{table}
 
-以下では，デュアル・ストリング構造の構築部分について説明する．各倍音について，アタックの芯となるレイヤーA（coreOsc）と，時間差で立ち上がる共鳴弦のレイヤーB（resOsc）の2層を生成する．レイヤーBはレイヤーAよりわずかに周波数をずらし（wobbleRate分のデチューン），buildUpTime秒かけてゆっくり音量を上げることで，芯の音と干渉して自然なうなりを生む．デュアル・ストリング構造の構築部分をコード\ref{lst:gakki_piano_dual}に示す．
+以下では，デュアル・ストリング構造の構築部分について説明する．各倍音について，アタックの芯となるレイヤーA（coreOsc）と，時間差で立ち上がる共鳴弦のレイヤーB（resOsc）の2層を生成する．レイヤーBはレイヤーAよりわずかに周波数をずらし（wobbleRate分のデチューン），buildUpTime秒かけてゆっくり音量を上げることで，芯の音と干渉して自然なうなりを生む．
+% デュアル・ストリング構造の構築部分をコード\ref{lst:gakki_piano_dual}に示す．
 
-\begin{lstlisting}[caption={PianoInstrumentコンストラクタ（デュアル・ストリング構造）}, label={lst:gakki_piano_dual}]
-// レイヤーA：アタックの芯（Dry弦）
-Oscil coreOsc = new Oscil(targetFreq, amp, Waves.SINE);
-coreOsc.setPhase(random(0.0f, 0.1f));
-Damp coreDamp = new Damp(0.001f, decayTime);
-coreOsc.patch(coreDamp).patch(mixer);
-damps.add(coreDamp);
+% \begin{lstlisting}[caption={PianoInstrumentコンストラクタ（デュアル・ストリング構造）}, label={lst:gakki_piano_dual}]
+% // レイヤーA：アタックの芯（Dry弦）
+% Oscil coreOsc = new Oscil(targetFreq, amp, Waves.SINE);
+% coreOsc.setPhase(random(0.0f, 0.1f));
+% Damp coreDamp = new Damp(0.001f, decayTime);
+% coreOsc.patch(coreDamp).patch(mixer);
+% damps.add(coreDamp);
+% 
+% // レイヤーB：時間差で来る響き（共鳴弦）
+% float reverbAmp = amp * wobbleDepth;
+% if (reverbAmp > 0.0001f && wobbleRate > 0.0f) {
+%   // 周波数をわずかにズラす（Detune）ことで、芯の弦と干渉して自然な「うなり(Beat)」を生む
+%   Oscil resOsc = new Oscil(targetFreq + wobbleRate, reverbAmp, Waves.SINE);
+%   Damp resDamp = new Damp(buildUpTime, decayTime);
+%   resOsc.patch(resDamp).patch(mixer);
+%   damps.add(resDamp);
+% }
+% \end{lstlisting}
 
-// レイヤーB：時間差で来る響き（共鳴弦）
-float reverbAmp = amp * wobbleDepth;
-if (reverbAmp > 0.0001f && wobbleRate > 0.0f) {
-  // 周波数をわずかにズラす（Detune）ことで、芯の弦と干渉して自然な「うなり(Beat)」を生む
-  Oscil resOsc = new Oscil(targetFreq + wobbleRate, reverbAmp, Waves.SINE);
-  Damp resDamp = new Damp(buildUpTime, decayTime);
-  resOsc.patch(resDamp).patch(mixer);
-  damps.add(resDamp);
-}
-\end{lstlisting}
+続いて，ハンマーの打撃ノイズについて説明する．音程の高低に応じてフィルターのカットオフを変化させることで，高音の鍵盤ほど硬い「カチッ」としたノイズになるよう調整している．
+% ハンマーノイズ部分をコード\ref{lst:gakki_piano_hammer}に示す．
 
-続いて，ハンマーの打撃ノイズについて説明する．音程の高低に応じてフィルターのカットオフを変化させることで，高音の鍵盤ほど硬い「カチッ」としたノイズになるよう調整している．ハンマーノイズ部分をコード\ref{lst:gakki_piano_hammer}に示す．
-
-\begin{lstlisting}[caption={PianoInstrumentコンストラクタ（ハンマーノイズ部分）}, label={lst:gakki_piano_hammer}]
-float hammerVol = masterVol * 0.003f * normVel;
-Noise hammerNoise = new Noise(hammerVol, Noise.Tint.WHITE);
-
-float hammerCutoff = map(midiNote, 21, 108, 600f, 4000f);
-MoogFilter hammerFilter = new MoogFilter(hammerCutoff, 0.1f);
-hammerFilter.type = MoogFilter.Type.LP;
-
-hammerEnv = new ADSR(1.0f, 0.001f, 0.02f, 0.0f, 0.01f);
-hammerNoise.patch(hammerFilter).patch(hammerEnv);
-\end{lstlisting}
+% \begin{lstlisting}[caption={PianoInstrumentコンストラクタ（ハンマーノイズ部分）}, label={lst:gakki_piano_hammer}]
+% float hammerVol = masterVol * 0.003f * normVel;
+% Noise hammerNoise = new Noise(hammerVol, Noise.Tint.WHITE);
+% 
+% float hammerCutoff = map(midiNote, 21, 108, 600f, 4000f);
+% MoogFilter hammerFilter = new MoogFilter(hammerCutoff, 0.1f);
+% hammerFilter.type = MoogFilter.Type.LP;
+% 
+% hammerEnv = new ADSR(1.0f, 0.001f, 0.02f, 0.0f, 0.01f);
+% hammerNoise.patch(hammerFilter).patch(hammerEnv);
+% \end{lstlisting}
 
 \paragraph{ドラム（KickInstrument・SnareInstrument・HiHatInstrument）}
-次に，ドラムの音色合成について説明する．Kick・Snare・HiHatの各コンストラクタのフローチャートを図\ref{fig:gakki_drum}に示す．
+次に，ドラムの音色合成について説明する．
+% Kick・Snare・HiHatの各コンストラクタのフローチャートを図\ref{fig:gakki_drum}に示す．
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.95\linewidth]{figs/DI_DrumInstrument.pdf}
-    \caption{Kick・Snare・HiHatの各コンストラクタのフローチャート}
-    \label{fig:gakki_drum}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.95\linewidth]{figs/DI_DrumInstrument.pdf}
+%     \caption{Kick・Snare・HiHatの各コンストラクタのフローチャート}
+%     \label{fig:gakki_drum}
+% \end{figure}
 
 ドラムはフルート等の旋律楽器とは異なり，Instrumentクラスをキック・スネア・ハイハットの3種類（および過去に試作されたSnareInstrumentOld・HiHatInstrumentOldの旧版，未使用のCymbalInstrument）に分けて実装している．いずれも短時間で減衰する打撃音であるため，全体の出力はshortOutバスへパッチされる．3種の主要な変数・関数の仕様を表\ref{table:gakki_drum}に示す．
 
@@ -2442,44 +2574,46 @@ hammerNoise.patch(hammerFilter).patch(hammerEnv);
     \end{tabular}
 \end{table}
 
-以下では，キックのピッチスイープと，スネアの胴鳴りパートについて，実際のコードとともに説明する．まず，KickInstrumentのピッチスイープについて説明する．各周波数成分について，Lineを用いて0.01秒かけて「本来の周波数の1.5倍」から「本来の周波数」へ直線的に下げることで，太鼓の膜が叩かれた瞬間にピッチが下がっていく物理的な挙動を再現している．該当部分をコード\ref{lst:gakki_kick}に示す．
+以下では，キックのピッチスイープと，スネアの胴鳴りパートについて説明する．まず，KickInstrumentのピッチスイープについて説明する．各周波数成分について，Lineを用いて0.01秒かけて「本来の周波数の1.5倍」から「本来の周波数」へ直線的に下げることで，太鼓の膜が叩かれた瞬間にピッチが下がっていく物理的な挙動を再現している．
+% 該当部分をコード\ref{lst:gakki_kick}に示す．
 
-\begin{lstlisting}[caption={KickInstrumentコンストラクタ（ピッチスイープ部分）}, label={lst:gakki_kick}]
-for (int i = 0; i < numComponents; i++) {
-  if (kickLUT[i] == null || kickLUT[i].length < 3) continue;
+% \begin{lstlisting}[caption={KickInstrumentコンストラクタ（ピッチスイープ部分）}, label={lst:gakki_kick}]
+% for (int i = 0; i < numComponents; i++) {
+%   if (kickLUT[i] == null || kickLUT[i].length < 3) continue;
+% 
+%   float freq = kickLUT[i][0] * random(0.95f, 1.05f);
+%   float mag = kickLUT[i][1];
+%   float decayTime = kickLUT[i][2];
+%   float amp = (baseAmp * mag) / numComponents;
+% 
+%   tones[i] = new Oscil(freq, amp, Waves.SINE);
+%   harmonicEnvs[i] = new ADSR(1.0f, 0.001f, decayTime*0.5f, 0.0f, 0.1f);
+% 
+%   // ピッチスイープ：1.5倍の高さから本来の周波数へ急降下させる
+%   pitchSweeps[i] = new Line(0.01f, freq * 1.5f, freq);
+%   pitchSweeps[i].patch(tones[i].frequency);
+% 
+%   tones[i].patch(harmonicEnvs[i]);
+%   harmonicEnvs[i].patch(mixer);
+% }
+% \end{lstlisting}
 
-  float freq = kickLUT[i][0] * random(0.95f, 1.05f);
-  float mag = kickLUT[i][1];
-  float decayTime = kickLUT[i][2];
-  float amp = (baseAmp * mag) / numComponents;
+次に，SnareInstrumentの胴鳴りパートについて説明する．発音の瞬間に約3倍の周波数から本来の胴鳴り周波数（172.3~Hz）へ急降下させるピッチエンベロープにより，スネアドラム特有のアタック感を表現している．
+% 該当部分をコード\ref{lst:gakki_snare}に示す．
 
-  tones[i] = new Oscil(freq, amp, Waves.SINE);
-  harmonicEnvs[i] = new ADSR(1.0f, 0.001f, decayTime*0.5f, 0.0f, 0.1f);
-
-  // ピッチスイープ：1.5倍の高さから本来の周波数へ急降下させる
-  pitchSweeps[i] = new Line(0.01f, freq * 1.5f, freq);
-  pitchSweeps[i].patch(tones[i].frequency);
-
-  tones[i].patch(harmonicEnvs[i]);
-  harmonicEnvs[i].patch(mixer);
-}
-\end{lstlisting}
-
-次に，SnareInstrumentの胴鳴りパートについて説明する．発音の瞬間に約3倍の周波数から本来の胴鳴り周波数（172.3~Hz）へ急降下させるピッチエンベロープにより，スネアドラム特有のアタック感を表現している．該当部分をコード\ref{lst:gakki_snare}に示す．
-
-\begin{lstlisting}[caption={SnareInstrumentコンストラクタ（胴鳴りパート）}, label={lst:gakki_snare}]
-float bodyFreq      = 172.3f * random(0.99f, 1.01f); // 実測データの最強ピーク
-float bodyPitchMod  = 3.0f;   // アタック時は約516Hzから172.3Hzへ急降下
-float bodySweepTime = 0.025f;
-float bodyDecay     = 0.07f;
-float bodyVolRatio  = 0.63f * sinSet;
-
-bodyOsc = new Oscil(bodyFreq, baseAmp * bodyVolRatio, Waves.SINE);
-bodyPitchEnv = new Line(bodySweepTime, bodyFreq * bodyPitchMod, bodyFreq);
-bodyPitchEnv.patch(bodyOsc.frequency);
-bodyAmpEnv = new ADSR(1.0f, 0.001f, bodyDecay, 0.0f, 0.05f);
-bodyOsc.patch(bodyAmpEnv).patch(mixer);
-\end{lstlisting}
+% \begin{lstlisting}[caption={SnareInstrumentコンストラクタ（胴鳴りパート）}, label={lst:gakki_snare}]
+% float bodyFreq      = 172.3f * random(0.99f, 1.01f); // 実測データの最強ピーク
+% float bodyPitchMod  = 3.0f;   // アタック時は約516Hzから172.3Hzへ急降下
+% float bodySweepTime = 0.025f;
+% float bodyDecay     = 0.07f;
+% float bodyVolRatio  = 0.63f * sinSet;
+% 
+% bodyOsc = new Oscil(bodyFreq, baseAmp * bodyVolRatio, Waves.SINE);
+% bodyPitchEnv = new Line(bodySweepTime, bodyFreq * bodyPitchMod, bodyFreq);
+% bodyPitchEnv.patch(bodyOsc.frequency);
+% bodyAmpEnv = new ADSR(1.0f, 0.001f, bodyDecay, 0.0f, 0.05f);
+% bodyOsc.patch(bodyAmpEnv).patch(mixer);
+% \end{lstlisting}
 
 \paragraph{ホルンとトランペット（HornInstrument・TrumpetInstrument）}
 最後に，ホルンおよびトランペットの音色合成について説明する．両クラスは，計画書当初の音源構成には含まれていなかった金管楽器である．演奏する楽曲の編成に金管パートを加え，楽曲表現の幅を広げることを目的として開発の後半で追加したものであり，既存のFluteInstrumentクラスの加算合成・ビブラート・息ノイズの構造をそのまま流用したうえで，KickInstrumentで用いていたアタック時のピッチエンベロープ機能を新たに付加して作成されている．HornInstrumentとTrumpetInstrumentは，基準MIDIノートや各種パラメータの数値が異なるのみで，クラス構造自体は同一である．両クラスで使用する主な変数・関数の仕様を表\ref{table:gakki_horn}に示す．
@@ -2503,28 +2637,29 @@ bodyOsc.patch(bodyAmpEnv).patch(mixer);
     \end{tabular}
 \end{table}
 
-以下では，両クラスに共通するアタック時のピッチエンベロープ機能について，HornInstrumentのnoteOn関数を例に説明する．発音直後，各倍音の周波数を本来値より一時的に高く（ホルンではpitchMod=0.05，すなわち5\%増しから）設定し，sweepTime秒（ホルンでは0.12秒）かけて本来の周波数へ直線的に戻すことで，金管楽器特有の「音の頭が一瞬上ずってから定まる」挙動を再現している．該当部分をコード\ref{lst:gakki_horn_pitch}に示す．なお，トランペットでは同じ構造に対してpitchMod=0.03，sweepTime=0.07秒という異なる数値が用いられている．
+以下では，両クラスに共通するアタック時のピッチエンベロープ機能について，HornInstrumentのnoteOn関数を例に説明する．発音直後，各倍音の周波数を本来値より一時的に高く（ホルンではpitchMod=0.05，すなわち5\%増しから）設定し，sweepTime秒（ホルンでは0.12秒）かけて本来の周波数へ直線的に戻すことで，金管楽器特有の「音の頭が一瞬上ずってから定まる」挙動を再現している．なお，トランペットでは同じ構造に対してpitchMod=0.03，sweepTime=0.07秒という異なる数値が用いられている．
+% 該当部分をコード\ref{lst:gakki_horn_pitch}に示す．
 
-\begin{lstlisting}[caption={HornInstrument::noteOn関数（ピッチエンベロープ部分）}, label={lst:gakki_horn_pitch}]
-float sweepTime = 0.12f; // 変化にかかる時間
-float pitchMod  = 0.05f; // 本来の周波数に対する上乗せ割合
-
-for(int i = 0; i < numHarmonics; i++) {
-  harmonicEnvs[i].noteOn();
-  ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
-  if (wobbleLines[i] != null) {
-    float factor = wobbleFactors[i];
-    wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
-  }
-
-  // アタック時のピッチエンベロープ（周波数の急降下）
-  if (pitchEnvLines[i] != null) {
-    float baseFreq = targetFreqs[i];
-    float startFreq = baseFreq * (1.0f + pitchMod); // 本来の周波数にpitchMod分を上乗せした値からスタート
-    pitchEnvLines[i].activate(sweepTime, startFreq, baseFreq); // baseFreqへ一直線に下げる
-  }
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={HornInstrument::noteOn関数（ピッチエンベロープ部分）}, label={lst:gakki_horn_pitch}]
+% float sweepTime = 0.12f; // 変化にかかる時間
+% float pitchMod  = 0.05f; // 本来の周波数に対する上乗せ割合
+% 
+% for(int i = 0; i < numHarmonics; i++) {
+%   harmonicEnvs[i].noteOn();
+%   ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
+%   if (wobbleLines[i] != null) {
+%     float factor = wobbleFactors[i];
+%     wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
+%   }
+% 
+%   // アタック時のピッチエンベロープ（周波数の急降下）
+%   if (pitchEnvLines[i] != null) {
+%     float baseFreq = targetFreqs[i];
+%     float startFreq = baseFreq * (1.0f + pitchMod); // 本来の周波数にpitchMod分を上乗せした値からスタート
+%     pitchEnvLines[i].activate(sweepTime, startFreq, baseFreq); // baseFreqへ一直線に下げる
+%   }
+% }
+% \end{lstlisting}
 
 プログラム全文は付録に示す．
 
@@ -2682,80 +2817,83 @@ flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPア
     \end{tabular}
 \end{table}
 
-以下では，マスターの同期制御における中核部分について，実際のコードとともに説明する．まず，'T'通信（スレーブからのTick報告）の受信処理について説明する．この処理は，スレーブのglobalTickとマスター自身のglobalTickとの差であるdiffを算出し，'R'通信で即座に返信する．該当部分をコード\ref{lst:douki_master_t}に示す．
+以下では，マスターの同期制御における中核部分について説明する．まず，'T'通信（スレーブからのTick報告）の受信処理について説明する．この処理は，スレーブのglobalTickとマスター自身のglobalTickとの差であるdiffを算出し，'R'通信で即座に返信する．
+% 該当部分をコード\ref{lst:douki_master_t}に示す．
 
-\begin{lstlisting}[caption={drum\_0706.inoのloop関数（'T'通信受信部分）}, label={lst:douki_master_t}]
-case 'T':
-  if (pktSize >= 6) {
-    uint32_t slaveTick =
-      ((uint32_t)packetBuffer[1] << 24) |
-      ((uint32_t)packetBuffer[2] << 16) |
-      ((uint32_t)packetBuffer[3] << 8)  |
-       (uint32_t)packetBuffer[4];
-    uint8_t id = packetBuffer[5];
+% \begin{lstlisting}[caption={drum\_0706.inoのloop関数（'T'通信受信部分）}, label={lst:douki_master_t}]
+% case 'T':
+%   if (pktSize >= 6) {
+%     uint32_t slaveTick =
+%       ((uint32_t)packetBuffer[1] << 24) |
+%       ((uint32_t)packetBuffer[2] << 16) |
+%       ((uint32_t)packetBuffer[3] << 8)  |
+%        (uint32_t)packetBuffer[4];
+%     uint8_t id = packetBuffer[5];
+% 
+%     if (id < MAX_INSTRUMENTS && id != drumInstId) {
+%       isInstConnected[id] = true;
+%       if (isInstJoin[id] != true) isInstJoin[id] = true;
+%       int32_t diff = (int32_t)(globalTick - slaveTick);
+%       lastReceivedDiff[id] = diff;
+% 
+%       sendRPacket(id, diff);
+%     }
+%   }
+%   break;
+% \end{lstlisting}
 
-    if (id < MAX_INSTRUMENTS && id != drumInstId) {
-      isInstConnected[id] = true;
-      if (isInstJoin[id] != true) isInstJoin[id] = true;
-      int32_t diff = (int32_t)(globalTick - slaveTick);
-      lastReceivedDiff[id] = diff;
+次に，同期完了判定を行うcheckSyncReady関数について説明する．この関数は，参加予告（'J'受信）のあった全スレーブについて，接続済みであり，かつ直近のdiffがtickIvalから算出したしきい値以内であるかを確認し，1台でも条件を満たさなければfalseを返す．
+% checkSyncReady関数をコード\ref{lst:douki_checksyncready}に示す．
 
-      sendRPacket(id, diff);
-    }
-  }
-  break;
-\end{lstlisting}
+% \begin{lstlisting}[caption={checkSyncReady関数}, label={lst:douki_checksyncready}]
+% bool checkSyncReady() {
+%   bool expectedToJoin = false;
+% 
+%   for (uint8_t i = 1; i < MAX_INSTRUMENTS; i++) {
+%     if (isInstJoin[i]) {
+%       expectedToJoin = true; // 参加予定の楽器が少なくとも1台いる
+%       float SYNC_READY_THRESHOLD = 50 / tickIval;
+% 
+%       // 参加予定だが未接続、または同期のズレが大きい場合は「まだ準備未完了」
+%       if (!isInstConnected[i] || abs(lastReceivedDiff[i]) > SYNC_READY_THRESHOLD) {
+%         return false;
+%       }
+%     }
+%   }
+%   return expectedToJoin;
+% }
+% \end{lstlisting}
 
-次に，同期完了判定を行うcheckSyncReady関数について説明する．この関数は，参加予告（'J'受信）のあった全スレーブについて，接続済みであり，かつ直近のdiffがtickIvalから算出したしきい値以内であるかを確認し，1台でも条件を満たさなければfalseを返す．checkSyncReady関数をコード\ref{lst:douki_checksyncready}に示す．
+最後に，各楽器の演奏開始タイミングを管理するprocessOCommands関数について説明する．この関数は，startSequenceに定義された各演奏開始イベントについて，該当楽器がドラム自身であればelapsedPlayTickが開始Tickに達した時点で演奏を開始し，スレーブであれば開始TickのO\_ADVANCE\_TICKS（96Tick）前から3段階に分けて'O'通信を送信することで，パケットロスに備えた冗長性を確保している．
+% 該当部分をコード\ref{lst:douki_processocommands}に示す．
 
-\begin{lstlisting}[caption={checkSyncReady関数}, label={lst:douki_checksyncready}]
-bool checkSyncReady() {
-  bool expectedToJoin = false;
-
-  for (uint8_t i = 1; i < MAX_INSTRUMENTS; i++) {
-    if (isInstJoin[i]) {
-      expectedToJoin = true; // 参加予定の楽器が少なくとも1台いる
-      float SYNC_READY_THRESHOLD = 50 / tickIval;
-
-      // 参加予定だが未接続、または同期のズレが大きい場合は「まだ準備未完了」
-      if (!isInstConnected[i] || abs(lastReceivedDiff[i]) > SYNC_READY_THRESHOLD) {
-        return false;
-      }
-    }
-  }
-  return expectedToJoin;
-}
-\end{lstlisting}
-
-最後に，各楽器の演奏開始タイミングを管理するprocessOCommands関数について説明する．この関数は，startSequenceに定義された各演奏開始イベントについて，該当楽器がドラム自身であればelapsedPlayTickが開始Tickに達した時点で演奏を開始し，スレーブであれば開始TickのO\_ADVANCE\_TICKS（96Tick）前から3段階に分けて'O'通信を送信することで，パケットロスに備えた冗長性を確保している．該当部分をコード\ref{lst:douki_processocommands}に示す．
-
-\begin{lstlisting}[caption={processOCommands関数（要部）}, label={lst:douki_processocommands}]
-if (instId == drumInstId) {
-  if (elapsedPlayTick >= evTick) {
-    if (!isDrumPlaying) {
-      isDrumPlaying = true;
-      curTick  = songStartParams[currentSongId].startTick;
-      scoreIdx = songStartParams[currentSongId].startNoteIdx;
-      state    = 3;
-    }
-    oSentCount[i] = 3;
-  }
-} else {
-  if (isInstJoin[instId] && isInstConnected[instId]) {
-    uint32_t startGlobalTick = (uint32_t)((int32_t)globalTick + ticksUntilStart);
-    if (ticksUntilStart <= O_ADVANCE_TICKS && oSentCount[i] == 0) {
-      sendOPacket_Single(instId, currentSongId, startGlobalTick);
-      oSentCount[i] = 1;
-    } else if (ticksUntilStart <= O_ADVANCE_TICKS * 2 / 3 && oSentCount[i] == 1) {
-      sendOPacket_Single(instId, currentSongId, startGlobalTick);
-      oSentCount[i] = 2;
-    } else if (ticksUntilStart <= O_ADVANCE_TICKS / 3 && oSentCount[i] == 2) {
-      sendOPacket_Single(instId, currentSongId, startGlobalTick);
-      oSentCount[i] = 3;
-    }
-  }
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={processOCommands関数（要部）}, label={lst:douki_processocommands}]
+% if (instId == drumInstId) {
+%   if (elapsedPlayTick >= evTick) {
+%     if (!isDrumPlaying) {
+%       isDrumPlaying = true;
+%       curTick  = songStartParams[currentSongId].startTick;
+%       scoreIdx = songStartParams[currentSongId].startNoteIdx;
+%       state    = 3;
+%     }
+%     oSentCount[i] = 3;
+%   }
+% } else {
+%   if (isInstJoin[instId] && isInstConnected[instId]) {
+%     uint32_t startGlobalTick = (uint32_t)((int32_t)globalTick + ticksUntilStart);
+%     if (ticksUntilStart <= O_ADVANCE_TICKS && oSentCount[i] == 0) {
+%       sendOPacket_Single(instId, currentSongId, startGlobalTick);
+%       oSentCount[i] = 1;
+%     } else if (ticksUntilStart <= O_ADVANCE_TICKS * 2 / 3 && oSentCount[i] == 1) {
+%       sendOPacket_Single(instId, currentSongId, startGlobalTick);
+%       oSentCount[i] = 2;
+%     } else if (ticksUntilStart <= O_ADVANCE_TICKS / 3 && oSentCount[i] == 2) {
+%       sendOPacket_Single(instId, currentSongId, startGlobalTick);
+%       oSentCount[i] = 3;
+%     }
+%   }
+% }
+% \end{lstlisting}
 
 次に，楽器デバイス（スレーブ）における同期処理について説明する．スレーブは，stateが0（BPM安定待ち）・1（マスターと同期中）・2（演奏中）・4（停止中）の4状態で動作し，'R'通信で受け取ったdiffをもとに自身のtickIvalを補正することでマスターとの同期を保つ．続いて，楽器デバイス（スレーブ）で使用する主な変数の仕様を表\ref{table:douki_slave_var}に示す．
 
@@ -2815,60 +2953,62 @@ if (instId == drumInstId) {
     \end{tabular}
 \end{table}
 
-以下では，スレーブの同期補正における中核部分について，実際のコードとともに説明する．まず，'R'通信（マスターからのdiff返信）の受信処理について説明する．この処理は，パケットの往復時間から通信遅延を見積もってdiffを補正したうえで，マスターがまだ動作していない場合の特別処理を経て，通常時はapplyDiffCorrection関数を呼び出す．該当部分をコード\ref{lst:douki_slave_r}に示す．
+以下では，スレーブの同期補正における中核部分について説明する．まず，'R'通信（マスターからのdiff返信）の受信処理について説明する．この処理は，パケットの往復時間から通信遅延を見積もってdiffを補正したうえで，マスターがまだ動作していない場合の特別処理を経て，通常時はapplyDiffCorrection関数を呼び出す．
+% 該当部分をコード\ref{lst:douki_slave_r}に示す．
 
-\begin{lstlisting}[caption={flute\_0706.inoのloop関数（'R'通信受信部分・要部）}, label={lst:douki_slave_r}]
-case 'R':
-  if (state == 0 || state == 4) break;
-  if (pktSize >= 5) {
-    int32_t rawDiff =
-      ((int32_t)(int8_t)packetBuffer[1] << 24) |
-      ((int32_t)packetBuffer[2] << 16) |
-      ((int32_t)packetBuffer[3] <<  8) |
-       (int32_t)packetBuffer[4];
+% \begin{lstlisting}[caption={flute\_0706.inoのloop関数（'R'通信受信部分・要部）}, label={lst:douki_slave_r}]
+% case 'R':
+%   if (state == 0 || state == 4) break;
+%   if (pktSize >= 5) {
+%     int32_t rawDiff =
+%       ((int32_t)(int8_t)packetBuffer[1] << 24) |
+%       ((int32_t)packetBuffer[2] << 16) |
+%       ((int32_t)packetBuffer[3] <<  8) |
+%        (int32_t)packetBuffer[4];
+% 
+%     uint32_t rtt = micros() - lastTPacketMicroTime;
+%     uint32_t latencyMicros = rtt / 2; // 片道遅延
+%     int32_t latencyTicks = (baseTickIval > 0)
+%       ? (int32_t)((latencyMicros + (baseTickIval / 2)) / baseTickIval) : 0;
+%     int32_t diff = rawDiff - latencyTicks; // 通信遅延を差し引いた真のズレ
+% 
+%     lastDiff = diff;
+%     if (state >= 1) {
+%       if (ticksToCorrect == 0 || abs(diff) >= 24) {
+%         applyDiffCorrection(diff);
+%       }
+%     }
+%   }
+%   break;
+% \end{lstlisting}
 
-    uint32_t rtt = micros() - lastTPacketMicroTime;
-    uint32_t latencyMicros = rtt / 2; // 片道遅延
-    int32_t latencyTicks = (baseTickIval > 0)
-      ? (int32_t)((latencyMicros + (baseTickIval / 2)) / baseTickIval) : 0;
-    int32_t diff = rawDiff - latencyTicks; // 通信遅延を差し引いた真のズレ
+次に，applyDiffCorrection関数について説明する．この関数は，diffの大きさに応じて補正の強さを4段階に切り替える．ズレが小さい場合は不感帯として何もせず，大幅なズレの場合はtickIvalを2倍または2/3倍にして急速に補正し，中程度のズレの場合は次の48Tickで吸収するように比率補正を行う．
+% applyDiffCorrection関数をコード\ref{lst:douki_diffcorrection}に示す．
 
-    lastDiff = diff;
-    if (state >= 1) {
-      if (ticksToCorrect == 0 || abs(diff) >= 24) {
-        applyDiffCorrection(diff);
-      }
-    }
-  }
-  break;
-\end{lstlisting}
-
-次に，applyDiffCorrection関数について説明する．この関数は，diffの大きさに応じて補正の強さを4段階に切り替える．ズレが小さい場合は不感帯として何もせず，大幅なズレの場合はtickIvalを2倍または2/3倍にして急速に補正し，中程度のズレの場合は次の48Tickで吸収するように比率補正を行う．applyDiffCorrection関数をコード\ref{lst:douki_diffcorrection}に示す．
-
-\begin{lstlisting}[caption={applyDiffCorrection関数}, label={lst:douki_diffcorrection}]
-void applyDiffCorrection(int32_t diff) {
-  if (baseTickIval == 0) return;
-  float SYNC_READY_THRESHOLD = 50 / baseTickIval;
-
-  if (abs(diff) <= SYNC_READY_THRESHOLD) {
-    // 不感帯：ズレが小さければ何もしない
-    tickIval = baseTickIval;
-    ticksToCorrect = 0;
-  } else if (diff <= -24) {
-    // 大幅に早い → ×2 で -diff Tick間遅らせる
-    tickIval       = baseTickIval * 2;
-    ticksToCorrect = -diff;
-  } else if (diff >= 24) {
-    // 大幅に遅い → ×2/3 で diff×3 Tick間速める
-    tickIval       = baseTickIval * 2 / 3;
-    ticksToCorrect = diff * 3;
-  } else {
-    // 小さいズレ → 次の48Tickでdiffを吸収する比率補正
-    tickIval       = (uint32_t)((48UL * baseTickIval) / (48 + diff));
-    ticksToCorrect = 48 + diff;
-  }
-}
-\end{lstlisting}
+% \begin{lstlisting}[caption={applyDiffCorrection関数}, label={lst:douki_diffcorrection}]
+% void applyDiffCorrection(int32_t diff) {
+%   if (baseTickIval == 0) return;
+%   float SYNC_READY_THRESHOLD = 50 / baseTickIval;
+% 
+%   if (abs(diff) <= SYNC_READY_THRESHOLD) {
+%     // 不感帯：ズレが小さければ何もしない
+%     tickIval = baseTickIval;
+%     ticksToCorrect = 0;
+%   } else if (diff <= -24) {
+%     // 大幅に早い → ×2 で -diff Tick間遅らせる
+%     tickIval       = baseTickIval * 2;
+%     ticksToCorrect = -diff;
+%   } else if (diff >= 24) {
+%     // 大幅に遅い → ×2/3 で diff×3 Tick間速める
+%     tickIval       = baseTickIval * 2 / 3;
+%     ticksToCorrect = diff * 3;
+%   } else {
+%     // 小さいズレ → 次の48Tickでdiffを吸収する比率補正
+%     tickIval       = (uint32_t)((48UL * baseTickIval) / (48 + diff));
+%     ticksToCorrect = 48 + diff;
+%   }
+% }
+% \end{lstlisting}
 
 最後に，'O'通信（マスターからの演奏開始指示）の受信処理について説明する．この処理は，指示されたstartGlobalTickと自身のglobalTickを比較し，まだ到達していなければwaitingForStartを立てて待機し，すでに超過していれば超過分だけcurTickをオフセットして即座に演奏へ合流する．なお，'O'通信の受信および状態遷移に関する処理の詳細な実装は付録に示すプログラム全文を参照されたい．
 
