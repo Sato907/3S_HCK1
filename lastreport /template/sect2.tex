@@ -169,7 +169,8 @@ Controller\_simultaneous.inoのloop関数の処理の流れを図\ref{fig:flow_s
 
 \fi
 
-ここからは，ボタン入力の判定，加速度センサの制御，可変抵抗器を用いたBPM・音量読み取り機能の順に，使用する変数・関数の仕様と処理内容について説明する．
+ここからは，ボタン入力の判定，加速度センサの制御，可変抵抗器を用いたBPM・音量読み取り機能の順に説明する．
+% 使用する変数・関数の仕様と処理内容について説明する．
 
 まず，指揮デバイスにおけるボタン入力の判定処理について説明する．
 ボタンの誤判定を防ぐため，プルアップ抵抗を用いた回路を構成しており，ボタンが押されていない状態ではデジタルピンに\SI{5}{V}が印加され，押下時には回路がGNDに短絡されることでピンの電位がLOWへ遷移する．
@@ -989,9 +990,8 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
 
 \subsubsection{内部設計}
 \label{sec:kan_naibu}
-本節では中継機デバイスの内部設計について説明する．主に回転速度同期機構（モータ制御）とLEDMatrix表示機構のプログラムについて説明する．
-
-次に，中継機デバイスの制御プログラムのファイル構成を示す．表\ref{tab:file1}の通り，各ファイルは機能ごとに分割されている．
+本節では中継機デバイスの内部設計について説明する．本デバイスでは，モータ制御と現在のBPMを表示するLEDMatrixのプログラムによって構成される．
+また，中継機デバイスの制御プログラムのファイル構成を示す．表\ref{tab:file1}の通り，各ファイルは機能ごとに分割されている．
 
 \begin{table}[h]
     \vspace{-1em}
@@ -1009,6 +1009,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
     \end{tabular}
 \end{table}
 
+\iffalse
 FerrisWheel.inoのloop関数は，Udp.parsePacket()でパケットの到着を監視し，届いていればuint8\_t packetBuffer[10]として2バイト分を読み取る．先頭バイトpacketBuffer[0]をヘッダ文字として判定し，ヘッダが'S'（演奏開始）の場合はmotor.startRamp()とdisplayBPM()を，'B'（BPM変更）の場合はmotor.changeBPM()とdisplayBPM()を，'E'（演奏終了）の場合はmotor.stopRamp()とclearDisplay()を，2バイト目のペイロード（BPM段階番号）を引数として呼び出す構成となっている．loop関数の処理の流れを図\ref{fig:flow_kan}に示す．
 % また，loop関数をコード\ref{lst:kan_loop}に示す．
 
@@ -1019,39 +1020,42 @@ FerrisWheel.inoのloop関数は，Udp.parsePacket()でパケットの到着を�
     \label{fig:flow_kan}
 \end{figure}
 
-% \begin{lstlisting}[caption={FerrisWheel.inoのloop関数}, label={lst:kan_loop}]
-% void loop() {
-%     uint8_t packetSize = Udp.parsePacket();
-%     if (packetSize <= 0) return;
-%     if (packetSize != 2) {
-%         while (Udp.available()) Udp.read();
-%         return;
-%     }
-% 
-%     Udp.read(packetBuffer, sizeof(packetBuffer));
-%     char    header  = packetBuffer[0];
-%     uint8_t payload = packetBuffer[1];
-% 
-%     switch (header) {
-%         case 'S':
-%             running = true;
-%             motor.startRamp(payload);
-%             displayBPM(payload);
-%             break;
-%         case 'B':
-%             if (!running) break;
-%             motor.changeBPM(payload);
-%             displayBPM(payload);
-%             break;
-%         case 'E':
-%             running = false;
-%             motor.stopRamp();
-%             clearDisplay();
-%             break;
-%     }
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={FerrisWheel.inoのloop関数}, label={lst:kan_loop}]
+void loop() {
+    uint8_t packetSize = Udp.parsePacket();
+    if (packetSize <= 0) return;
+    if (packetSize != 2) {
+        while (Udp.available()) Udp.read();
+        return;
+    }
 
+    Udp.read(packetBuffer, sizeof(packetBuffer));
+    char    header  = packetBuffer[0];
+    uint8_t payload = packetBuffer[1];
+
+    switch (header) {
+        case 'S':
+            running = true;
+            motor.startRamp(payload);
+            displayBPM(payload);
+            break;
+        case 'B':
+            if (!running) break;
+            motor.changeBPM(payload);
+            displayBPM(payload);
+            break;
+        case 'E':
+            running = false;
+            motor.stopRamp();
+            clearDisplay();
+            break;
+    }
+}
+\end{lstlisting}
+
+\fi
+
+\iffalse
 続いて，Main（FerrisWheel.ino）で使用する変数の仕様を表\ref{table:kan_main_var}に示す．
 
 \begin{table}[H]
@@ -1096,9 +1100,14 @@ FerrisWheel.inoのloop関数は，Udp.parsePacket()でパケットの到着を�
     \end{tabular}
 \end{table}
 
-ここからは，モータの制御，LEDMatrixでのBPM表示，回転速度実測プログラム（LaserIntervalTest）の順に，使用する変数・関数の仕様と処理内容について説明する．
+\fi
 
-まず，中継機デバイスにおけるモータの制御処理について説明する．本デバイスのギアボックスモータの回転速度を制御するために，ArduinoのPWM(パルス幅変調)機能を用いてモータの平均印加電圧を制御する．
+
+ここからは，モータの制御，LEDMatrixでのBPM表示，回転速度実測プログラム（LaserIntervalTest）の順に説明する．
+
+% 使用する変数・関数の仕様と処理内容について説明する．
+
+まず，中継機デバイスにおけるモータの制御処理について説明する．本デバイスのギアボックスモータの回転速度を制御するために，Arduinoのパルス幅変調機能(PWM)を用いてモータの平均印加電圧を制御する．
 PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態とLOW状態の時間比率(デューティー比)を変化させることで，擬似的にアナログ電圧を生成する制御方式である．Arduinoのデジタル出力ピンは$\SI{5}{V}$のHIGHか$\SI{0}{V}$のLOWのいずれかしか出力できないが，HIGHとLOWを高速に切り替えてデューティー比を調整することで，負荷に対して見かけ上の連続的な電圧を印加することが可能となる．
 
 本デバイスは，ArduinoのD5ピンをモータドライバーモジュールに接続し，PWM制御を行う構成としている．ArduinoのanalogWrite関数は，引数として0から255の整数値を受け取り，この値に応じたデューティー比の矩形波を出力する．このとき引数が0のときデューティー比は常時LOWであり，255のときデューティー比は常時HIGHとなる．中間値では，引数に比例したデューティー比の矩形波が生成される．
@@ -1112,9 +1121,10 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
 このとき，モータの巻線が持つインダクタンスとギアボックスの機械的慣性が電気的・機械的なローパスフィルタとして機能するため，モータはパルスの平均値に応じた一定速度で回転する．
 
 次に，ルックアップテーブルによる速度制御について説明する．一般的なDCモータの回転速度は供給電圧に比例する性質があるが\cite{ref:control}，実際には摩擦や機構の負荷などによる非線形な挙動を示す事が多い．
-そのため，当初検討していた「4拍で90度（1小節が90度）回転する」といった幾何学的な理論式による制御ではなく，より確実な速度追従を実現するため，幾何学的な縛りを廃止して実測値に基づくルックアップテーブル方式を採用する．
+そのため，当初検討していた「4拍で90度回転する」といった幾何学的な理論式による制御ではなく，より確実な速度追従を実現するため，幾何学的な縛りを廃止して実測値に基づくルックアップテーブル方式を採用する．
 
-本デバイスでは，表\ref{tab:pwm_lut}に示す離散的な5段階のBPM設定値と，あらかじめ実測により求めたPWM出力値を，コード内の配列bpmTable・pwmTableとして対応させ，受信した段階番号に応じたpwmValueを即座に選択・出力する構成とする．表\ref{tab:pwm_lut}に示す実測周期は，後述する回転速度実測プログラム（LaserIntervalTest）を用いて計測した値に基づいて決定している．
+本デバイスでは，表\ref{tab:pwm_lut}に示す離散的な5段階のBPM設定値と，あらかじめ実測により求めたPWM出力値を，コード内の配列bpmTable・pwmTableとして対応させ，受信した段階番号に応じたpwmValueを即座に選択・出力する構成とする．
+表\ref{tab:pwm_lut}に示す実測周期は，後述する回転速度実測プログラム（LaserIntervalTest）を用いて計測した値に基づいて決定している．
 
 \begin{table}[H]
     \centering
@@ -1131,6 +1141,7 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
     \end{tabular}
 \end{table}
 
+\iffalse
 続いて，モータ制御（MotorControlクラス）で使用する変数・定数の仕様を表\ref{table:kan_motor_var}に示す．
 
 \begin{table}[H]
@@ -1297,25 +1308,30 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
 % }
 % \end{lstlisting}
 
-次に，中継機デバイスにおけるLEDMatrix表示処理について説明する．今回のシステムでは表示用のマトリクスとして，Arduino Uno R4 WiFi付属のマトリクスを使用する．
-このマトリクスを用いて，FerrisWheel.inoのloop関数から受信したBPM段階番号を数値変換し，独自定義したフォント配列を用いて表示を行う．
+\fi
+
+次に，中継機デバイスにおけるLEDMatrix表示処理について説明する．本システムでは表示用のマトリクスとして，Arduino Uno R4 WiFi付属のマトリクスを使用する．
+このマトリクスを用いて，受信したBPM段階番号を数値変換し，独自定義したフォント配列を用いて表示を行う．
 ここで，今回利用するArduinoのマトリクスは縦12横8の範囲で構成されている．
 この時，通常で定義されている文字列では文字の間隔が短くなることや，それに付随した可読性の低下が考えられる．
 よって，今回は1文字を縦5横3で再定義することにより文字同士の間隔を開け，可読性の担保を目指す．
-% 例として数字0のドットパターンをコード\ref{lst:font0}に示す．
+例として数字0のドットパターンをコード\ref{lst:font0}に示す．
 
-% \begin{lstlisting}[caption={font3x5配列における数字0のドットパターン定義}, label={lst:font0}]
-%     {1,1,1,
-%     1,0,1,
-%     1,0,1,
-%     1,0,1,
-%     1,1,1}
-% \end{lstlisting}
+\begin{lstlisting}[caption={font3x5配列における数字0のドットパターン定義}, label={lst:font0}]
+    {1,1,1,
+    1,0,1,
+    1,0,1,
+    1,0,1,
+    1,1,1}
+\end{lstlisting}
 
-また，LEDマトリクスの描画処理は，受信した段階番号からBPM値を参照し，整数を各桁に分割した後，独自定義した3×5のフォント配列を用いてフレームバッファに書き込むことで行う．続いて，LEDMatrix表示（Displayモジュール）で使用する変数・定数の仕様を表\ref{table:kan_disp_var}に示す．
+また，LEDマトリクスの描画処理は，受信した段階番号からBPM値を参照し，整数を各桁に分割した後，独自定義した3×5のフォント配列を用いてフレームバッファに書き込むことで行う．
+
+
+続いて，LEDMatrix表示で使用する変数・定数の仕様を表\ref{table:kan_disp_var}に示す．
 
 \begin{table}[H]
-    \caption{LEDMatrix表示（Displayモジュール）で使用する変数・定数の仕様一覧}
+    \caption{LEDMatrix表示で使用する変数・定数の仕様一覧}
     \centering
     \label{table:kan_disp_var}
     \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
@@ -1345,11 +1361,11 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
     \end{tabular}
 \end{table}
 
-続いて，LEDMatrix表示（Displayモジュール）で使用する関数の仕様を表\ref{tab:func1}に示す．
+続いて，LEDMatrix表示で使用する関数の仕様を表\ref{tab:func1}に示す．
 
 \begin{table}[h]
     \vspace{-1em}
-    \caption{LEDMatrix表示（Displayモジュール）で使用する関数の仕様一覧}
+    \caption{LEDMatrix表示で使用する関数の仕様一覧}
     \centering
     \label{tab:func1}
     \begin{tabular}{p{2.6cm}p{1.6cm}p{3.3cm}p{6cm}}
@@ -1378,7 +1394,8 @@ LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りで�
     \label{matcla}
 \end{figure}
 
-以下では，表\ref{tab:func1}に示した順に，各関数の処理内容を説明する．はじめに，displaySetup関数について説明する．この関数は，matrix.begin()を呼び出した後，消灯フレームを一度描画してから\SI{200}{ms}待機する．これは，begin()直後の最初のloadFrame()は反映されない場合があるための対策である．
+以下では，表\ref{tab:func1}に示した順に，各関数の処理内容を説明する．はじめに，displaySetup関数について説明する．
+この関数は，matrix.begin()を呼び出した後，消灯フレームを一度描画してから\SI{200}{ms}待機する．これは，begin()直後の最初のloadFrame()は反映されない場合があるための対策である．
 % displaySetup関数をコード\ref{lst:disp_setup}に示す．
 
 % \begin{lstlisting}[caption={displaySetup関数}, label={lst:disp_setup}]
@@ -1476,8 +1493,12 @@ LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りで�
 % }
 % \end{lstlisting}
 
+
 最後に，中継機デバイスのモータ回転速度を実測するために用いたプログラムであるLaserIntervalTestについて説明する．このプログラムは中継機デバイス本体には搭載せず，開発段階で観覧車に設置したレーザーとCdSセルを用いて，各PWM出力値における実際の回転周期を計測するために使用したものであり，表\ref{tab:pwm_lut}に示した実測周期の値はこのプログラムによって得られている．
-本プログラムは，CdSセルの出力値を監視し，レーザー光の通過（パルス）を検知するたびに，直前のパルス検知からの経過時間（interval）をシリアルモニタへ出力する．周囲光量やレーザーの取り付け誤差による検知レベルのばらつきに対応するため，固定閾値ではなく，起動直後のキャリブレーションと直近のピーク値履歴に基づいて検知しきい値を継続的に調整する適応しきい値方式を採用している．LaserIntervalTestで使用する主な定数の仕様を表\ref{table:laser_const}に示す．
+本プログラムは，CdSセルの出力値を監視し，レーザー光の通過を検知するたびに，直前のパルス検知からの経過時間（interval）をシリアルモニタへ出力する．周囲光量やレーザーの取り付け誤差による検知レベルのばらつきに対応するため，固定閾値ではなく，起動直後のキャリブレーションと直近のピーク値履歴に基づいて検知閾値を継続的に調整する適応閾値方式を採用している．
+
+\iffalse
+LaserIntervalTestで使用する主な定数の仕様を表\ref{table:laser_const}に示す．
 
 \begin{table}[H]
     \caption{LaserIntervalTestで使用する主な定数の仕様一覧}
@@ -1530,115 +1551,120 @@ LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りで�
     \end{tabular}
 \end{table}
 
+\fi
+
+\iffalse
 以下では，表\ref{table:laser_func}に示した主要な関数のうち，公開インタフェースであるupdate関数と，検知処理の中心であるdetectLight関数について説明する．なお，registerPeak関数・updateFallbackThresholds関数・limitStep関数の詳細な実装は付録に示すプログラム全文を参照されたい．
 
 はじめに，setup関数とloop関数について説明する．setup関数ではシリアル通信を開始するのみであり，loop関数ではCdSセルの値を毎回取得し，LaserDetectorのupdate関数へ渡している．新しいパルスが検知された場合は，得られたinterval[ms]をシリアルモニタへ出力する．
 % setup関数・loop関数をコード\ref{lst:laser_setuploop}に示す．
 
-% \begin{lstlisting}[caption={LaserIntervalTest.inoのsetup関数・loop関数}, label={lst:laser_setuploop}]
-% void setup() {
-%   Serial.begin(115200);
-%   Serial.println("--- レーザー間隔計測 Setup Started ---");
-% }
-% 
-% void loop() {
-%   unsigned long now      = millis();
-%   int           cdsValue = analogRead(CDS_PIN);
-%   unsigned long interval = 0;
-% 
-%   if (detector.update(cdsValue, now, interval)) {
-%     Serial.print("[interval] ");
-%     Serial.print(interval);
-%     Serial.println(" ms");
-%   }
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={LaserIntervalTest.inoのsetup関数・loop関数}, label={lst:laser_setuploop}]
+void setup() {
+  Serial.begin(115200);
+  Serial.println("--- レーザー間隔計測 Setup Started ---");
+}
+
+void loop() {
+  unsigned long now      = millis();
+  int           cdsValue = analogRead(CDS_PIN);
+  unsigned long interval = 0;
+
+  if (detector.update(cdsValue, now, interval)) {
+    Serial.print("[interval] ");
+    Serial.print(interval);
+    Serial.println(" ms");
+  }
+}
+\end{lstlisting}
 
 次に，LaserDetectorクラスのupdate関数について説明する．この関数は，detectLight関数によってパルスの立ち上がりが検知され，かつ前回検知からDEBOUNCE\_MS（\SI{200}{ms}）以上が経過している場合にのみ，trueを返してinterval（前回検知時刻との差）を書き込む．
 % update関数をコード\ref{lst:laser_update}に示す．
 
-% \begin{lstlisting}[caption={LaserDetector::update関数}, label={lst:laser_update}]
-% bool update(int cdsValue, unsigned long nowMs, unsigned long &intervalOut) {
-%     if (calibrationStartMs == 0) calibrationStartMs = nowMs;
-%     if (!detectLight(cdsValue, nowMs)) return false;
-%     if (nowMs - lastDetectTime < DEBOUNCE_MS) return false;
-% 
-%     intervalOut = (lastDetectTime != 0) ? (nowMs - lastDetectTime) : 0;
-%     bool hasInterval = (lastDetectTime != 0);
-%     lastDetectTime = nowMs;
-%     return hasInterval;
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={LaserDetector::update関数}, label={lst:laser_update}]
+bool update(int cdsValue, unsigned long nowMs, unsigned long &intervalOut) {
+    if (calibrationStartMs == 0) calibrationStartMs = nowMs;
+    if (!detectLight(cdsValue, nowMs)) return false;
+    if (nowMs - lastDetectTime < DEBOUNCE_MS) return false;
+
+    intervalOut = (lastDetectTime != 0) ? (nowMs - lastDetectTime) : 0;
+    bool hasInterval = (lastDetectTime != 0);
+    lastDetectTime = nowMs;
+    return hasInterval;
+}
+\end{lstlisting}
 
 最後に，detectLight関数について説明する．この関数は，暗状態の推定値であるbaselineを継続的に追従させながら，値がbaseline+CDS\_MIN\_DELTA相当のonThresholdを上回った瞬間をパルスの立ち上がりとして検知する状態機械である．起動直後はstartupCalibratedフラグがfalseの間，CDS\_STARTUP\_CALIBRATION\_MS（1秒）をかけて最も暗い値をbaselineの初期値として探索し，誤検知を防止する．また，キャリブレーション完了時点でレーザーが既に照射状態であった場合は，waitingForReleaseフラグによって一度非照射状態に戻るまで検知を保留する．パルスの立ち下がり（照射終了）を検知するとregisterPeak関数を呼び出し，しきい値を実測値に基づいて更新する．起動時較正・照射解除待ち・baseline追従・立ち上がり／立ち下がり判定という状態機械の分岐構造を表している．
 % detectLight関数の処理の流れを図\ref{fig:flow_detectlight}に示す．
 % また，detectLight関数をコード\ref{lst:laser_detectlight}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.8\textwidth]{figs/flow_detectlight.pdf}
-%     \caption{detectLight関数の処理フローチャート}
-%     \label{fig:flow_detectlight}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figs/flow_detectlight.pdf}
+    \caption{detectLight関数の処理フローチャート}
+    \label{fig:flow_detectlight}
+\end{figure}
+
 \FloatBarrier
 
 
-% \begin{lstlisting}[caption={LaserDetector::detectLight関数}, label={lst:laser_detectlight}]
-% bool detectLight(int v, unsigned long nowMs) {
-%     if (!baselineReady) {
-%       baseline = v;
-%       startupMin = v;
-%       baselineReady = true;
-%       updateFallbackThresholds();
-%     }
-% 
-%     if (!startupCalibrated) {
-%       if (v < startupMin) startupMin = v;
-%       baseline = startupMin;
-%       updateFallbackThresholds();
-%       if (nowMs - calibrationStartMs < CDS_STARTUP_CALIBRATION_MS) return false;
-%       startupCalibrated = true;
-%       waitingForRelease = (v >= onThreshold);
-%       releaseThreshold = (baseline > 1023 - CDS_MIN_DELTA) ? baseline - CDS_MIN_DELTA : offThreshold;
-%       return false;
-%     }
-% 
-%     if (waitingForRelease) {
-%       if (v <= releaseThreshold) {
-%         baseline = v;
-%         updateFallbackThresholds();
-%         waitingForRelease = false;
-%       }
-%       return false;
-%     }
-% 
-%     if (!laserOn) {
-%       if (v < baseline) baseline = v;
-%       else baseline = (baseline * 31 + v) / 32;
-%       if (!calibrated) updateFallbackThresholds();
-%     }
-% 
-%     if (!laserOn && v >= onThreshold) {
-%       laserOn = true;
-%       pulsePeak = v;
-%       return true;
-%     }
-% 
-%     if (laserOn) {
-%       if (v > pulsePeak) pulsePeak = v;
-%       if (v <= offThreshold) {
-%         laserOn = false;
-%         registerPeak(pulsePeak);
-%       }
-%     }
-%     return false;
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={LaserDetector::detectLight関数}, label={lst:laser_detectlight}]
+bool detectLight(int v, unsigned long nowMs) {
+    if (!baselineReady) {
+      baseline = v;
+      startupMin = v;
+      baselineReady = true;
+      updateFallbackThresholds();
+    }
+
+    if (!startupCalibrated) {
+      if (v < startupMin) startupMin = v;
+      baseline = startupMin;
+      updateFallbackThresholds();
+      if (nowMs - calibrationStartMs < CDS_STARTUP_CALIBRATION_MS) return false;
+      startupCalibrated = true;
+      waitingForRelease = (v >= onThreshold);
+      releaseThreshold = (baseline > 1023 - CDS_MIN_DELTA) ? baseline - CDS_MIN_DELTA : offThreshold;
+      return false;
+    }
+
+    if (waitingForRelease) {
+      if (v <= releaseThreshold) {
+        baseline = v;
+        updateFallbackThresholds();
+        waitingForRelease = false;
+      }
+      return false;
+    }
+
+    if (!laserOn) {
+      if (v < baseline) baseline = v;
+      else baseline = (baseline * 31 + v) / 32;
+      if (!calibrated) updateFallbackThresholds();
+    }
+
+    if (!laserOn && v >= onThreshold) {
+      laserOn = true;
+      pulsePeak = v;
+      return true;
+    }
+
+    if (laserOn) {
+      if (v > pulsePeak) pulsePeak = v;
+      if (v <= offThreshold) {
+        laserOn = false;
+        registerPeak(pulsePeak);
+      }
+    }
+    return false;
+}
+\end{lstlisting}
 
 プログラム全文は付録に示す．
 
 なお，本節で説明したFerrisWheel.inoのUDP受信処理は，指揮デバイスのSyncManagerクラスから送信された演奏開始・終了，BPM，音量の各情報を受信する側の処理であり，送信側の詳細は\ref{sec:siki_naibu}項（指揮デバイスの内部設計）を参照されたい．また，中継機デバイスから楽器デバイスへの同期は，回転する観覧車に設置されたレーザーの通過光を各楽器デバイスのCdSセルで検知することで実現しているが，この受光をもとに各楽器デバイス間で発音タイミングを同期させるArduinoプログラム（douki\_saigo）の内部設計については，\ref{sec:gakki_naibu}項（楽器デバイスの内部設計）で説明する．
 
+\fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1750,8 +1776,11 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
     \end{tabular}
 \end{table}
 
+
 各楽器クラスは，Minimライブラリの提供するInstrumentインタフェースを実装しており，コンストラクタで音色を構築したうえで，noteOn関数で発音を，noteOff関数で消音を行う共通の枠組みに従っている．発音命令はInstrumentPlayerクラスを介して各楽器固有のクラスへ委譲され，波形生成に必要なLUTデータはDataUtilsクラスに集約されている．最終的な音声信号は，楽器の種類に応じてAddReverbによる残響エフェクトを通したうえでAudioOutputへ出力される．プログラム全文は付録に示す．
 
+
+\iffalse
 以上の各クラスの関係をまとめたクラス図を図\ref{fig:gakki_class}に示す．
 
 \begin{figure}[htbp]
@@ -1763,19 +1792,32 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
 
 図\ref{fig:gakki_class}に示すように，Main（SoundProcessingCode.pde）がInstrumentPlayerおよびDataUtilsのインスタンスを保持し，発音命令の委譲と波形合成用データの取得を行う．AddReverbはInstrumentPlayerを介して生成された各楽器クラスの出力に対して独立に適用される残響エフェクトであり，FluteInstrument・StringsInstrument・PianoInstrumentおよびKickInstrument・HiHatInstrument・SnareInstrumentの各打楽器クラスは，いずれもDataUtilsから取得した倍音プロファイルをもとに波形を合成する．
 
-ここからは，シリアル通信によるArduinoとの連携，LUTデータの管理（DataUtils），発音命令の委譲（InstrumentPlayer），残響エフェクト（AddEffect），デバッグ用自動演奏（NoteSampler），各楽器クラスによる音色合成の順に，使用する変数・関数の仕様と処理内容について説明する．
+\fi
 
+
+ここからは，シリアル通信によるArduinoとの連携，LUTデータの管理（DataUtils），発音命令の委譲（InstrumentPlayer），残響エフェクト（AddEffect），デバッグ用自動演奏（NoteSampler），各楽器クラスによる音色合成の順に説明する．
 まず，Arduinoとのシリアル通信および発音ディスパッチについて説明する．
-% setup関数のフローチャートを図\ref{fig:gakki_setup}に示す．
+楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，定数arduinoNumberによって，このProcessingインスタンスがどの楽器として動作するかを切り替える．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.5\linewidth]{figs/SC_setup.pdf}
-%     \caption{setup関数のフローチャート}
-%     \label{fig:gakki_setup}
-% \end{figure}
+% 使用する変数・関数の仕様と処理内容について説明する．
 
-楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，定数arduinoNumberによって，このProcessingインスタンスがどの楽器として動作するかを切り替える．Main（SoundProcessingCode.pde）で使用する主な変数の仕様を表\ref{table:gakki_main_var}に示す．
+
+
+\iffalse
+setup関数のフローチャートを図\ref{fig:gakki_setup}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/SC_setup.pdf}
+    \caption{setup関数のフローチャート}
+    \label{fig:gakki_setup}
+\end{figure}
+
+\fi
+
+
+\iffalse
+Main（SoundProcessingCode.pde）で使用する主な変数の仕様を表\ref{table:gakki_main_var}に示す．
 % 図\ref{fig:gakki_setup}に示すように，SoundProcessingCode.pdeのsetup関数では，Minimライブラリの初期化，残響用バス（longOut・shortOut）の生成，InstrumentPlayerおよびDataUtilsの初期化，そしてシリアルポートの初期化を行う．
 
 \begin{table}[H]
@@ -1827,14 +1869,14 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
 \end{table}
 
 続いて，draw関数について説明する．
-% draw関数のフローチャートを図\ref{fig:gakki_draw}に示す．
+draw関数のフローチャートを図\ref{fig:gakki_draw}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.5\linewidth]{figs/SC_draw.pdf}
-%     \caption{draw関数のフローチャート}
-%     \label{fig:gakki_draw}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/SC_draw.pdf}
+    \caption{draw関数のフローチャート}
+    \label{fig:gakki_draw}
+\end{figure}
 
 なお，この描画処理はデバッグ時の音色確認を目的としたものであり，発音タイミング自体には関与しない．
 % 図\ref{fig:gakki_draw}に示すように，draw関数は，Minimライブラリが提供するオシロスコープ波形とFFTスペクトルアナライザを毎フレーム描画する関数であり，\SI{20}{\hertz}〜\SI{20000}{\hertz}の範囲を対数スケールに変換したうえでスペクトルの線を描画し，最後にX軸・Y軸の目盛りとラベルを描画する．
@@ -1842,70 +1884,78 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
 以下では，表\ref{table:gakki_main_func}に示した関数のうち，実際の演奏に用いられるserialEvent関数について説明する．
 % serialEvent関数のフローチャートを図\ref{fig:gakki_serialevent}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.6\linewidth]{figs/SC_serialEvent.pdf}
-%     \caption{serialEvent関数のフローチャート}
-%     \label{fig:gakki_serialevent}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.6\linewidth]{figs/SC_serialEvent.pdf}
+    \caption{serialEvent関数のフローチャート}
+    \label{fig:gakki_serialevent}
+\end{figure}
+
+
 この関数は，Arduinoから届いた1行のデータをカンマで分割し，先頭要素をヘッダとして判定する．ヘッダが'N'（発音指示）の場合，5個1組（音程・長さ・開始ベロシティ・終了ベロシティ・種別）のデータを順に読み取り，durationにはBPMに応じた時間換算（$60000 \div (\text{BPM} \times 24)$）を施したうえで，arduinoNumberに応じた楽器のPlay関数を呼び出す．
 % serialEvent関数の発音指示部分をコード\ref{lst:gakki_serial}に示す．
 
-% \begin{lstlisting}[caption={serialEvent関数（発音指示'N'の処理部分）}, label={lst:gakki_serial}]
-% case "N" :
-%   if (listLength % 5 != 0) break;
-%   for (int i = 5; i <= listLength; i += 5) {
-%     float pitch, duration, startVel, endVel, type;
-%     try {
-%       pitch    = float(list[i-4]);
-%       duration = float(list[i-3]) * (2.5f / musicBPM); // 60000÷(BPM*24)
-%       startVel = float(list[i-2]);
-%       endVel   = float(list[i-1]);
-%       type     = int(list[i]);
-%     } catch (NumberFormatException e) {
-%       continue;
-%     }
-% 
-%     switch (arduinoNumber) {
-%       case 1 :
-%         player.PlayFlute(pitch, duration, startVel, endVel, currentMasterVolume);
-%         break;
-%       case 2 :
-%         player.PlayStrings(pitch, duration, startVel, endVel, currentMasterVolume);
-%         break;
-%       case 3 :
-%         if      (type == 0) player.PlayPiano(pitch, duration, startVel, currentMasterVolume);
-%         else if (type == 1) player.PlayTrumpet(pitch, duration, startVel, endVel, currentMasterVolume);
-%         else if (type == 2) player.PlayHorn(pitch, duration, startVel, endVel, currentMasterVolume);
-%         break;
-%       case 4 :
-%         int a = int(list[i-4]) % 12;
-%         if      (a == 0) player.PlayKick(currentMasterVolume, startVel);
-%         else if (a == 3) player.PlaySnare(currentMasterVolume, startVel, endVel);
-%         else if (a == 4) player.PlayHiHat(currentMasterVolume, startVel);
-%         break;
-%       default: break;
-%     }
-%   }
-%   break;
-% \end{lstlisting}
+\begin{lstlisting}[caption={serialEvent関数（発音指示'N'の処理部分）}, label={lst:gakki_serial}]
+case "N" :
+  if (listLength % 5 != 0) break;
+  for (int i = 5; i <= listLength; i += 5) {
+    float pitch, duration, startVel, endVel, type;
+    try {
+      pitch    = float(list[i-4]);
+      duration = float(list[i-3]) * (2.5f / musicBPM); // 60000÷(BPM*24)
+      startVel = float(list[i-2]);
+      endVel   = float(list[i-1]);
+      type     = int(list[i]);
+    } catch (NumberFormatException e) {
+      continue;
+    }
+
+    switch (arduinoNumber) {
+      case 1 :
+        player.PlayFlute(pitch, duration, startVel, endVel, currentMasterVolume);
+        break;
+      case 2 :
+        player.PlayStrings(pitch, duration, startVel, endVel, currentMasterVolume);
+        break;
+      case 3 :
+        if      (type == 0) player.PlayPiano(pitch, duration, startVel, currentMasterVolume);
+        else if (type == 1) player.PlayTrumpet(pitch, duration, startVel, endVel, currentMasterVolume);
+        else if (type == 2) player.PlayHorn(pitch, duration, startVel, endVel, currentMasterVolume);
+        break;
+      case 4 :
+        int a = int(list[i-4]) % 12;
+        if      (a == 0) player.PlayKick(currentMasterVolume, startVel);
+        else if (a == 3) player.PlaySnare(currentMasterVolume, startVel, endVel);
+        else if (a == 4) player.PlayHiHat(currentMasterVolume, startVel);
+        break;
+      default: break;
+    }
+  }
+  break;
+\end{lstlisting}
+
 
 ここで，種別typeによる分岐について述べる．計画書当初の音源構成はストリングス・フルート・ピアノ・ドラム類のみであり，この分岐は存在しなかった．しかし，演奏する楽曲の編成に金管パートを加え，楽曲表現の幅を広げるため，開発の後半でトランペット（TrumpetInstrument）とホルン（HornInstrument）を追加しており，これに伴い楽譜データ上で発音する楽器の種類を判別する本分岐を新設した．また，ヘッダが'B'（BPM変更）の場合はmusicBPMを60〜180の範囲に制限して更新し，ヘッダが'V'（マスターボリューム変更）の場合はcurrentMasterVolumeを0.2〜1.0の範囲に写像して更新する．
 
 続いて，Play/keyPressed関数について説明する．
 % Play関数のフローチャートを図\ref{fig:gakki_play}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.9\linewidth]{figs/SC_Play.pdf}
-%     \caption{Play関数のフローチャート}
-%     \label{fig:gakki_play}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figs/SC_Play.pdf}
+    \caption{Play関数のフローチャート}
+    \label{fig:gakki_play}
+\end{figure}
 
 Drumが選択されている場合は，さらにsoundDoReMiの値によってPlayKick／PlaySnare／PlayHiHatのいずれかへ分岐する．
 % 図\ref{fig:gakki_play}に示すように，この関数は，isDebugModeが有効な場合にのみキー入力から呼び出される，Arduino未接続でも単体で音色を試奏するための関数であり，キー操作によってあらかじめ設定された音程・強弱等（soundOctave，soundDoReMi，soundStartVelocity，soundEndVelocity）をもとに，変数timbreが示す楽器（Flute／Strings／Piano／Drum等）に応じたInstrumentPlayerのPlayXxx関数を呼び出す．
 
-次に，楽器デバイスにおけるLUTデータの管理（DataUtilsクラス）について説明する．計画書当初は，倍音の周波数と振幅を数式によって機械的に算出し合成する設計を検討していたが，低音域や高音域において実在の楽器との音色の再現度が低下するという問題が生じたため，実際はアイオワ大学等が公開する実楽器の音声データをFFT解析し，各音程・各強弱（pp/mf/ff）ごとの「周波数と振幅のペア」を抽出してJSON形式のLUTとして事前に用意しておく設計に変更した．DataUtilsクラスは，このLUTの読み込みと，発音時のピッチ・ベロシティに応じた倍音プロファイルの動的な取得を担う．DataUtilsクラスで使用する主な変数の仕様を表\ref{table:gakki_utils_var}に示す．
+\fi
+
+次に，楽器デバイスにおけるLUTデータの管理（DataUtilsクラス）について説明する．計画書当初は，倍音の周波数と振幅を数式によって機械的に算出し合成する設計を検討していたが，低音域や高音域において実在の楽器との音色の再現度が低下するという問題が生じたため，実際はアイオワ大学等が公開する実楽器の音声データをFFT解析し，各音程・各強弱（pp/mf/ff）ごとの「周波数と振幅のペア」を抽出してJSON形式のLUTとして事前に用意しておく設計に変更した．
+
+\iffalse
+DataUtilsクラスは，このLUTの読み込みと，発音時のピッチ・ベロシティに応じた倍音プロファイルの動的な取得を担う．DataUtilsクラスで使用する主な変数の仕様を表\ref{table:gakki_utils_var}に示す．
 
 \begin{table}[H]
     \caption{DataUtilsクラスで使用する主な変数の仕様一覧}
@@ -1952,24 +2002,24 @@ Drumが選択されている場合は，さらにsoundDoReMiの値によってPl
 続いて，DataUtilsクラスのコンストラクタについて説明する．
 % コンストラクタのフローチャートを図\ref{fig:gakki_datautils_ctor}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.4\linewidth]{figs/DU_DataUtils.pdf}
-%     \caption{DataUtilsクラスのコンストラクタのフローチャート}
-%     \label{fig:gakki_datautils_ctor}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.4\linewidth]{figs/DU_DataUtils.pdf}
+    \caption{DataUtilsクラスのコンストラクタのフローチャート}
+    \label{fig:gakki_datautils_ctor}
+\end{figure}
 
 % 図\ref{fig:gakki_datautils_ctor}に示すように，コンストラクタでは，Load2LUT関数を用いて楽譜データやピアノ・ドラムの特殊データ等の2次元LUTを読み込んだうえで，Load3LUT関数を用いて各楽器・各強弱ごとの波形データ（3次元LUT）を読み込むことで，DataUtilsが保持する全LUTデータの初期化を行う．
 
 次に，Load2LUT関数およびLoad3LUT関数について説明する．
 % 両関数のフローチャートを図\ref{fig:gakki_loadlut}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.55\linewidth]{figs/DU_LoadLUT.pdf}
-%     \caption{Load2LUT関数・Load3LUT関数のフローチャート}
-%     \label{fig:gakki_loadlut}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.55\linewidth]{figs/DU_LoadLUT.pdf}
+    \caption{Load2LUT関数・Load3LUT関数のフローチャート}
+    \label{fig:gakki_loadlut}
+\end{figure}
 
 読み込み対象のデータが存在しない場合は，データ欠損として扱い該当要素をnullのまま格納する．
 % 図\ref{fig:gakki_loadlut}に示すように，両関数はいずれもJSONファイルを1行ずつ読み込み，各行のデータが2次元か3次元かに応じて，Load2LUTはfloat配列として，Load3LUTは[周波数, 振幅]のペア配列（float[][2]）として格納する．
@@ -1977,118 +2027,125 @@ Drumが選択されている場合は，さらにsoundDoReMiの値によってPl
 次に，GetLUT関数について説明する．
 % GetLUT関数のフローチャートを図\ref{fig:gakki_getlut}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.5\linewidth]{figs/DU_GetLUT.pdf}
-%     \caption{GetLUT関数のフローチャート}
-%     \label{fig:gakki_getlut}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/DU_GetLUT.pdf}
+    \caption{GetLUT関数のフローチャート}
+    \label{fig:gakki_getlut}
+\end{figure}
 
 % 図\ref{fig:gakki_getlut}に示すように，この関数は，引数typeに指定された文字列に応じて，NoteSamplerが参照する試奏用楽譜データ，ピアノ専用の減衰特性等のLUT，およびドラム各パート（Kick／Snare／HiHat）のLUTのいずれかを返す統合ゲッターであり，該当する種別が存在しない場合はエラーを出力してnullを返す．
 
 以下では，表\ref{table:gakki_utils_func}に示した関数のうち，本デバイスの音色再現の核となるGetProfileForPitch関数とGetDynamicProfile関数について説明する．はじめに，GetProfileForPitch関数について説明する．
 % GetProfileForPitch関数のフローチャートを図\ref{fig:gakki_getprofile}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.5\linewidth]{figs/DU_GetProfileForPitch.pdf}
-%     \caption{GetProfileForPitch関数のフローチャート}
-%     \label{fig:gakki_getprofile}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/DU_GetProfileForPitch.pdf}
+    \caption{GetProfileForPitch関数のフローチャート}
+    \label{fig:gakki_getprofile}
+\end{figure}
+
+
 この関数は，要求されたピッチに最も近い有効なサンプルインデックスをLUTから探索し，そのサンプルが本来持つ基準音程（sourceMidi）と要求ピッチとの半音差から求めた倍率（pitchShiftFactor）を，実測された周波数構造にそのまま乗算することで，インハーモニシティ（倍音の非整数性）のデコボコを保持したまま滑らかにピッチをスケーリングする．
 % GetProfileForPitch関数の要部をコード\ref{lst:gakki_getprofile}に示す．
 
-% \begin{lstlisting}[caption={DataUtils::GetProfileForPitch関数（要部）}, label={lst:gakki_getprofile}]
-% float[][] GetProfileForPitch(float pitch, float[][][] lut, int baseMidiNote) {
-%   float originalPitch = pitch;
-%   float maxMidiNote = baseMidiNote + lut.length - 1;
-%   float searchPitch = constrain(pitch, baseMidiNote, maxMidiNote);
-% 
-%   int targetIndex = round(searchPitch) - baseMidiNote;
-%   targetIndex = constrain(targetIndex, 0, lut.length - 1);
-% 
-%   // targetIndexがnull（データ欠損）の場合は、最も近い有効なインデックスを探索する
-%   int finalIndex = targetIndex;
-%   // (探索処理は省略。詳細は付録のプログラム全文を参照)
-% 
-%   float[][] sourceProfile = lut[finalIndex];
-%   int numPeaks = sourceProfile.length;
-%   float[][] result = new float[numPeaks][2];
-% 
-%   // 流用元サンプルの基準MIDIノート番号を逆算
-%   float sourceMidi = finalIndex + baseMidiNote;
-%   // 要求ピッチと流用元との半音差から、周波数の倍率を算出
-%   float pitchShiftFactor = pow(2.0f, (originalPitch - sourceMidi) / 12.0f);
-% 
-%   for (int h = 0; h < numPeaks; h++) {
-%     result[h][0] = sourceProfile[h][0] * pitchShiftFactor; // 実測周波数構造をそのままスケーリング
-%     result[h][1] = sourceProfile[h][1]; // 振幅はそのままコピー
-%   }
-%   return result;
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={DataUtils::GetProfileForPitch関数（要部）}, label={lst:gakki_getprofile}]
+float[][] GetProfileForPitch(float pitch, float[][][] lut, int baseMidiNote) {
+  float originalPitch = pitch;
+  float maxMidiNote = baseMidiNote + lut.length - 1;
+  float searchPitch = constrain(pitch, baseMidiNote, maxMidiNote);
+
+  int targetIndex = round(searchPitch) - baseMidiNote;
+  targetIndex = constrain(targetIndex, 0, lut.length - 1);
+
+  // targetIndexがnull（データ欠損）の場合は、最も近い有効なインデックスを探索する
+  int finalIndex = targetIndex;
+  // (探索処理は省略。詳細は付録のプログラム全文を参照)
+
+  float[][] sourceProfile = lut[finalIndex];
+  int numPeaks = sourceProfile.length;
+  float[][] result = new float[numPeaks][2];
+
+  // 流用元サンプルの基準MIDIノート番号を逆算
+  float sourceMidi = finalIndex + baseMidiNote;
+  // 要求ピッチと流用元との半音差から、周波数の倍率を算出
+  float pitchShiftFactor = pow(2.0f, (originalPitch - sourceMidi) / 12.0f);
+
+  for (int h = 0; h < numPeaks; h++) {
+    result[h][0] = sourceProfile[h][0] * pitchShiftFactor; // 実測周波数構造をそのままスケーリング
+    result[h][1] = sourceProfile[h][1]; // 振幅はそのままコピー
+  }
+  return result;
+}
+\end{lstlisting}
 
 次に，GetDynamicProfile関数について説明する．
 % GetDynamicProfile関数のフローチャートを図\ref{fig:gakki_getdynamic}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.5\linewidth]{figs/DU_GetDynamicProfile.pdf}
-%     \caption{GetDynamicProfile関数のフローチャート}
-%     \label{fig:gakki_getdynamic}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/DU_GetDynamicProfile.pdf}
+    \caption{GetDynamicProfile関数のフローチャート}
+    \label{fig:gakki_getdynamic}
+\end{figure}
 
 この関数は，まずpp/mf/ffの3つの強弱プロファイルをGetProfileForPitch関数で取得したうえで，ベロシティを0〜1に正規化し，あらかじめ定めた3つの閾値（32/80/112 を127で除した値）と比較して，隣接する2つの強弱のうちベロシティに近い方のプロファイル形状を採用する．続いて，振幅0.05未満の微小なピークを除去したうえで，採用した各ピークの振幅の2乗和（エネルギー）に対する目標音量の比からゲインを算出し，全ピークへ一括で乗算することで最終的な音量を決定する．
 % GetDynamicProfile関数の要部をコード\ref{lst:gakki_getdynamic}に示す．
 
-% \begin{lstlisting}[caption={DataUtils::GetDynamicProfile関数（要部）}, label={lst:gakki_getdynamic}]
-% float[][] GetDynamicProfile(float pitch, float velocity, String type, int baseMidiNote, float basePower) {
-%   float[][] profilePP, profileMF, profileFF;
-%   // switch(type)によりPP/MF/FFの各LUTからGetProfileForPitchで取得（詳細略）
-% 
-%   float normVel = constrain(velocity, 0, 127) / 127.0f;
-%   float thresholdPP = 32.0f / 127.0f;
-%   float thresholdMF = 80.0f / 127.0f;
-%   float thresholdFF = 112.0f / 127.0f;
-% 
-%   float[][] baseProfile;
-%   float t = 0;
-%   if (normVel <= thresholdPP) {
-%     baseProfile = profilePP;
-%   } else if (normVel <= thresholdMF) {
-%     t = map(normVel, thresholdPP, thresholdMF, 0.0f, 1.0f);
-%     baseProfile = (t < 0.5f) ? profilePP : profileMF;
-%   } else if (normVel <= thresholdFF) {
-%     t = map(normVel, thresholdMF, thresholdFF, 0.0f, 1.0f);
-%     baseProfile = (t < 0.5f) ? profileMF : profileFF;
-%   } else {
-%     baseProfile = profileFF;
-%   }
-% 
-%   int numPeaks = baseProfile.length;
-%   float ampThreshold = 0.05f;
-%   int validPeakCount = 0;
-%   float energy = 0;
-%   float[][] finalProfile = new float[numPeaks][2]; // 実際は有効数分で確保
-% 
-%   for (int h = 0; h < numPeaks; h++) {
-%     if (baseProfile[h][1] < ampThreshold) continue; // 微小ピークは除去
-%     finalProfile[validPeakCount][0] = baseProfile[h][0];
-%     finalProfile[validPeakCount][1] = baseProfile[h][1];
-%     energy += baseProfile[h][1] * baseProfile[h][1];
-%     validPeakCount++;
-%   }
-% 
-%   float targetVolume = basePower * pow(normVel, 0.9f);
-%   float gain = targetVolume / sqrt(energy + 1e-9f);
-%   for (int i = 0; i < validPeakCount; i++) {
-%     finalProfile[i][1] *= gain; // エネルギー正規化ゲインを適用
-%   }
-%   return finalProfile;
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={DataUtils::GetDynamicProfile関数（要部）}, label={lst:gakki_getdynamic}]
+float[][] GetDynamicProfile(float pitch, float velocity, String type, int baseMidiNote, float basePower) {
+  float[][] profilePP, profileMF, profileFF;
+  // switch(type)によりPP/MF/FFの各LUTからGetProfileForPitchで取得（詳細略）
+
+  float normVel = constrain(velocity, 0, 127) / 127.0f;
+  float thresholdPP = 32.0f / 127.0f;
+  float thresholdMF = 80.0f / 127.0f;
+  float thresholdFF = 112.0f / 127.0f;
+
+  float[][] baseProfile;
+  float t = 0;
+  if (normVel <= thresholdPP) {
+    baseProfile = profilePP;
+  } else if (normVel <= thresholdMF) {
+    t = map(normVel, thresholdPP, thresholdMF, 0.0f, 1.0f);
+    baseProfile = (t < 0.5f) ? profilePP : profileMF;
+  } else if (normVel <= thresholdFF) {
+    t = map(normVel, thresholdMF, thresholdFF, 0.0f, 1.0f);
+    baseProfile = (t < 0.5f) ? profileMF : profileFF;
+  } else {
+    baseProfile = profileFF;
+  }
+
+  int numPeaks = baseProfile.length;
+  float ampThreshold = 0.05f;
+  int validPeakCount = 0;
+  float energy = 0;
+  float[][] finalProfile = new float[numPeaks][2]; // 実際は有効数分で確保
+
+  for (int h = 0; h < numPeaks; h++) {
+    if (baseProfile[h][1] < ampThreshold) continue; // 微小ピークは除去
+    finalProfile[validPeakCount][0] = baseProfile[h][0];
+    finalProfile[validPeakCount][1] = baseProfile[h][1];
+    energy += baseProfile[h][1] * baseProfile[h][1];
+    validPeakCount++;
+  }
+
+  float targetVolume = basePower * pow(normVel, 0.9f);
+  float gain = targetVolume / sqrt(energy + 1e-9f);
+  for (int i = 0; i < validPeakCount; i++) {
+    finalProfile[i][1] *= gain; // エネルギー正規化ゲインを適用
+  }
+  return finalProfile;
+}
+\end{lstlisting}
+
+\fi
 
 次に，発音命令の委譲を行うInstrumentPlayerクラスについて説明する．
+このクラスは，AudioOutputへの参照を保持し，各PlayXxx関数が呼び出されるたびに，対応する楽器クラスのインスタンスをその場で生成してout.playNote関数へ渡すという単純な委譲処理のみを行う．
+
+
 % InstrumentPlayerクラスのコンストラクタおよびPlayXxx関数のフローチャートを図\ref{fig:gakki_instplayer}に示す．
 
 % \begin{figure}[htbp]
@@ -2098,7 +2155,9 @@ Drumが選択されている場合は，さらにsoundDoReMiの値によってPl
 %     \label{fig:gakki_instplayer}
 % \end{figure}
 
-このクラスは，AudioOutputへの参照を保持し，各PlayXxx関数が呼び出されるたびに，対応する楽器クラスのインスタンスをその場で生成してout.playNote関数へ渡すという単純な委譲処理のみを行う．InstrumentPlayerクラスで使用する主な関数の仕様を表\ref{table:gakki_player_func}に示す．
+
+\iffalse
+InstrumentPlayerクラスで使用する主な関数の仕様を表\ref{table:gakki_player_func}に示す．
 
 \begin{table}[H]
     \caption{InstrumentPlayerクラスで使用する主な関数の仕様一覧}
@@ -2120,14 +2179,18 @@ Drumが選択されている場合は，さらにsoundDoReMiの値によってPl
 他のPlayXxx関数も，生成するInstrumentクラスが異なるのみで，同様の構造となっている．
 % InstrumentPlayerクラスのPlayFlute関数をコード\ref{lst:gakki_player}に示す．
 
-% \begin{lstlisting}[caption={InstrumentPlayer::PlayFlute関数}, label={lst:gakki_player}]
-% void PlayFlute(float midiNote, float duration, float startVel, float endVel, float masterVol) {
-%   out.playNote(0.0f, duration,
-%     new FluteInstrument(midiNote, duration, startVel, endVel, masterVol));
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={InstrumentPlayer::PlayFlute関数}, label={lst:gakki_player}]
+void PlayFlute(float midiNote, float duration, float startVel, float endVel, float masterVol) {
+  out.playNote(0.0f, duration,
+    new FluteInstrument(midiNote, duration, startVel, endVel, masterVol));
+}
+\end{lstlisting}
 
-次に，残響エフェクトを付加するAddEffect.pdeのAddReverbクラスについて説明する．
+\fi
+
+
+
+% 次に，残響エフェクトを付加するAddEffect.pdeのAddReverbクラスについて説明する．
 % AddReverbクラスのコンストラクタおよびuGenerate関数のフローチャートを図\ref{fig:gakki_addreverb}に示す．
 
 % \begin{figure}[htbp]
@@ -2137,48 +2200,58 @@ Drumが選択されている場合は，さらにsoundDoReMiの値によってPl
 %     \label{fig:gakki_addreverb}
 % \end{figure}
 
-このクラスはMinimライブラリのUGenを継承しており，講義で扱われたたたみ込み積分（コンボリューション）を，指数関数的に減衰するランダムノイズを疑似的なインパルス応答として用いることで実装している．左右のチャンネルの記憶バッファ（historyBufferL・historyBufferR）を独立させることで，ステレオ音場に対応している．
-% AddReverbクラスの心臓部であるuGenerate関数をコード\ref{lst:gakki_reverb}に示す．
+次に，残響エフェクトを付加するAddEffect.pdeのAddReverbクラスについて説明する．
+このクラスはMinimライブラリのUGenを継承しており，講義で扱われたたたみ込み積分を，指数関数的に減衰するランダムノイズを疑似的なインパルス応答として用いることで実装している．
+左右のチャンネルの記憶バッファ（historyBufferL・historyBufferR）を独立させることで，ステレオ音場に対応している．
 
-% \begin{lstlisting}[caption={AddReverb::uGenerate関数}, label={lst:gakki_reverb}]
-% protected void uGenerate(float[] channels) {
-%   float[] inputs = audio.getLastValues();
-%   float inL = inputs[0];
-%   float inR = (inputs.length > 1) ? inputs[1] : inL;
-% 
-%   historyBufferL[bufferIndex] = inL;
-%   historyBufferR[bufferIndex] = inR;
-% 
-%   float outL = 0;
-%   float outR = 0;
-%   for (int j = 0; j < kernelSize; j++) {
-%     int idx = (bufferIndex - j + kernelSize) % kernelSize;
-%     outL += historyBufferL[idx] * impulseResponse[j];
-%     outR += historyBufferR[idx] * impulseResponse[j];
-%   }
-% 
-%   bufferIndex = (bufferIndex + 1) % kernelSize;
-% 
-%   if (channels.length == 1) {
-%     channels[0] = inL + outL;
-%   } else if (channels.length >= 2) {
-%     channels[0] = inL + outL;
-%     channels[1] = inR + outR;
-%   }
-% }
-% \end{lstlisting}
+\iffalse
+
+AddReverbクラスの心臓部であるuGenerate関数をコード\ref{lst:gakki_reverb}に示す．
+
+\begin{lstlisting}[caption={AddReverb::uGenerate関数}, label={lst:gakki_reverb}]
+protected void uGenerate(float[] channels) {
+  float[] inputs = audio.getLastValues();
+  float inL = inputs[0];
+  float inR = (inputs.length > 1) ? inputs[1] : inL;
+
+  historyBufferL[bufferIndex] = inL;
+  historyBufferR[bufferIndex] = inR;
+
+  float outL = 0;
+  float outR = 0;
+  for (int j = 0; j < kernelSize; j++) {
+    int idx = (bufferIndex - j + kernelSize) % kernelSize;
+    outL += historyBufferL[idx] * impulseResponse[j];
+    outR += historyBufferR[idx] * impulseResponse[j];
+  }
+
+  bufferIndex = (bufferIndex + 1) % kernelSize;
+
+  if (channels.length == 1) {
+    channels[0] = inL + outL;
+  } else if (channels.length >= 2) {
+    channels[0] = inL + outL;
+    channels[1] = inR + outR;
+  }
+}
+\end{lstlisting}
 
 setup関数内では，持続音向けの残響バスlongOut（カーネルサイズ15000，レベル0.20）と，打撃音向けの残響バスshortOut（カーネルサイズ2000，レベル0.25）の2種類のAddReverbが生成されており，各楽器クラスはnoteOn関数内でmasterEnvをこのいずれかへパッチすることで，音色に適した残響を選択している．
 
-次に，デバッグ用の自動演奏機能を提供するNoteSampler.pdeについて説明する．本機能は，指揮デバイスや中継機デバイスが未接続の状態でもPC単体で音色の検証を行えるようにするためのものであり，Processingの標準描画ループ（draw）に依存すると波形描画の負荷でタイミングがずれるため，音楽専用のスレッド（audioThread）を用いて高精度にタイミングを管理している．
+\fi
+
+次に，デバッグ用の自動演奏機能を提供するNoteSampler.pdeについて説明する．
+本機能は，指揮デバイスや中継機デバイスが未接続の状態でもPC単体で音色の検証を行えるようにするためのものであり，Processingの標準描画ループ（draw）に依存すると波形描画の負荷でタイミングがずれるため，音楽専用のスレッド（audioThread）を用いて高精度にタイミングを管理している．
+
+\iffalse
 % audioThreadの処理ループおよびSoundPlay関数のフローチャートを図\ref{fig:gakki_soundplay_thread}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.45\linewidth]{figs/SC_SoundPlay.pdf}
-%     \caption{audioThreadの処理ループおよびSoundPlay関数のフローチャート}
-%     \label{fig:gakki_soundplay_thread}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.45\linewidth]{figs/SC_SoundPlay.pdf}
+    \caption{audioThreadの処理ループおよびSoundPlay関数のフローチャート}
+    \label{fig:gakki_soundplay_thread}
+\end{figure}
 
 NoteSampler.pdeで使用する主な変数の仕様を表\ref{table:gakki_sampler_var}に示す．
 % 図\ref{fig:gakki_soundplay_thread}に示すように，スレッドはisPlayingおよびisDebugModeが共に有効な間，一定のインターバルごとにSoundPlay関数を呼び出し，現在のtickに該当する音符をNote配列から取得して各楽器のPlayメソッドを呼び出したうえで，次の音符のtickへ進む．
@@ -2227,48 +2300,56 @@ NoteSampler.pdeで使用する主な変数の仕様を表\ref{table:gakki_sample
 
 % SoundPlay関数をコード\ref{lst:gakki_soundplay}に示す．
 
-% \begin{lstlisting}[caption={SoundPlay関数}, label={lst:gakki_soundplay}]
-% void SoundPlay() {
-%   if (tick == returnTick[returnIndex][0]) {
-%     tick = returnTick[returnIndex][1];
-%     noteIndex = returnTick[returnIndex][2];
-%     returnIndex ++;
-%     if (returnIndex == returnTick.length) returnIndex = 0;
-%   }
-% 
-%   if (noteIndex < Note.length) {
-%     float durationTuning = interval / 1000000000.0f;
-%     while (Note[noteIndex][0] == tick) {
-%       float duration = float(Note[noteIndex][1]) * durationTuning;
-%       float pitch = float(Note[noteIndex][2]);
-%       float startVelocity = float(Note[noteIndex][3]);
-%       float endVelocity = float(Note[noteIndex][4]);
-%       float type = (Note[noteIndex].length == 6) ? float(Note[noteIndex][5]) : 0;
-%       switch (timbre) {
-%         case "Flute": case "Flute2":
-%           player.PlayFlute(pitch, duration, startVelocity, endVelocity, 1.0f);
-%           break;
-%         // 以下、Strings/Piano/Drum/Horn/Trumpetも同様に分岐（詳細は付録参照）
-%       }
-%       noteIndex ++;
-%       if (noteIndex == Note.length) break;
-%     }
-%   }
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={SoundPlay関数}, label={lst:gakki_soundplay}]
+void SoundPlay() {
+  if (tick == returnTick[returnIndex][0]) {
+    tick = returnTick[returnIndex][1];
+    noteIndex = returnTick[returnIndex][2];
+    returnIndex ++;
+    if (returnIndex == returnTick.length) returnIndex = 0;
+  }
 
-最後に，各楽器クラスによる音色合成について説明する．いずれの楽器クラスも，コンストラクタ内でDataUtilsから取得した倍音プロファイルをもとに正弦波（Oscil）を加算合成し，ADSR（Attack, Decay, Sustain, Release）エンベロープおよびLineによる時間変化を付加したうえでミキサー（Summer）へ結線し，noteOn関数でエンベロープとLineを一斉に起動する，という共通の設計に従っている．以下では，各楽器クラスに特有の合成技法について説明する．
+  if (noteIndex < Note.length) {
+    float durationTuning = interval / 1000000000.0f;
+    while (Note[noteIndex][0] == tick) {
+      float duration = float(Note[noteIndex][1]) * durationTuning;
+      float pitch = float(Note[noteIndex][2]);
+      float startVelocity = float(Note[noteIndex][3]);
+      float endVelocity = float(Note[noteIndex][4]);
+      float type = (Note[noteIndex].length == 6) ? float(Note[noteIndex][5]) : 0;
+      switch (timbre) {
+        case "Flute": case "Flute2":
+          player.PlayFlute(pitch, duration, startVelocity, endVelocity, 1.0f);
+          break;
+        // 以下、Strings/Piano/Drum/Horn/Trumpetも同様に分岐（詳細は付録参照）
+      }
+      noteIndex ++;
+      if (noteIndex == Note.length) break;
+    }
+  }
+}
+\end{lstlisting}
+
+\fi
+
+
+最後に，各楽器クラスによる音色合成について説明する．
+いずれの楽器クラスも，コンストラクタ内でDataUtilsから取得した倍音プロファイルをもとに正弦波を加算合成し，ADSR（Attack, Decay, Sustain, Release）エンベロープおよびLineによる時間変化を付加したうえでミキサーへ結線し，noteOn関数でエンベロープとLineを一斉に起動する，という共通の設計に従っている．
+
+\iffalse
+以下では，各楽器クラスに特有の合成技法について説明する．
+
 
 \paragraph{フルート（FluteInstrument）}
 まず，フルートの音色合成について説明する．
 % FluteInstrumentコンストラクタのフローチャートを図\ref{fig:gakki_flute}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.5\linewidth]{figs/FI_FluteInstrument.pdf}
-%     \caption{FluteInstrumentコンストラクタのフローチャート}
-%     \label{fig:gakki_flute}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/FI_FluteInstrument.pdf}
+    \caption{FluteInstrumentコンストラクタのフローチャート}
+    \label{fig:gakki_flute}
+\end{figure}
 
 FluteInstrumentクラスは，DataUtilsから取得した倍音プロファイルをもとに正弦波を加算合成する層と，息が管に吹き込まれる音（Chiff）を再現するノイズ層の2層構造で構成される．加算合成の各倍音には，globalBreathSpeedという1つの共通の乱数速度で駆動されるビブラート（FM変調）と，倍音ごとに個別の深さを持つ音量の呼吸的揺らぎ（AM変調）が付加されている．FluteInstrumentクラスで使用する主な変数の仕様を表\ref{table:gakki_flute_var}に示す．
 
@@ -2317,77 +2398,77 @@ FluteInstrumentクラスは，DataUtilsから取得した倍音プロファイ�
 以下では，コンストラクタとnoteOn関数について説明する．まず，加算合成部分について説明する．各倍音についてOscilを生成し，位相をランダムに散らしたうえで，ビブラート用のOscil（freqController）を周波数へ，音量揺らぎ用のOscil（ampLFO）を振幅へそれぞれパッチしている．
 % 加算合成部分をコード\ref{lst:gakki_flute_ctor}に示す．
 
-% \begin{lstlisting}[caption={FluteInstrumentコンストラクタ（加算合成部分）}, label={lst:gakki_flute_ctor}]
-% for (int i = 0; i < numHarmonics; i++) {
-%   float targetFreq = startProfile[i][0];
-%   Oscil osc = new Oscil(targetFreq, 0.0f, Waves.SINE);
-%   osc.setPhase(random(1.0f)); // アタック音の機械的な均一さを防ぐ
-% 
-%   float baseAmp = startProfile[i][1] * volFactor;
-%   startAmps[i] = baseAmp * startGainFactor;
-%   endAmps[i]   = baseAmp * endGainFactor;
-% 
-%   // ビブラート（FM変調）
-%   float vibDepthHz = targetFreq * 0.0015f;
-%   Oscil freqController = new Oscil(globalBreathSpeed, vibDepthHz/10, Waves.SINE);
-%   freqController.offset.setLastValue(targetFreq);
-%   freqController.patch(osc.frequency);
-% 
-%   // 音量揺らぎ（AM変調）：ウナリ自体をフェードさせる
-%   wobbleFactors[i] = wobbleDepths[i];
-%   wobbleLines[i] = new Line();
-%   Oscil ampLFO = new Oscil(globalBreathSpeed, 0.0f, Waves.SINE);
-%   ampLFO.setPhase(random(1.0f));
-%   wobbleLines[i].patch(ampLFO.amplitude);
-%   ampLFO.patch(osc.amplitude);
-% 
-%   ampLines[i] = new Line();
-%   ampLines[i].patch(osc.amplitude);
-% 
-%   float attackTime = (i == baseWaveNum) ? 0.058f : 0.395f;
-%   harmonicEnvs[i] = new ADSR(1.0f, attackTime/3, 1.0f, 0.7f, 10.0f);
-%   osc.patch(harmonicEnvs[i]);
-%   harmonicEnvs[i].patch(mixer);
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={FluteInstrumentコンストラクタ（加算合成部分）}, label={lst:gakki_flute_ctor}]
+for (int i = 0; i < numHarmonics; i++) {
+  float targetFreq = startProfile[i][0];
+  Oscil osc = new Oscil(targetFreq, 0.0f, Waves.SINE);
+  osc.setPhase(random(1.0f)); // アタック音の機械的な均一さを防ぐ
+
+  float baseAmp = startProfile[i][1] * volFactor;
+  startAmps[i] = baseAmp * startGainFactor;
+  endAmps[i]   = baseAmp * endGainFactor;
+
+  // ビブラート（FM変調）
+  float vibDepthHz = targetFreq * 0.0015f;
+  Oscil freqController = new Oscil(globalBreathSpeed, vibDepthHz/10, Waves.SINE);
+  freqController.offset.setLastValue(targetFreq);
+  freqController.patch(osc.frequency);
+
+  // 音量揺らぎ（AM変調）：ウナリ自体をフェードさせる
+  wobbleFactors[i] = wobbleDepths[i];
+  wobbleLines[i] = new Line();
+  Oscil ampLFO = new Oscil(globalBreathSpeed, 0.0f, Waves.SINE);
+  ampLFO.setPhase(random(1.0f));
+  wobbleLines[i].patch(ampLFO.amplitude);
+  ampLFO.patch(osc.amplitude);
+
+  ampLines[i] = new Line();
+  ampLines[i].patch(osc.amplitude);
+
+  float attackTime = (i == baseWaveNum) ? 0.058f : 0.395f;
+  harmonicEnvs[i] = new ADSR(1.0f, attackTime/3, 1.0f, 0.7f, 10.0f);
+  osc.patch(harmonicEnvs[i]);
+  harmonicEnvs[i].patch(mixer);
+}
+\end{lstlisting}
 
 次に，息のノイズ（Chiff）部分について説明する．ホワイトノイズをバンドパスフィルター（MoogFilter）に通すことで，息が管に吹き込まれる瞬間の「シュッ」という音のみを抽出している．
 % 息ノイズ部分をコード\ref{lst:gakki_flute_breath}に示す．
 
-% \begin{lstlisting}[caption={FluteInstrumentコンストラクタ（息ノイズ部分）}, label={lst:gakki_flute_breath}]
-% float startNorm = constrain(startVel, 0, 127) / 127.0f;
-% float attackNoiseVol = masterVol * 0.008f * pow(startNorm, 0.9f);
-% Noise breathNoise = new Noise(attackNoiseVol, Noise.Tint.WHITE);
-% 
-% MoogFilter breathFilter = new MoogFilter(581.4f, 0.15f);
-% breathFilter.type = MoogFilter.Type.BP;
-% 
-% breathEnv = new ADSR(1.0f, 0.001f, 0.2f, 0.0f, 0.0f);
-% breathNoise.patch(breathFilter);
-% breathFilter.patch(breathEnv);
-% breathEnv.patch(mixer);
-% \end{lstlisting}
+\begin{lstlisting}[caption={FluteInstrumentコンストラクタ（息ノイズ部分）}, label={lst:gakki_flute_breath}]
+float startNorm = constrain(startVel, 0, 127) / 127.0f;
+float attackNoiseVol = masterVol * 0.008f * pow(startNorm, 0.9f);
+Noise breathNoise = new Noise(attackNoiseVol, Noise.Tint.WHITE);
+
+MoogFilter breathFilter = new MoogFilter(581.4f, 0.15f);
+breathFilter.type = MoogFilter.Type.BP;
+
+breathEnv = new ADSR(1.0f, 0.001f, 0.2f, 0.0f, 0.0f);
+breathNoise.patch(breathFilter);
+breathFilter.patch(breathEnv);
+breathEnv.patch(mixer);
+\end{lstlisting}
 
 最後に，noteOn関数について説明する．この関数は，masterEnvとharmonicEnvsを起動したうえで，ampLines（ベース音量）とwobbleLines（揺らぎの深さ）を，音符の長さに0.5秒の余裕を加えたsafeDurにわたって開始値から終了値へフェードさせる．
 % noteOn関数をコード\ref{lst:gakki_flute_noteon}に示す．
 
-% \begin{lstlisting}[caption={FluteInstrument::noteOn関数}, label={lst:gakki_flute_noteon}]
-% void noteOn(float dur) {
-%   masterEnv.noteOn();
-%   float safeDur = dur + 0.5f;
-% 
-%   for(int i = 0; i < numHarmonics; i++) {
-%     harmonicEnvs[i].noteOn();
-%     ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
-%     if (wobbleLines[i] != null) {
-%       float factor = wobbleFactors[i];
-%       wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
-%     }
-%   }
-%   breathEnv.noteOn();
-%   masterEnv.patch(longOut);
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={FluteInstrument::noteOn関数}, label={lst:gakki_flute_noteon}]
+void noteOn(float dur) {
+  masterEnv.noteOn();
+  float safeDur = dur + 0.5f;
+
+  for(int i = 0; i < numHarmonics; i++) {
+    harmonicEnvs[i].noteOn();
+    ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
+    if (wobbleLines[i] != null) {
+      float factor = wobbleFactors[i];
+      wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
+    }
+  }
+  breathEnv.noteOn();
+  masterEnv.patch(longOut);
+}
+\end{lstlisting}
 
 \paragraph{ストリングス（StringsInstrument）}
 次に，ストリングスの音色合成について説明する．StringsInstrumentクラスは，単一の楽器データではなく，コントラバス・チェロ・ビオラ・バイオリンの4種類のLUTを音程に応じてクロスフェード（混合）させることで，低音から高音まで滑らかに音色が変化する弦楽器群を表現している点が最大の特徴である．音程が低いほどコントラバスの比率が高く，音程が上がるにつれてチェロ・ビオラ・バイオリンへと比率が滑らかに移行する．StringsInstrumentクラスで使用する主な変数・関数の仕様を表\ref{table:gakki_strings}に示す．
@@ -2414,73 +2495,73 @@ FluteInstrumentクラスは，DataUtilsから取得した倍音プロファイ�
 まず，楽器ブレンド比率の算出について説明する．音程（midiNote）の値に応じて，隣接する2楽器間の比率をmap関数で線形補間する．
 % ブレンド比率の算出部分をコード\ref{lst:gakki_strings_blend}に示す．
 
-% \begin{lstlisting}[caption={StringsInstrumentコンストラクタ（楽器ブレンド比率の算出）}, label={lst:gakki_strings_blend}]
-% float baseBassRatio = 0.0f, baseCelloRatio = 0.0f, baseViolaRatio = 0.0f, baseViolinRatio = 0.0f;
-% 
-% if (midiNote <= 36) {
-%   baseBassRatio = 1.0f;
-% } else if (midiNote <= 48) {
-%   baseBassRatio = map(midiNote, 36, 48, 1.0f, 0.0f);
-%   baseCelloRatio = 1.0f - baseBassRatio;
-% } else if (midiNote <= 60) {
-%   baseCelloRatio = map(midiNote, 48, 60, 1.0f, 0.0f);
-%   baseViolaRatio = 1.0f - baseCelloRatio;
-% } else if (midiNote <= 72) {
-%   baseViolaRatio = map(midiNote, 60, 72, 1.0f, 0.0f);
-%   baseViolinRatio = 1.0f - baseViolaRatio;
-% } else {
-%   baseViolinRatio = 1.0f;
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={StringsInstrumentコンストラクタ（楽器ブレンド比率の算出）}, label={lst:gakki_strings_blend}]
+float baseBassRatio = 0.0f, baseCelloRatio = 0.0f, baseViolaRatio = 0.0f, baseViolinRatio = 0.0f;
+
+if (midiNote <= 36) {
+  baseBassRatio = 1.0f;
+} else if (midiNote <= 48) {
+  baseBassRatio = map(midiNote, 36, 48, 1.0f, 0.0f);
+  baseCelloRatio = 1.0f - baseBassRatio;
+} else if (midiNote <= 60) {
+  baseCelloRatio = map(midiNote, 48, 60, 1.0f, 0.0f);
+  baseViolaRatio = 1.0f - baseCelloRatio;
+} else if (midiNote <= 72) {
+  baseViolaRatio = map(midiNote, 60, 72, 1.0f, 0.0f);
+  baseViolinRatio = 1.0f - baseViolaRatio;
+} else {
+  baseViolinRatio = 1.0f;
+}
+\end{lstlisting}
 
 次に，createInstrumentOscillators関数について説明する．この関数は，指定された楽器のLUTプロファイルを振幅の大きい順にソートしたうえで上限本数（maxPeaks）まで選別し，周波数の低い順に並べ直してからOscilとして生成する．これにより，計算負荷を抑えつつ音色に対する寄与の大きい成分を優先的に採用している．
 % createInstrumentOscillators関数の要部をコード\ref{lst:gakki_strings_create}に示す．
 
-% \begin{lstlisting}[caption={StringsInstrument::createInstrumentOscillators関数（要部）}, label={lst:gakki_strings_create}]
-% private void createInstrumentOscillators(final float[][] profile, float blendRatio, int maxPeaks,
-%     float volFactor, float globalVibSpeed, float fmDepthCents, Summer mixer,
-%     float startGainFactor, float endGainFactor) {
-%   if (profile == null || profile.length == 0) return;
-% 
-%   // 振幅の大きい順にインデックスをソートし、上位limitPeaks個を抽出（詳細は付録参照）
-%   // その後、周波数の低い順に並べ直す
-% 
-%   for (int h = 0; h < limitPeaks; h++) {
-%     if (totalActiveOscils >= maxTotalOscils) break;
-% 
-%     float targetFreq = filteredProfile[h][0];
-%     float rawAmp     = filteredProfile[h][1];
-%     if (targetFreq > 14000.0f) continue;
-% 
-%     // 7000Hz〜17000Hzにかけて振幅を滑らかに減衰させる高域フィルター
-%     if (targetFreq > 7000.0f) {
-%       float filterFactor = map(targetFreq, 7000.0f, 17000.0f, 1.0f, 0.0f);
-%       rawAmp *= constrain(filterFactor, 0.0f, 1.0f);
-%     }
-% 
-%     float baseAmp = rawAmp * volFactor * blendRatio;
-%     int idx = totalActiveOscils;
-%     startAmps[idx] = baseAmp * startGainFactor;
-%     endAmps[idx]   = baseAmp * endGainFactor;
-% 
-%     oscils[idx] = new Oscil(targetFreq, 0.0f, Waves.SINE);
-%     oscils[idx].setPhase(random(1.0f));
-%     oscils[idx].patch(mixer);
-%     totalActiveOscils++;
-%   }
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={StringsInstrument::createInstrumentOscillators関数（要部）}, label={lst:gakki_strings_create}]
+private void createInstrumentOscillators(final float[][] profile, float blendRatio, int maxPeaks,
+    float volFactor, float globalVibSpeed, float fmDepthCents, Summer mixer,
+    float startGainFactor, float endGainFactor) {
+  if (profile == null || profile.length == 0) return;
+
+  // 振幅の大きい順にインデックスをソートし、上位limitPeaks個を抽出（詳細は付録参照）
+  // その後、周波数の低い順に並べ直す
+
+  for (int h = 0; h < limitPeaks; h++) {
+    if (totalActiveOscils >= maxTotalOscils) break;
+
+    float targetFreq = filteredProfile[h][0];
+    float rawAmp     = filteredProfile[h][1];
+    if (targetFreq > 14000.0f) continue;
+
+    // 7000Hz〜17000Hzにかけて振幅を滑らかに減衰させる高域フィルター
+    if (targetFreq > 7000.0f) {
+      float filterFactor = map(targetFreq, 7000.0f, 17000.0f, 1.0f, 0.0f);
+      rawAmp *= constrain(filterFactor, 0.0f, 1.0f);
+    }
+
+    float baseAmp = rawAmp * volFactor * blendRatio;
+    int idx = totalActiveOscils;
+    startAmps[idx] = baseAmp * startGainFactor;
+    endAmps[idx]   = baseAmp * endGainFactor;
+
+    oscils[idx] = new Oscil(targetFreq, 0.0f, Waves.SINE);
+    oscils[idx].setPhase(random(1.0f));
+    oscils[idx].patch(mixer);
+    totalActiveOscils++;
+  }
+}
+\end{lstlisting}
 
 \paragraph{ピアノ（PianoInstrument）}
 次に，ピアノの音色合成について説明する．
 % PianoInstrumentコンストラクタのフローチャートを図\ref{fig:gakki_piano}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.5\linewidth]{figs/PI_PianoInstrument.pdf}
-%     \caption{PianoInstrumentコンストラクタのフローチャート}
-%     \label{fig:gakki_piano}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/PI_PianoInstrument.pdf}
+    \caption{PianoInstrumentコンストラクタのフローチャート}
+    \label{fig:gakki_piano}
+\end{figure}
 
 PianoInstrumentクラスは，1つの音に対して2本の弦をわずかにデチューン（周波数をずらす）して重ねる「デュアル・ストリング構造」により，時間が経つにつれて自然に生じる音のうなり（Beat）を再現している点が特徴である．また，実測データ（LUT）が存在しない倍音・音域については，ピアノの物理特性の傾向を数式化した近似モデルで補完するハイブリッド方式を採用している．PianoInstrumentクラスで使用する主な変数・関数の仕様を表\ref{table:gakki_piano}に示す．
 
@@ -2508,50 +2589,50 @@ PianoInstrumentクラスは，1つの音に対して2本の弦をわずかにデ
 以下では，デュアル・ストリング構造の構築部分について説明する．各倍音について，アタックの芯となるレイヤーA（coreOsc）と，時間差で立ち上がる共鳴弦のレイヤーB（resOsc）の2層を生成する．レイヤーBはレイヤーAよりわずかに周波数をずらし（wobbleRate分のデチューン），buildUpTime秒かけてゆっくり音量を上げることで，芯の音と干渉して自然なうなりを生む．
 % デュアル・ストリング構造の構築部分をコード\ref{lst:gakki_piano_dual}に示す．
 
-% \begin{lstlisting}[caption={PianoInstrumentコンストラクタ（デュアル・ストリング構造）}, label={lst:gakki_piano_dual}]
-% // レイヤーA：アタックの芯（Dry弦）
-% Oscil coreOsc = new Oscil(targetFreq, amp, Waves.SINE);
-% coreOsc.setPhase(random(0.0f, 0.1f));
-% Damp coreDamp = new Damp(0.001f, decayTime);
-% coreOsc.patch(coreDamp).patch(mixer);
-% damps.add(coreDamp);
-% 
-% // レイヤーB：時間差で来る響き（共鳴弦）
-% float reverbAmp = amp * wobbleDepth;
-% if (reverbAmp > 0.0001f && wobbleRate > 0.0f) {
-%   // 周波数をわずかにズラす（Detune）ことで、芯の弦と干渉して自然な「うなり(Beat)」を生む
-%   Oscil resOsc = new Oscil(targetFreq + wobbleRate, reverbAmp, Waves.SINE);
-%   Damp resDamp = new Damp(buildUpTime, decayTime);
-%   resOsc.patch(resDamp).patch(mixer);
-%   damps.add(resDamp);
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={PianoInstrumentコンストラクタ（デュアル・ストリング構造）}, label={lst:gakki_piano_dual}]
+// レイヤーA：アタックの芯（Dry弦）
+Oscil coreOsc = new Oscil(targetFreq, amp, Waves.SINE);
+coreOsc.setPhase(random(0.0f, 0.1f));
+Damp coreDamp = new Damp(0.001f, decayTime);
+coreOsc.patch(coreDamp).patch(mixer);
+damps.add(coreDamp);
+
+// レイヤーB：時間差で来る響き（共鳴弦）
+float reverbAmp = amp * wobbleDepth;
+if (reverbAmp > 0.0001f && wobbleRate > 0.0f) {
+  // 周波数をわずかにズラす（Detune）ことで、芯の弦と干渉して自然な「うなり(Beat)」を生む
+  Oscil resOsc = new Oscil(targetFreq + wobbleRate, reverbAmp, Waves.SINE);
+  Damp resDamp = new Damp(buildUpTime, decayTime);
+  resOsc.patch(resDamp).patch(mixer);
+  damps.add(resDamp);
+}
+\end{lstlisting}
 
 続いて，ハンマーの打撃ノイズについて説明する．音程の高低に応じてフィルターのカットオフを変化させることで，高音の鍵盤ほど硬い「カチッ」としたノイズになるよう調整している．
 % ハンマーノイズ部分をコード\ref{lst:gakki_piano_hammer}に示す．
 
-% \begin{lstlisting}[caption={PianoInstrumentコンストラクタ（ハンマーノイズ部分）}, label={lst:gakki_piano_hammer}]
-% float hammerVol = masterVol * 0.003f * normVel;
-% Noise hammerNoise = new Noise(hammerVol, Noise.Tint.WHITE);
-% 
-% float hammerCutoff = map(midiNote, 21, 108, 600f, 4000f);
-% MoogFilter hammerFilter = new MoogFilter(hammerCutoff, 0.1f);
-% hammerFilter.type = MoogFilter.Type.LP;
-% 
-% hammerEnv = new ADSR(1.0f, 0.001f, 0.02f, 0.0f, 0.01f);
-% hammerNoise.patch(hammerFilter).patch(hammerEnv);
-% \end{lstlisting}
+\begin{lstlisting}[caption={PianoInstrumentコンストラクタ（ハンマーノイズ部分）}, label={lst:gakki_piano_hammer}]
+float hammerVol = masterVol * 0.003f * normVel;
+Noise hammerNoise = new Noise(hammerVol, Noise.Tint.WHITE);
+
+float hammerCutoff = map(midiNote, 21, 108, 600f, 4000f);
+MoogFilter hammerFilter = new MoogFilter(hammerCutoff, 0.1f);
+hammerFilter.type = MoogFilter.Type.LP;
+
+hammerEnv = new ADSR(1.0f, 0.001f, 0.02f, 0.0f, 0.01f);
+hammerNoise.patch(hammerFilter).patch(hammerEnv);
+\end{lstlisting}
 
 \paragraph{ドラム（KickInstrument・SnareInstrument・HiHatInstrument）}
 次に，ドラムの音色合成について説明する．
 % Kick・Snare・HiHatの各コンストラクタのフローチャートを図\ref{fig:gakki_drum}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.95\linewidth]{figs/DI_DrumInstrument.pdf}
-%     \caption{Kick・Snare・HiHatの各コンストラクタのフローチャート}
-%     \label{fig:gakki_drum}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figs/DI_DrumInstrument.pdf}
+    \caption{Kick・Snare・HiHatの各コンストラクタのフローチャート}
+    \label{fig:gakki_drum}
+\end{figure}
 
 ドラムはフルート等の旋律楽器とは異なり，Instrumentクラスをキック・スネア・ハイハットの3種類（および過去に試作されたSnareInstrumentOld・HiHatInstrumentOldの旧版，未使用のCymbalInstrument）に分けて実装している．いずれも短時間で減衰する打撃音であるため，全体の出力はshortOutバスへパッチされる．3種の主要な変数・関数の仕様を表\ref{table:gakki_drum}に示す．
 
@@ -2577,43 +2658,43 @@ PianoInstrumentクラスは，1つの音に対して2本の弦をわずかにデ
 以下では，キックのピッチスイープと，スネアの胴鳴りパートについて説明する．まず，KickInstrumentのピッチスイープについて説明する．各周波数成分について，Lineを用いて0.01秒かけて「本来の周波数の1.5倍」から「本来の周波数」へ直線的に下げることで，太鼓の膜が叩かれた瞬間にピッチが下がっていく物理的な挙動を再現している．
 % 該当部分をコード\ref{lst:gakki_kick}に示す．
 
-% \begin{lstlisting}[caption={KickInstrumentコンストラクタ（ピッチスイープ部分）}, label={lst:gakki_kick}]
-% for (int i = 0; i < numComponents; i++) {
-%   if (kickLUT[i] == null || kickLUT[i].length < 3) continue;
-% 
-%   float freq = kickLUT[i][0] * random(0.95f, 1.05f);
-%   float mag = kickLUT[i][1];
-%   float decayTime = kickLUT[i][2];
-%   float amp = (baseAmp * mag) / numComponents;
-% 
-%   tones[i] = new Oscil(freq, amp, Waves.SINE);
-%   harmonicEnvs[i] = new ADSR(1.0f, 0.001f, decayTime*0.5f, 0.0f, 0.1f);
-% 
-%   // ピッチスイープ：1.5倍の高さから本来の周波数へ急降下させる
-%   pitchSweeps[i] = new Line(0.01f, freq * 1.5f, freq);
-%   pitchSweeps[i].patch(tones[i].frequency);
-% 
-%   tones[i].patch(harmonicEnvs[i]);
-%   harmonicEnvs[i].patch(mixer);
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={KickInstrumentコンストラクタ（ピッチスイープ部分）}, label={lst:gakki_kick}]
+for (int i = 0; i < numComponents; i++) {
+  if (kickLUT[i] == null || kickLUT[i].length < 3) continue;
+
+  float freq = kickLUT[i][0] * random(0.95f, 1.05f);
+  float mag = kickLUT[i][1];
+  float decayTime = kickLUT[i][2];
+  float amp = (baseAmp * mag) / numComponents;
+
+  tones[i] = new Oscil(freq, amp, Waves.SINE);
+  harmonicEnvs[i] = new ADSR(1.0f, 0.001f, decayTime*0.5f, 0.0f, 0.1f);
+
+  // ピッチスイープ：1.5倍の高さから本来の周波数へ急降下させる
+  pitchSweeps[i] = new Line(0.01f, freq * 1.5f, freq);
+  pitchSweeps[i].patch(tones[i].frequency);
+
+  tones[i].patch(harmonicEnvs[i]);
+  harmonicEnvs[i].patch(mixer);
+}
+\end{lstlisting}
 
 次に，SnareInstrumentの胴鳴りパートについて説明する．発音の瞬間に約3倍の周波数から本来の胴鳴り周波数（172.3~Hz）へ急降下させるピッチエンベロープにより，スネアドラム特有のアタック感を表現している．
 % 該当部分をコード\ref{lst:gakki_snare}に示す．
 
-% \begin{lstlisting}[caption={SnareInstrumentコンストラクタ（胴鳴りパート）}, label={lst:gakki_snare}]
-% float bodyFreq      = 172.3f * random(0.99f, 1.01f); // 実測データの最強ピーク
-% float bodyPitchMod  = 3.0f;   // アタック時は約516Hzから172.3Hzへ急降下
-% float bodySweepTime = 0.025f;
-% float bodyDecay     = 0.07f;
-% float bodyVolRatio  = 0.63f * sinSet;
-% 
-% bodyOsc = new Oscil(bodyFreq, baseAmp * bodyVolRatio, Waves.SINE);
-% bodyPitchEnv = new Line(bodySweepTime, bodyFreq * bodyPitchMod, bodyFreq);
-% bodyPitchEnv.patch(bodyOsc.frequency);
-% bodyAmpEnv = new ADSR(1.0f, 0.001f, bodyDecay, 0.0f, 0.05f);
-% bodyOsc.patch(bodyAmpEnv).patch(mixer);
-% \end{lstlisting}
+\begin{lstlisting}[caption={SnareInstrumentコンストラクタ（胴鳴りパート）}, label={lst:gakki_snare}]
+float bodyFreq      = 172.3f * random(0.99f, 1.01f); // 実測データの最強ピーク
+float bodyPitchMod  = 3.0f;   // アタック時は約516Hzから172.3Hzへ急降下
+float bodySweepTime = 0.025f;
+float bodyDecay     = 0.07f;
+float bodyVolRatio  = 0.63f * sinSet;
+
+bodyOsc = new Oscil(bodyFreq, baseAmp * bodyVolRatio, Waves.SINE);
+bodyPitchEnv = new Line(bodySweepTime, bodyFreq * bodyPitchMod, bodyFreq);
+bodyPitchEnv.patch(bodyOsc.frequency);
+bodyAmpEnv = new ADSR(1.0f, 0.001f, bodyDecay, 0.0f, 0.05f);
+bodyOsc.patch(bodyAmpEnv).patch(mixer);
+\end{lstlisting}
 
 \paragraph{ホルンとトランペット（HornInstrument・TrumpetInstrument）}
 最後に，ホルンおよびトランペットの音色合成について説明する．両クラスは，計画書当初の音源構成には含まれていなかった金管楽器である．演奏する楽曲の編成に金管パートを加え，楽曲表現の幅を広げることを目的として開発の後半で追加したものであり，既存のFluteInstrumentクラスの加算合成・ビブラート・息ノイズの構造をそのまま流用したうえで，KickInstrumentで用いていたアタック時のピッチエンベロープ機能を新たに付加して作成されている．HornInstrumentとTrumpetInstrumentは，基準MIDIノートや各種パラメータの数値が異なるのみで，クラス構造自体は同一である．両クラスで使用する主な変数・関数の仕様を表\ref{table:gakki_horn}に示す．
@@ -2640,31 +2721,35 @@ PianoInstrumentクラスは，1つの音に対して2本の弦をわずかにデ
 以下では，両クラスに共通するアタック時のピッチエンベロープ機能について，HornInstrumentのnoteOn関数を例に説明する．発音直後，各倍音の周波数を本来値より一時的に高く（ホルンではpitchMod=0.05，すなわち5\%増しから）設定し，sweepTime秒（ホルンでは0.12秒）かけて本来の周波数へ直線的に戻すことで，金管楽器特有の「音の頭が一瞬上ずってから定まる」挙動を再現している．なお，トランペットでは同じ構造に対してpitchMod=0.03，sweepTime=0.07秒という異なる数値が用いられている．
 % 該当部分をコード\ref{lst:gakki_horn_pitch}に示す．
 
-% \begin{lstlisting}[caption={HornInstrument::noteOn関数（ピッチエンベロープ部分）}, label={lst:gakki_horn_pitch}]
-% float sweepTime = 0.12f; // 変化にかかる時間
-% float pitchMod  = 0.05f; // 本来の周波数に対する上乗せ割合
-% 
-% for(int i = 0; i < numHarmonics; i++) {
-%   harmonicEnvs[i].noteOn();
-%   ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
-%   if (wobbleLines[i] != null) {
-%     float factor = wobbleFactors[i];
-%     wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
-%   }
-% 
-%   // アタック時のピッチエンベロープ（周波数の急降下）
-%   if (pitchEnvLines[i] != null) {
-%     float baseFreq = targetFreqs[i];
-%     float startFreq = baseFreq * (1.0f + pitchMod); // 本来の周波数にpitchMod分を上乗せした値からスタート
-%     pitchEnvLines[i].activate(sweepTime, startFreq, baseFreq); // baseFreqへ一直線に下げる
-%   }
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={HornInstrument::noteOn関数（ピッチエンベロープ部分）}, label={lst:gakki_horn_pitch}]
+float sweepTime = 0.12f; // 変化にかかる時間
+float pitchMod  = 0.05f; // 本来の周波数に対する上乗せ割合
+
+for(int i = 0; i < numHarmonics; i++) {
+  harmonicEnvs[i].noteOn();
+  ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
+  if (wobbleLines[i] != null) {
+    float factor = wobbleFactors[i];
+    wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
+  }
+
+  // アタック時のピッチエンベロープ（周波数の急降下）
+  if (pitchEnvLines[i] != null) {
+    float baseFreq = targetFreqs[i];
+    float startFreq = baseFreq * (1.0f + pitchMod); // 本来の周波数にpitchMod分を上乗せした値からスタート
+    pitchEnvLines[i].activate(sweepTime, startFreq, baseFreq); // baseFreqへ一直線に下げる
+  }
+}
+\end{lstlisting}
 
 プログラム全文は付録に示す．
 
-\paragraph{楽器デバイスの同期方式（douki\_saigo）}
-次に，各楽器デバイスの同期方式を担うArduinoプログラムについて説明する．楽器デバイスは，指揮デバイスからの演奏開始指示を受けた後，中継機デバイスの回転に伴うレーザー光をCdSセルで検知することでおおまかなBPMを推定し，さらに楽器デバイス同士のUDP通信によって発音タイミングを細かく補正することで，複数台のArduino間での高精度な同期を実現している．この同期方式では，ドラムを担当するArduinoを基準時刻源（マスター）とし，ピアノ・ストリングス・フルートを担当する3台のArduinoをスレーブとするマスタースレーブ方式が採用されている．
+\fi
+
+
+% \paragraph{楽器デバイスの同期方式（douki\_saigo）}
+次に，各楽器デバイスの同期方式を担うArduinoプログラムについて説明する．楽器デバイスは，指揮デバイスからの演奏開始指示を受けた後，中継機デバイスの回転に伴うレーザー光をCdSセルで検知することでおおまかなBPMを推定し，さらに楽器デバイス同士のUDP通信によって発音タイミングを細かく補正することで，複数台のArduino間での同期を実現している．
+この同期方式では，ドラムを担当するArduinoを基準時刻源（マスター）とし，ピアノ・ストリングス・フルートを担当する3台のArduinoをスレーブとするマスタースレーブ方式が採用されている．
 
 続いて，同期プログラムのファイル構成を示す．表\ref{table:douki_files}の通り，各ファイルは担当する楽器ごとに用意されている．
 
@@ -2687,7 +2772,7 @@ PianoInstrumentクラスは，1つの音に対して2本の弦をわずかにデ
     \end{tabular}
 \end{table}
 
-flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPアドレス・楽器ID・CdS検知しきい値・埋め込みの楽譜データが異なるのみで，通信・同期ロジックの構造は完全に同一である．そのため，以下ではスレーブ側の代表例としてflute\_0706.inoを用いて説明し，マスター側はdrum\_0706.inoを用いて説明する．
+flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPアドレス・楽器ID・CdS検知閾値・埋め込みの楽譜データが異なるのみで，通信・同期ロジックの構造は完全に同一である．そのため，以下ではスレーブ側の代表例としてflute\_0706.inoを用いて説明し，マスター側はdrum\_0706.inoを用いて説明する．
 
 次に，各Arduino間の同期に用いられる通信ヘッダの一覧を示す．表\ref{table:douki_headers}の通り，指揮デバイスからの一斉指示に加え，マスター・スレーブ間で複数種類のパケットがやり取りされる．
 
@@ -2720,9 +2805,17 @@ flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPア
     \end{tabular}
 \end{table}
 
-続いて，レーザー光の検知処理について説明する．各Arduinoは，中継機デバイスの回転周期をCdSセルで検知するために，\ref{sec:kan_naibu}項で説明したLaserDetectorクラスと同一の適応しきい値方式のロジックを実装したSyncManagerクラスを備えている．検知したパルス間隔から求めた実測BPMは，マスターでは自身のBPM推定値として，スレーブでは'M'通信によるBPM提案として用いられる．検知ロジックの詳細な実装は\ref{sec:kan_naibu}項および付録に示すプログラム全文を参照されたい．
+続いて，レーザー光の検知処理について説明する．
+各Arduinoが中継機デバイスのレーザー光を検知したパルス間隔から求めた実測BPMは，マスターでは自身のBPM推定値として，スレーブでは'M'通信によるBPM提案として用いられる．
+% 各Arduinoは，中継機デバイスの回転周期をCdSセルで検知するために，\ref{sec:kan_naibu}項で説明したLaserDetectorクラスと同一の適応しきい値方式のロジックを実装したSyncManagerクラスを備えている．
 
-次に，ドラム機（マスター）における同期状態管理について説明する．マスターは，stateという状態変数によって管理される5段階の状態遷移に沿って動作する．各状態の内容を表\ref{table:douki_master_state}に示す．
+% 検知ロジックの詳細な実装は\ref{sec:kan_naibu}項および付録に示すプログラム全文を参照されたい．
+
+次に，ドラム機（マスター）における同期状態管理について説明する．
+マスターは，stateという状態変数によって管理される5段階の状態遷移に沿って動作する．
+
+\iffalse
+各状態の内容を表\ref{table:douki_master_state}に示す．
 
 \begin{table}[H]
     \caption{ドラム機（マスター）の状態遷移一覧}
@@ -2817,85 +2910,101 @@ flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPア
     \end{tabular}
 \end{table}
 
-以下では，マスターの同期制御における中核部分について説明する．まず，'T'通信（スレーブからのTick報告）の受信処理について説明する．この処理は，スレーブのglobalTickとマスター自身のglobalTickとの差であるdiffを算出し，'R'通信で即座に返信する．
+\fi
+
+ここからは，マスターの同期制御における中核部分について説明する．まず，'T'通信（スレーブからのTick報告）の受信処理について説明する．
+この処理は，スレーブのglobalTickとマスター自身のglobalTickとの差であるdiffを算出し，'R'通信で即座に返信する．
+
+\iffalse
 % 該当部分をコード\ref{lst:douki_master_t}に示す．
 
-% \begin{lstlisting}[caption={drum\_0706.inoのloop関数（'T'通信受信部分）}, label={lst:douki_master_t}]
-% case 'T':
-%   if (pktSize >= 6) {
-%     uint32_t slaveTick =
-%       ((uint32_t)packetBuffer[1] << 24) |
-%       ((uint32_t)packetBuffer[2] << 16) |
-%       ((uint32_t)packetBuffer[3] << 8)  |
-%        (uint32_t)packetBuffer[4];
-%     uint8_t id = packetBuffer[5];
-% 
-%     if (id < MAX_INSTRUMENTS && id != drumInstId) {
-%       isInstConnected[id] = true;
-%       if (isInstJoin[id] != true) isInstJoin[id] = true;
-%       int32_t diff = (int32_t)(globalTick - slaveTick);
-%       lastReceivedDiff[id] = diff;
-% 
-%       sendRPacket(id, diff);
-%     }
-%   }
-%   break;
-% \end{lstlisting}
+\begin{lstlisting}[caption={drum\_0706.inoのloop関数（'T'通信受信部分）}, label={lst:douki_master_t}]
+case 'T':
+  if (pktSize >= 6) {
+    uint32_t slaveTick =
+      ((uint32_t)packetBuffer[1] << 24) |
+      ((uint32_t)packetBuffer[2] << 16) |
+      ((uint32_t)packetBuffer[3] << 8)  |
+       (uint32_t)packetBuffer[4];
+    uint8_t id = packetBuffer[5];
 
-次に，同期完了判定を行うcheckSyncReady関数について説明する．この関数は，参加予告（'J'受信）のあった全スレーブについて，接続済みであり，かつ直近のdiffがtickIvalから算出したしきい値以内であるかを確認し，1台でも条件を満たさなければfalseを返す．
+    if (id < MAX_INSTRUMENTS && id != drumInstId) {
+      isInstConnected[id] = true;
+      if (isInstJoin[id] != true) isInstJoin[id] = true;
+      int32_t diff = (int32_t)(globalTick - slaveTick);
+      lastReceivedDiff[id] = diff;
+
+      sendRPacket(id, diff);
+    }
+  }
+  break;
+\end{lstlisting}
+
+\fi
+
+\iffalse
+次に，同期完了判定を行うcheckSyncReady関数について説明する．
+この関数は，参加予告（'J'受信）のあった全スレーブについて，接続済みであり，かつ直近のdiffがtickIvalから算出したしきい値以内であるかを確認し，1台でも条件を満たさなければfalseを返す．
 % checkSyncReady関数をコード\ref{lst:douki_checksyncready}に示す．
 
-% \begin{lstlisting}[caption={checkSyncReady関数}, label={lst:douki_checksyncready}]
-% bool checkSyncReady() {
-%   bool expectedToJoin = false;
-% 
-%   for (uint8_t i = 1; i < MAX_INSTRUMENTS; i++) {
-%     if (isInstJoin[i]) {
-%       expectedToJoin = true; // 参加予定の楽器が少なくとも1台いる
-%       float SYNC_READY_THRESHOLD = 50 / tickIval;
-% 
-%       // 参加予定だが未接続、または同期のズレが大きい場合は「まだ準備未完了」
-%       if (!isInstConnected[i] || abs(lastReceivedDiff[i]) > SYNC_READY_THRESHOLD) {
-%         return false;
-%       }
-%     }
-%   }
-%   return expectedToJoin;
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={checkSyncReady関数}, label={lst:douki_checksyncready}]
+bool checkSyncReady() {
+  bool expectedToJoin = false;
+
+  for (uint8_t i = 1; i < MAX_INSTRUMENTS; i++) {
+    if (isInstJoin[i]) {
+      expectedToJoin = true; // 参加予定の楽器が少なくとも1台いる
+      float SYNC_READY_THRESHOLD = 50 / tickIval;
+
+      // 参加予定だが未接続、または同期のズレが大きい場合は「まだ準備未完了」
+      if (!isInstConnected[i] || abs(lastReceivedDiff[i]) > SYNC_READY_THRESHOLD) {
+        return false;
+      }
+    }
+  }
+  return expectedToJoin;
+}
+\end{lstlisting}
+
 
 最後に，各楽器の演奏開始タイミングを管理するprocessOCommands関数について説明する．この関数は，startSequenceに定義された各演奏開始イベントについて，該当楽器がドラム自身であればelapsedPlayTickが開始Tickに達した時点で演奏を開始し，スレーブであれば開始TickのO\_ADVANCE\_TICKS（96Tick）前から3段階に分けて'O'通信を送信することで，パケットロスに備えた冗長性を確保している．
 % 該当部分をコード\ref{lst:douki_processocommands}に示す．
 
-% \begin{lstlisting}[caption={processOCommands関数（要部）}, label={lst:douki_processocommands}]
-% if (instId == drumInstId) {
-%   if (elapsedPlayTick >= evTick) {
-%     if (!isDrumPlaying) {
-%       isDrumPlaying = true;
-%       curTick  = songStartParams[currentSongId].startTick;
-%       scoreIdx = songStartParams[currentSongId].startNoteIdx;
-%       state    = 3;
-%     }
-%     oSentCount[i] = 3;
-%   }
-% } else {
-%   if (isInstJoin[instId] && isInstConnected[instId]) {
-%     uint32_t startGlobalTick = (uint32_t)((int32_t)globalTick + ticksUntilStart);
-%     if (ticksUntilStart <= O_ADVANCE_TICKS && oSentCount[i] == 0) {
-%       sendOPacket_Single(instId, currentSongId, startGlobalTick);
-%       oSentCount[i] = 1;
-%     } else if (ticksUntilStart <= O_ADVANCE_TICKS * 2 / 3 && oSentCount[i] == 1) {
-%       sendOPacket_Single(instId, currentSongId, startGlobalTick);
-%       oSentCount[i] = 2;
-%     } else if (ticksUntilStart <= O_ADVANCE_TICKS / 3 && oSentCount[i] == 2) {
-%       sendOPacket_Single(instId, currentSongId, startGlobalTick);
-%       oSentCount[i] = 3;
-%     }
-%   }
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={processOCommands関数（要部）}, label={lst:douki_processocommands}]
+if (instId == drumInstId) {
+  if (elapsedPlayTick >= evTick) {
+    if (!isDrumPlaying) {
+      isDrumPlaying = true;
+      curTick  = songStartParams[currentSongId].startTick;
+      scoreIdx = songStartParams[currentSongId].startNoteIdx;
+      state    = 3;
+    }
+    oSentCount[i] = 3;
+  }
+} else {
+  if (isInstJoin[instId] && isInstConnected[instId]) {
+    uint32_t startGlobalTick = (uint32_t)((int32_t)globalTick + ticksUntilStart);
+    if (ticksUntilStart <= O_ADVANCE_TICKS && oSentCount[i] == 0) {
+      sendOPacket_Single(instId, currentSongId, startGlobalTick);
+      oSentCount[i] = 1;
+    } else if (ticksUntilStart <= O_ADVANCE_TICKS * 2 / 3 && oSentCount[i] == 1) {
+      sendOPacket_Single(instId, currentSongId, startGlobalTick);
+      oSentCount[i] = 2;
+    } else if (ticksUntilStart <= O_ADVANCE_TICKS / 3 && oSentCount[i] == 2) {
+      sendOPacket_Single(instId, currentSongId, startGlobalTick);
+      oSentCount[i] = 3;
+    }
+  }
+}
+\end{lstlisting}
 
-次に，楽器デバイス（スレーブ）における同期処理について説明する．スレーブは，stateが0（BPM安定待ち）・1（マスターと同期中）・2（演奏中）・4（停止中）の4状態で動作し，'R'通信で受け取ったdiffをもとに自身のtickIvalを補正することでマスターとの同期を保つ．続いて，楽器デバイス（スレーブ）で使用する主な変数の仕様を表\ref{table:douki_slave_var}に示す．
+\fi
+
+次に，スレーブにおける同期処理について説明する．
+スレーブは，stateが0（BPM安定待ち）・1（マスターと同期中）・2（演奏中）・4（停止中）の4状態で動作し，'R'通信で受け取ったdiffをもとに自身のtickIvalを補正することでマスターとの同期を保つ．
+
+\iffalse
+続いて，楽器デバイス（スレーブ）で使用する主な変数の仕様を表\ref{table:douki_slave_var}に示す．
 
 \begin{table}[H]
     \caption{楽器デバイス（スレーブ）で使用する主な変数の仕様一覧}
@@ -2953,63 +3062,69 @@ flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPア
     \end{tabular}
 \end{table}
 
-以下では，スレーブの同期補正における中核部分について説明する．まず，'R'通信（マスターからのdiff返信）の受信処理について説明する．この処理は，パケットの往復時間から通信遅延を見積もってdiffを補正したうえで，マスターがまだ動作していない場合の特別処理を経て，通常時はapplyDiffCorrection関数を呼び出す．
+\fi
+
+\iffalse
+次に，スレーブの同期補正における中核部分について説明する．まず，'R'通信（マスターからのdiff返信）の受信処理について説明する．この処理は，パケットの往復時間から通信遅延を見積もってdiffを補正したうえで，マスターがまだ動作していない場合の特別処理を経て，通常時はapplyDiffCorrection関数を呼び出す．
 % 該当部分をコード\ref{lst:douki_slave_r}に示す．
 
-% \begin{lstlisting}[caption={flute\_0706.inoのloop関数（'R'通信受信部分・要部）}, label={lst:douki_slave_r}]
-% case 'R':
-%   if (state == 0 || state == 4) break;
-%   if (pktSize >= 5) {
-%     int32_t rawDiff =
-%       ((int32_t)(int8_t)packetBuffer[1] << 24) |
-%       ((int32_t)packetBuffer[2] << 16) |
-%       ((int32_t)packetBuffer[3] <<  8) |
-%        (int32_t)packetBuffer[4];
-% 
-%     uint32_t rtt = micros() - lastTPacketMicroTime;
-%     uint32_t latencyMicros = rtt / 2; // 片道遅延
-%     int32_t latencyTicks = (baseTickIval > 0)
-%       ? (int32_t)((latencyMicros + (baseTickIval / 2)) / baseTickIval) : 0;
-%     int32_t diff = rawDiff - latencyTicks; // 通信遅延を差し引いた真のズレ
-% 
-%     lastDiff = diff;
-%     if (state >= 1) {
-%       if (ticksToCorrect == 0 || abs(diff) >= 24) {
-%         applyDiffCorrection(diff);
-%       }
-%     }
-%   }
-%   break;
-% \end{lstlisting}
+\begin{lstlisting}[caption={flute\_0706.inoのloop関数（'R'通信受信部分・要部）}, label={lst:douki_slave_r}]
+case 'R':
+  if (state == 0 || state == 4) break;
+  if (pktSize >= 5) {
+    int32_t rawDiff =
+      ((int32_t)(int8_t)packetBuffer[1] << 24) |
+      ((int32_t)packetBuffer[2] << 16) |
+      ((int32_t)packetBuffer[3] <<  8) |
+       (int32_t)packetBuffer[4];
+
+    uint32_t rtt = micros() - lastTPacketMicroTime;
+    uint32_t latencyMicros = rtt / 2; // 片道遅延
+    int32_t latencyTicks = (baseTickIval > 0)
+      ? (int32_t)((latencyMicros + (baseTickIval / 2)) / baseTickIval) : 0;
+    int32_t diff = rawDiff - latencyTicks; // 通信遅延を差し引いた真のズレ
+
+    lastDiff = diff;
+    if (state >= 1) {
+      if (ticksToCorrect == 0 || abs(diff) >= 24) {
+        applyDiffCorrection(diff);
+      }
+    }
+  }
+  break;
+\end{lstlisting}
 
 次に，applyDiffCorrection関数について説明する．この関数は，diffの大きさに応じて補正の強さを4段階に切り替える．ズレが小さい場合は不感帯として何もせず，大幅なズレの場合はtickIvalを2倍または2/3倍にして急速に補正し，中程度のズレの場合は次の48Tickで吸収するように比率補正を行う．
 % applyDiffCorrection関数をコード\ref{lst:douki_diffcorrection}に示す．
 
-% \begin{lstlisting}[caption={applyDiffCorrection関数}, label={lst:douki_diffcorrection}]
-% void applyDiffCorrection(int32_t diff) {
-%   if (baseTickIval == 0) return;
-%   float SYNC_READY_THRESHOLD = 50 / baseTickIval;
-% 
-%   if (abs(diff) <= SYNC_READY_THRESHOLD) {
-%     // 不感帯：ズレが小さければ何もしない
-%     tickIval = baseTickIval;
-%     ticksToCorrect = 0;
-%   } else if (diff <= -24) {
-%     // 大幅に早い → ×2 で -diff Tick間遅らせる
-%     tickIval       = baseTickIval * 2;
-%     ticksToCorrect = -diff;
-%   } else if (diff >= 24) {
-%     // 大幅に遅い → ×2/3 で diff×3 Tick間速める
-%     tickIval       = baseTickIval * 2 / 3;
-%     ticksToCorrect = diff * 3;
-%   } else {
-%     // 小さいズレ → 次の48Tickでdiffを吸収する比率補正
-%     tickIval       = (uint32_t)((48UL * baseTickIval) / (48 + diff));
-%     ticksToCorrect = 48 + diff;
-%   }
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={applyDiffCorrection関数}, label={lst:douki_diffcorrection}]
+void applyDiffCorrection(int32_t diff) {
+  if (baseTickIval == 0) return;
+  float SYNC_READY_THRESHOLD = 50 / baseTickIval;
 
-最後に，'O'通信（マスターからの演奏開始指示）の受信処理について説明する．この処理は，指示されたstartGlobalTickと自身のglobalTickを比較し，まだ到達していなければwaitingForStartを立てて待機し，すでに超過していれば超過分だけcurTickをオフセットして即座に演奏へ合流する．なお，'O'通信の受信および状態遷移に関する処理の詳細な実装は付録に示すプログラム全文を参照されたい．
+  if (abs(diff) <= SYNC_READY_THRESHOLD) {
+    // 不感帯：ズレが小さければ何もしない
+    tickIval = baseTickIval;
+    ticksToCorrect = 0;
+  } else if (diff <= -24) {
+    // 大幅に早い → ×2 で -diff Tick間遅らせる
+    tickIval       = baseTickIval * 2;
+    ticksToCorrect = -diff;
+  } else if (diff >= 24) {
+    // 大幅に遅い → ×2/3 で diff×3 Tick間速める
+    tickIval       = baseTickIval * 2 / 3;
+    ticksToCorrect = diff * 3;
+  } else {
+    // 小さいズレ → 次の48Tickでdiffを吸収する比率補正
+    tickIval       = (uint32_t)((48UL * baseTickIval) / (48 + diff));
+    ticksToCorrect = 48 + diff;
+  }
+}
+\end{lstlisting}
+
+\fi
+
+最後に，'O'通信（マスターからの演奏開始指示）の受信処理について説明する．この処理は，指示されたstartGlobalTickと自身のglobalTickを比較し，まだ到達していなければwaitingForStartを立てて待機し，すでに超過していれば超過分だけcurTickをオフセットして即座に演奏へ合流する．
+なお，'O'通信の受信および状態遷移に関する処理の詳細な実装は付録に示すプログラム全文を参照されたい．
 
 プログラム全文は付録に示す．
