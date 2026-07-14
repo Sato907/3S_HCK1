@@ -3,8 +3,6 @@
 """
 フローチャート生成スクリプト
 - figs/flow_zentai.pdf : システム全体の処理フローチャート
-- figs/flow_siki.pdf   : 指揮デバイスのloop関数の処理フローチャート
-- figs/flow_kan.pdf    : 中継機デバイスのloop関数の処理フローチャート
 """
 
 import matplotlib
@@ -137,86 +135,5 @@ fig.savefig(os.path.join(OUTDIR, 'flow_zentai.pdf'), bbox_inches='tight')
 fig.savefig(os.path.join(OUTDIR, 'flow_zentai.png'), dpi=200, bbox_inches='tight')
 print('flow_zentai saved')
 
-# ============================================================
-# 2. 指揮デバイス loop関数の処理フローチャート
-# ============================================================
-fig, ax = new_ax(7.6, 8.0)
-ax.set_ylim(0, 13.4)
-Cx = 4.6
-rounded(ax, Cx, 12.9, 2.6, 0.7, 'loop() 開始')
-diamond(ax, Cx, 11.5, 3.8, 1.3, 'button()：\ninput_PINの立下り？')
-rect(ax, Cx, 9.9, 5.4, 0.9, "isButtonPlayingを反転し'S'（開始）\nまたは'E'（終了）を送信，300 ms待機")
-diamond(ax, Cx, 8.3, 4.2, 1.3, 'pot.update()：\nSAMPLE_INTERVAL経過？')
-rect(ax, Cx, 6.7, 5.4, 0.9, '可変抵抗器2系統をサンプリングし\n移動平均・段階算出（変化時にフラグ設定）')
-rect(ax, Cx, 5.3, 5.4, 0.9, 'acc.update()：合成加速度を取得\n（I2C異常時はrecoverI2C()で復旧）')
-diamond(ax, Cx, 3.6, 4.6, 1.4, '|差分| > accThreshold かつ\nshakeInterval経過？')
-rect(ax, Cx, 1.9, 5.4, 0.9, "フラグの立っている項目について\n'B'（BPM）・'V'（音量）を送信")
-rounded(ax, Cx, 0.6, 2.9, 0.7, 'loop() 先頭へ戻る')
-
-arrow(ax, Cx, 12.55, Cx, 12.15)
-arrow(ax, Cx, 10.85, Cx, 10.35, label='yes')
-arrow(ax, Cx, 9.45, Cx, 8.95)
-# button no → pot.update()へ
-polyline_arrow(ax, [(Cx + 1.9, 11.5), (Cx + 3.3, 11.5), (Cx + 3.3, 8.3), (Cx + 2.15, 8.3)])
-ax.text(Cx + 2.7, 11.7, 'no', fontsize=FS - 1, fontproperties=jp)
-arrow(ax, Cx, 7.65, Cx, 7.15, label='yes')
-# pot no → acc.update()
-polyline_arrow(ax, [(Cx - 2.1, 8.3), (Cx - 3.3, 8.3), (Cx - 3.3, 5.75), (Cx - 2.7, 5.75)])
-ax.text(Cx - 3.15, 8.5, 'no', fontsize=FS - 1, fontproperties=jp)
-arrow(ax, Cx, 6.25, Cx, 5.75)
-arrow(ax, Cx, 4.85, Cx, 4.3)
-arrow(ax, Cx, 2.9, Cx, 2.35, label='yes')
-# acc no → loop先頭
-polyline_arrow(ax, [(Cx - 2.3, 3.6), (Cx - 3.5, 3.6), (Cx - 3.5, 0.6), (Cx - 1.45, 0.6)])
-ax.text(Cx - 3.35, 3.8, 'no', fontsize=FS - 1, fontproperties=jp)
-arrow(ax, Cx, 1.45, Cx, 0.95)
-
-fig.savefig(os.path.join(OUTDIR, 'flow_siki.pdf'), bbox_inches='tight')
-fig.savefig(os.path.join(OUTDIR, 'flow_siki.png'), dpi=200, bbox_inches='tight')
-print('flow_siki saved')
-
-# ============================================================
-# 3. 中継機デバイス loop関数の処理フローチャート
-# ============================================================
-fig, ax = new_ax(8.6, 7.0)
-ax.set_ylim(0, 11.4)
-Cx = 5.0
-rounded(ax, Cx, 10.9, 2.6, 0.7, 'loop() 開始')
-diamond(ax, Cx, 9.5, 3.6, 1.3, 'UDPパケット\n到着？')
-rect(ax, Cx, 8.0, 5.0, 0.8, 'ヘッダ（1バイト目）と\nペイロード（2バイト目）を読み取り')
-diamond(ax, Cx, 6.4, 3.2, 1.2, 'ヘッダ判定')
-# 3分岐
-rect(ax, 1.8, 4.6, 3.0, 0.9, "'S'：startRamp()\ndisplayBPM()")
-diamond(ax, 5.0, 4.5, 3.0, 1.2, "'B'：演奏中？")
-rect(ax, 8.2, 4.6, 2.8, 0.9, "'E'：stopRamp()\nclearDisplay()")
-rect(ax, 4.0, 2.7, 2.9, 0.9, 'changeBPM()\ndisplayBPM()')
-rect(ax, 6.6, 2.7, 2.0, 0.7, '無視')
-rounded(ax, Cx, 1.0, 3.2, 0.7, 'loop() 先頭へ戻る')
-
-arrow(ax, Cx, 10.55, Cx, 10.15)
-arrow(ax, Cx, 8.85, Cx, 8.4, label='yes')
-# no → loop先頭
-polyline_arrow(ax, [(Cx + 1.8, 9.5), (9.85, 9.5), (9.85, 0.35), (Cx, 0.35), (Cx, 0.62)])
-ax.text(Cx + 2.6, 9.7, 'no', fontsize=FS - 1, fontproperties=jp)
-arrow(ax, Cx, 7.6, Cx, 7.0)
-# 分岐
-polyline_arrow(ax, [(Cx - 1.6, 6.4), (1.8, 6.4), (1.8, 5.05)])
-ax.text(2.3, 6.55, "'S'", fontsize=FS - 1, fontproperties=jp)
-arrow(ax, Cx, 5.8, Cx, 5.1)
-ax.text(Cx + 0.15, 5.45, "'B'", fontsize=FS - 1, fontproperties=jp)
-polyline_arrow(ax, [(Cx + 1.6, 6.4), (8.2, 6.4), (8.2, 5.05)])
-ax.text(7.4, 6.55, "'E'", fontsize=FS - 1, fontproperties=jp)
-# 'B' の分岐
-polyline_arrow(ax, [(4.0, 4.5), (4.0, 3.15)])
-ax.text(3.5, 3.9, 'yes', fontsize=FS - 1, fontproperties=jp)
-polyline_arrow(ax, [(6.5, 4.5), (6.6, 4.5), (6.6, 3.05)])
-ax.text(6.75, 3.9, 'no', fontsize=FS - 1, fontproperties=jp)
-# 合流
-polyline_arrow(ax, [(1.8, 4.15), (1.8, 1.0), (Cx - 1.6, 1.0)])
-polyline_arrow(ax, [(4.0, 2.25), (4.0, 1.35)])
-polyline_arrow(ax, [(6.6, 2.35), (6.6, 1.35)])
-polyline_arrow(ax, [(8.2, 4.15), (8.2, 1.0), (Cx + 1.6, 1.0)])
-
-fig.savefig(os.path.join(OUTDIR, 'flow_kan.pdf'), bbox_inches='tight')
-fig.savefig(os.path.join(OUTDIR, 'flow_kan.png'), dpi=200, bbox_inches='tight')
-print('flow_kan saved')
+# 指揮デバイス・中継機デバイスのloop関数フローチャート（flow_siki, flow_kan）は
+# 図35・36の形式に統一した result11.py で生成する（本スクリプトからは削除済み）．

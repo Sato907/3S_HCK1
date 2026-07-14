@@ -350,13 +350,20 @@ float AccManager::readAccMagnitude() {
 }
 \end{lstlisting}
 
-ここで，Wire.endTransmission(false)がエラーを返した場合，またはrequestFromで6バイト読み出せなかった場合には，I2Cバスがロックアップ（スレーブがSDA線を握ったまま停止する現象）していると判断し，recoverI2C関数を呼び出したうえで前回値lastAccValを返すことで，誤ったシェイク検知（ニセshake）を防いでいる．続いて，recoverI2C関数について説明する．この関数は，SCL線を9回手動でトグルさせてSDA線の握りを解放したうえでSTOP条件を生成し，Wireを再初期化してADXL345を再設定することでバスを復旧させる．lastRecoverMsは，この復旧処理およびログ出力が短時間に連続して実行されることを防ぐスロットル用の時刻管理に用いられる．readAccMagnitude関数およびrecoverI2C関数の処理の流れを図\ref{fig:flow_acc_read}に示す．I2C通信の異常はアドレス送信時と読み出し時の2箇所で検出され，いずれの場合も復旧処理を実行したうえで直前値を返す．recoverI2C関数をコード\ref{lst:acc_recover}に示す．
+ここで，Wire.endTransmission(false)がエラーを返した場合，またはrequestFromで6バイト読み出せなかった場合には，I2Cバスがロックアップ（スレーブがSDA線を握ったまま停止する現象）していると判断し，recoverI2C関数を呼び出したうえで前回値lastAccValを返すことで，誤ったシェイク検知（ニセshake）を防いでいる．続いて，recoverI2C関数について説明する．この関数は，SCL線を9回手動でトグルさせてSDA線の握りを解放したうえでSTOP条件を生成し，Wireを再初期化してADXL345を再設定することでバスを復旧させる．lastRecoverMsは，この復旧処理およびログ出力が短時間に連続して実行されることを防ぐスロットル用の時刻管理に用いられる．readAccMagnitude関数の処理の流れを図\ref{fig:flow_acc_read}に，recoverI2C関数の処理の流れを図\ref{fig:flow_recoveri2c}に示す．I2C通信の異常はアドレス送信時と読み出し時の2箇所で検出され，いずれの場合も復旧処理を実行したうえで直前値を返す．recoverI2C関数をコード\ref{lst:acc_recover}に示す．
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.9\textwidth]{figs/flow_acc_read.pdf}
-    \caption{readAccMagnitude関数（左）およびrecoverI2C関数（右）の処理フローチャート}
+    \includegraphics[width=0.72\textwidth]{figs/flow_acc_read.pdf}
+    \caption{readAccMagnitude関数の処理フローチャート}
     \label{fig:flow_acc_read}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.62\textwidth]{figs/flow_recoveri2c.pdf}
+    \caption{recoverI2C関数の処理フローチャート}
+    \label{fig:flow_recoveri2c}
 \end{figure}
 \FloatBarrier
 
@@ -1121,7 +1128,16 @@ void MotorControl::createRpmTable() {
 }
 \end{lstlisting}
 
-次に，startRamp関数について説明する．この関数は，まずstepToNumber関数によって目標のpwmValueを求めたうえで，出力値を0からpwmValueまで5刻みで増加させながら\SI{40}{ms}ずつ待機することで，モータを滑らかに加速させる．startRamp関数をコード\ref{lst:motor_startramp}に示す．
+次に，startRamp関数について説明する．この関数は，まずstepToNumber関数によって目標のpwmValueを求めたうえで，出力値を0からpwmValueまで5刻みで増加させながら\SI{40}{ms}ずつ待機することで，モータを段階的に加速させる．startRamp関数の処理の流れを図\ref{fig:flow_startramp}に示す．また，startRamp関数をコード\ref{lst:motor_startramp}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.62\textwidth]{figs/flow_startramp.pdf}
+    \caption{startRamp関数の処理フローチャート}
+    \label{fig:flow_startramp}
+\end{figure}
+\FloatBarrier
+
 
 \begin{lstlisting}[caption={MotorControl::startRamp関数}, label={lst:motor_startramp}]
 void MotorControl::startRamp(uint8_t stepNumber) {
@@ -1134,7 +1150,16 @@ void MotorControl::startRamp(uint8_t stepNumber) {
 }
 \end{lstlisting}
 
-次に，stopRamp関数について説明する．この関数はstartRamp関数と対になる処理であり，現在のpwmValueから0まで5刻みで減少させながら\SI{40}{ms}ずつ待機することで，モータを滑らかに減速・停止させる．stopRamp関数をコード\ref{lst:motor_stopramp}に示す．
+次に，stopRamp関数について説明する．この関数はstartRamp関数と対になる処理であり，現在のpwmValueから0まで5刻みで減少させながら\SI{40}{ms}ずつ待機することで，モータを段階的に減速・停止させる．stopRamp関数の処理の流れを図\ref{fig:flow_stopramp}に示す．また，stopRamp関数をコード\ref{lst:motor_stopramp}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.62\textwidth]{figs/flow_stopramp.pdf}
+    \caption{stopRamp関数の処理フローチャート}
+    \label{fig:flow_stopramp}
+\end{figure}
+\FloatBarrier
+
 
 \begin{lstlisting}[caption={MotorControl::stopRamp関数}, label={lst:motor_stopramp}]
 void MotorControl::stopRamp() {
@@ -1146,13 +1171,13 @@ void MotorControl::stopRamp() {
 }
 \end{lstlisting}
 
-次に，changeBPM関数について説明する．この関数は演奏中にBPMの段階が変更された際に呼び出され，stepToNumber関数とupdateStatus関数によって新しい段階の値を求めたうえで，startRamp関数のような段階的な加減速を行わず，目標のpwmValueを即座に出力する．演奏を止めずにテンポを追従させるため，段階的な加減速は行わない仕様としている．changeBPM関数をコード\ref{lst:motor_changebpm}に示す．また，startRamp・changeBPM・stopRampの3関数の処理の流れを図\ref{fig:flow_motor}に示す．演奏の開始・終了時は段階的な加減速（ランプ制御）を行い，演奏中のBPM変更時のみ即座に出力を切り替えるという役割の違いが対比できる．
+次に，changeBPM関数について説明する．この関数は演奏中にBPMの段階が変更された際に呼び出され，stepToNumber関数とupdateStatus関数によって新しい段階の値を求めたうえで，startRamp関数のような段階的な加減速を行わず，目標のpwmValueを即座に出力する．演奏を止めずにテンポを追従させるため，段階的な加減速は行わない仕様としている．changeBPM関数の処理の流れを図\ref{fig:flow_changebpm}に示す．また，changeBPM関数をコード\ref{lst:motor_changebpm}に示す．
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.95\textwidth]{figs/flow_motor.pdf}
-    \caption{MotorControlクラスのstartRamp関数（左）・changeBPM関数（中央）・stopRamp関数（右）の処理フローチャート}
-    \label{fig:flow_motor}
+    \includegraphics[width=0.62\textwidth]{figs/flow_changebpm.pdf}
+    \caption{changeBPM関数の処理フローチャート}
+    \label{fig:flow_changebpm}
 \end{figure}
 \FloatBarrier
 
