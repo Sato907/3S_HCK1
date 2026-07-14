@@ -1784,7 +1784,7 @@ case "N" :
   break;
 \end{lstlisting}
 
-ここで，種別typeによる分岐は，ハッカソン第11回時点でトランペット（TrumpetInstrument）とホルン（HornInstrument）を追加したことに伴い，楽譜データ上で発音する楽器の種類を判別するために新設されたものである．また，ヘッダが'B'（BPM変更）の場合はmusicBPMを60〜180の範囲に制限して更新し，ヘッダが'V'（マスターボリューム変更）の場合はcurrentMasterVolumeを0.2〜1.0の範囲に写像して更新する．
+ここで，種別typeによる分岐について述べる．計画書当初の音源構成はストリングス・フルート・ピアノ・ドラム類のみであり，この分岐は存在しなかった．しかし，演奏する楽曲の編成に金管パートを加え，楽曲表現の幅を広げるため，開発の後半でトランペット（TrumpetInstrument）とホルン（HornInstrument）を追加しており，これに伴い楽譜データ上で発音する楽器の種類を判別する本分岐を新設した．また，ヘッダが'B'（BPM変更）の場合はmusicBPMを60〜180の範囲に制限して更新し，ヘッダが'V'（マスターボリューム変更）の場合はcurrentMasterVolumeを0.2〜1.0の範囲に写像して更新する．
 
 続いて，Play/keyPressed関数について説明する．Play関数のフローチャートを図\ref{fig:gakki_play}に示す．
 
@@ -2482,7 +2482,7 @@ bodyOsc.patch(bodyAmpEnv).patch(mixer);
 \end{lstlisting}
 
 \paragraph{ホルンとトランペット（HornInstrument・TrumpetInstrument）}
-最後に，ホルンおよびトランペットの音色合成について説明する．両クラスは，ハッカソン第11回時点で追加された金管楽器であり，事前課題の報告の通り，既存のFluteInstrumentクラスの加算合成・ビブラート・息ノイズの構造をそのまま流用したうえで，KickInstrumentで用いていたアタック時のピッチエンベロープ機能を新たに付加して作成されている．HornInstrumentとTrumpetInstrumentは，基準MIDIノートや各種パラメータの数値が異なるのみで，クラス構造自体は同一である．両クラスで使用する主な変数・関数の仕様を表\ref{table:gakki_horn}に示す．
+最後に，ホルンおよびトランペットの音色合成について説明する．両クラスは，計画書当初の音源構成には含まれていなかった金管楽器である．演奏する楽曲の編成に金管パートを加え，楽曲表現の幅を広げることを目的として開発の後半で追加したものであり，既存のFluteInstrumentクラスの加算合成・ビブラート・息ノイズの構造をそのまま流用したうえで，KickInstrumentで用いていたアタック時のピッチエンベロープ機能を新たに付加して作成されている．HornInstrumentとTrumpetInstrumentは，基準MIDIノートや各種パラメータの数値が異なるのみで，クラス構造自体は同一である．両クラスで使用する主な変数・関数の仕様を表\ref{table:gakki_horn}に示す．
 
 \begin{table}[H]
     \caption{HornInstrument・TrumpetInstrumentクラスで使用する主な変数・関数の仕様一覧}
