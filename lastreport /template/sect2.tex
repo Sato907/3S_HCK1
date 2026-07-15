@@ -169,12 +169,12 @@ Controller\_simultaneous.inoのloop関数の処理の流れを図\ref{fig:flow_s
 
 \fi
 
-ここからは，ボタン入力の判定，加速度センサの制御，可変抵抗器を用いたBPM・音量読み取り機能の順に説明する．
+ここからは，ボタン入力の判定，加速度センサの制御，可変抵抗器を用いたBPM・音量読み取り機能，各デバイスへの無線送信機能の順に説明する．
 % 使用する変数・関数の仕様と処理内容について説明する．
 
 まず，指揮デバイスにおけるボタン入力の判定処理について説明する．
 ボタンの誤判定を防ぐため，プルアップ抵抗を用いた回路を構成しており，ボタンが押されていない状態ではデジタルピンに\SI{5}{V}が印加され，押下時には回路がGNDに短絡されることでピンの電位がLOWへ遷移する．
-指揮デバイスのプログラムでは，このデジタルピンの電圧状態の変化を常時監視することでボタンの押下を判定する．さらに，チャタリングによる誤判定や冗長パケットによる誤作動を防止するため，押下検知後に一定時間の待機処理を設けるとともに，演奏状態管理フラグを用いたトグル制御を導入している．これにより，同一の物理ボタンのみで演奏の開始と終了を交互に切り替えることが可能となる．
+指揮デバイスのプログラムでは，このデジタルピンの電圧状態の変化を常時監視することでボタンの押下を判定する．さらに，チャタリングによる誤判定や冗長パケットによる誤作動を防止するため，押下検知後に\SI{300}{ms}の待機処理を設けるとともに，演奏状態管理フラグを用いたトグル制御を導入している．これにより，同一の物理ボタンのみで演奏の開始と終了を交互に切り替えることが可能となる．押下を検知した際は，停止中であれば現在設定されているBPM段階を付与した演奏開始の合図を，演奏中であれば演奏終了の合図を，後述する無線送信機能を介して中継機デバイスおよび全楽器デバイスへ送信する．
 
 \iffalse
 ボタン入力の判定で使用する変数の仕様を表\ref{table:siki_button_var}に示す．
@@ -268,6 +268,9 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
 次に，指揮デバイスにおける加速度センサの制御処理について説明する．指揮デバイスは，加速度センサを用いてユーザが指揮デバイスを振ったことを検知し，演奏情報の更新を行う．
 センサ値の急激な変化を読み取ることで動作を判定し，また誤検知防止機能を設けることで安定した動作を実現している．
 処理の流れは，差分算出と判定，多重検知の防止，状態の反転，事後処理の4段階に分類される．
+まず差分算出と判定では，一定周期（\SI{20}{ms}）ごとに3軸の測定値から合成加速度を算出し，前回値との差の絶対値が検知閾値を超過したかを判定する．次に多重検知の防止では，一度振る動作を検知してから一定時間（\SI{750}{ms}）が経過するまで新たな検知を無効とすることで，一連の振る動作が複数回の操作として誤検知されることを防ぐ．状態の反転では，振る動作を検知するたびに演奏状態を示すフラグを反転させる．最後に事後処理として，今回の測定値を次回の比較に用いる前回値として保存する．
+また，振る動作の確定時には，可変抵抗器側で設定値の変更が検知されている場合に限り，変更後のBPM・音量の段階番号を無線送信する．このため，実際に無線送信が発生するのは，可変抵抗器を操作したうえでデバイスを振った場合に限られる．さらに，センサとのI2C通信に異常を検知した場合には，バスの初期化とセンサの再設定による自動復旧を行い，復旧が完了するまでは直前の測定値を代用することで誤検知を防いでいる．
+
 
 \iffalse
 まず差分算出と判定では，現在の合成加速度currentAccValと前回値lastAccValとの差の絶対値を求める．この差分が検知閾値accThresholdを超過し，かつ前回検知からshakeInterval以上の時間が経過している場合に，指揮棒を振ったと判定する．多重検知の防止では，一度振る動作を検知するとlastDetectTimeを現在時刻に更新し，以降shakeIntervalが経過するまでは加速度の変化を無視することで，一連の動作による複数回の誤検知を防止する．状態の反転では，振る動作を検知するたびにisStartedのbool値を反転させる．事後処理として，次回の判定に備えてcurrentAccValの値をlastAccValへ代入し，前回のサンプリング時刻を更新する．また，振る動作の確定時には，可変抵抗器側で設定値の変更を検知したフラグbpmFragまたはvolFrag（\ref{sec:pot_detail}項で説明する）が有効になっている場合，SyncManagerクラスを介してその情報の送信指示を行う．さらに，I2C通信の異常を検知した場合には自動復旧を行う機能を備えている．サンプリング周期の管理，差分判定，多重検知防止，送信処理という本文で述べた4段階が，1回の呼び出しの中で順に実行される．
@@ -502,6 +505,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
 \label{sec:pot_detail}
 最後に，指揮デバイスにおけるスライド式可変抵抗器を用いたBPM・音量読み取り機能について説明する．
 指揮デバイスでは，演奏の要素であるBPMと音量を，ユーザが操作できるようにスライド式可変抵抗器を用いて5段階で調整する．本プログラムは，アナログ入力値の特性を考慮したデータ処理を行うことで，安定した制御環境を構築している．アルゴリズムは，サンプリングと移動平均化，範囲分割，パラメータの抽出と出力の3段階に分けられる．
+まずサンプリングと移動平均化では，一定周期ごとにBPM用・音量用の2系統のアナログ入力値を読み取り，系統ごとに直近10回分の値を保持してその平均を求めることで，アナログ入力に含まれるノイズを平滑化する．次に範囲分割では，得られた移動平均値を4つの閾値と比較することで1〜5の段階番号へ離散化する．閾値の間隔を均等にしていないのは，可変抵抗器の実測特性に合わせて各段階の操作のしやすさを調整するためである．最後にパラメータの抽出と出力では，算出した段階番号が直前の値から変化した場合にのみ，変更があったことを示すフラグを記録する．このフラグは，前述の振る動作の確定時に参照され，変更後の段階番号が無線送信される．なお，音量用の可変抵抗器は配線の都合上，操作方向とセンサ値の増減が逆になるため，段階番号を反転して扱うことで操作方向と音量の増減を一致させている．
 
 
 % サンプリングと移動平均化では，SAMPLE\_INTERVALごとにBPMおよび音量変更用の可変抵抗器の電圧値を，配列bpmSamples・volSamplesにsampleSize分だけ読み取り保存する．このとき，配列の各要素は書き込み位置（bpmReadIndex・volReadIndex）が指す最も古い値から順に上書きされ，上書きの直前に該当要素の値を合計bpmTotal・volTotalからあらかじめ減算し，新たに読み取った値を加算することで，配列全体を読み直すことなく常に最新の合計値を保持する（移動合計）．配列が一巡し全要素が新しい値に更新された時点（bpmBufferFull・volBufferFullがtrueになった時点）以降，この合計値をsampleSizeで除算した移動平均値をaverageBpmVal・averageVolValに格納する．範囲分割では，移動平均化された値をSTEP\_BOUNDARIES[]で定義した4つの閾値と比較し，1〜5の段階番号をcurrentBpmStep・currentVolStepに格納する．パラメータの抽出と出力では，算出した段階が直前の段階（prevBpmStep・prevVolStep）から変化した場合にのみ，公開フラグbpmFrag・volFragを立てる．外部からはgetBpmStep()・getVolStep()を介して現在の段階を取得し，前述の加速度センサ制御における棒振り動作の確定時にこれらのフラグを参照して各楽器デバイスへの送信を行う．なお，音量用可変抵抗器は配線の都合上，回した方向とセンサ値の増減が逆になるため，getVolStep()は6-currentVolStepを返すことで表示上の段階を反転させる．update関数およびbpmUpdatePotentiometers関数の処理の流れを図\ref{fig:flow_pot}に示す．移動合計の差し替えによってバッファ全体の再走査を避けている点，およびバッファが一巡するまで段階判定を行わない点が特徴である．BPM・音量読み取り機能で使用する変数の仕様を表\ref{table:siki_pot_var}に示す．
@@ -806,12 +810,11 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
 
 \fi
 
+最後に，各デバイスへの無線送信機能について説明する．指揮デバイスは，Wi-Fi経由のUDP通信により，演奏開始・演奏終了・BPM変更・音量変更の4種類の指令を各デバイスへ送信する．いずれの指令も，種類を表すヘッダ1バイトと段階番号などの値1バイトからなる固定長2バイトのパケットとして送信される．送信先は指令の種類に応じて異なり，演奏開始・終了は中継機デバイスと全楽器デバイスへ，BPM変更は中継機デバイスへ，音量変更は全楽器デバイスへ，それぞれあらかじめ定めた固定IPアドレス宛てのユニキャストで送信される．
 
+また，UDP通信にはパケット消失時の再送機構がないため，本機能では同一の指令を繰り返し送信する冗長化を行っている．具体的には，対象となる全デバイスへ1回ずつ送信する処理を1周とし，\SI{20}{ms}の間隔を空けて3周繰り返す．デバイスごとに連続して複数回送信するのではなく周単位で繰り返す方式としたのは，前者では送信順が後方のデバイスほど1回目の指令の到達が遅れ，デバイス間で反映タイミングに差が生じるためである．
 
-
-
-
-
+なお，これらの指令が中継機デバイスおよび楽器デバイス側でどのように受信・反映されるかについては，それぞれ\ref{sec:kan_naibu}項および\ref{sec:gakki_naibu}項で説明する．
 
 \subsection{中継機デバイス}
 \subsubsection{概要}
@@ -1103,6 +1106,8 @@ void loop() {
 \fi
 
 
+本デバイスの全体の処理の流れは次の通りである．起動時に，Wi-Fiネットワークへの接続とUDP受信用ポートの開放，およびモータ制御・LEDマトリクス表示の初期化を行う．その後は，指揮デバイスから送信される固定長2バイトのパケットを常時監視し，先頭のヘッダに応じて処理を分岐する．演奏開始の指令を受信すると，パケットに付与されたBPM段階番号に対応する速度でモータの回転を開始し，LEDマトリクスに該当するBPM値を表示する．演奏中にBPM変更の指令を受信した場合は，回転速度と表示を新しい段階に更新する．なお，BPM変更の指令は演奏中のみ受け付け，停止中は無視する．演奏終了の指令を受信すると，モータを停止させ，LEDマトリクスを消灯する．
+
 ここからは，モータの制御，LEDMatrixでのBPM表示，回転速度実測プログラム（LaserIntervalTest）の順に説明する．
 
 % 使用する変数・関数の仕様と処理内容について説明する．
@@ -1110,8 +1115,10 @@ void loop() {
 まず，中継機デバイスにおけるモータの制御処理について説明する．本デバイスのギアボックスモータの回転速度を制御するために，Arduinoのパルス幅変調機能(PWM)を用いてモータの平均印加電圧を制御する．
 PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態とLOW状態の時間比率(デューティー比)を変化させることで，擬似的にアナログ電圧を生成する制御方式である．Arduinoのデジタル出力ピンは$\SI{5}{V}$のHIGHか$\SI{0}{V}$のLOWのいずれかしか出力できないが，HIGHとLOWを高速に切り替えてデューティー比を調整することで，負荷に対して見かけ上の連続的な電圧を印加することが可能となる．
 
-本デバイスは，ArduinoのD5ピンをモータドライバーモジュールに接続し，PWM制御を行う構成としている．ArduinoのanalogWrite関数は，引数として0から255の整数値を受け取り，この値に応じたデューティー比の矩形波を出力する．このとき引数が0のときデューティー比は常時LOWであり，255のときデューティー比は常時HIGHとなる．中間値では，引数に比例したデューティー比の矩形波が生成される．
+本デバイスは，ArduinoのD5ピンをモータドライバーモジュールに接続し，PWM制御を行う構成としている．ArduinoのanalogWrite()は，引数として0から255の整数値を受け取り，この値に応じたデューティー比の矩形波を出力する．このとき引数が0のときデューティー比は常時LOWであり，255のときデューティー比は常時HIGHとなる．中間値では，引数に比例したデューティー比の矩形波が生成される．
 この関係を式で表すと，供給電圧を $V_{cc}$（定数 VCC），プログラム上の出力値を $pwmValue$ とすると，モータに加わる平均電圧 $V_{average}$ は(\ref{eq:average})式で決定される．
+なお，実装上の都合により実際のプログラムにおいては分母を256とする近似演算を用いている．
+
 
 \begin{equation}
     \label{eq:average}
@@ -1140,6 +1147,8 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
     5 & 180 & 80  & 37 \\ \hline
     \end{tabular}
 \end{table}
+
+また，モータの起動・停止時には，PWM出力値を一定周期で少しずつ増減させる段階的な制御を行っている．演奏開始時には出力値を0から目標値まで徐々に増加させることで急激な起動による機構への負荷を避け，演奏終了時には徐々に減少させて滑らかに停止させる．一方，演奏中のBPM変更時には，対応するPWM出力値へ直ちに切り替えることで，操作に対する応答性を確保している．
 
 \iffalse
 続いて，モータ制御（MotorControlクラス）で使用する変数・定数の仕様を表\ref{table:kan_motor_var}に示す．
@@ -1312,7 +1321,7 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
 
 次に，中継機デバイスにおけるLEDMatrix表示処理について説明する．本システムでは表示用のマトリクスとして，Arduino Uno R4 WiFi付属のマトリクスを使用する．
 このマトリクスを用いて，受信したBPM段階番号を数値変換し，独自定義したフォント配列を用いて表示を行う．
-ここで，今回利用するArduinoのマトリクスは縦12横8の範囲で構成されている．
+ここで，今回利用するArduinoのマトリクスは縦8横12の範囲で構成されている．
 この時，通常で定義されている文字列では文字の間隔が短くなることや，それに付随した可読性の低下が考えられる．
 よって，今回は1文字を縦5横3で再定義することにより文字同士の間隔を開け，可読性の担保を目指す．
 例として数字0のドットパターンをコード\ref{lst:font0}に示す．
@@ -1396,102 +1405,102 @@ LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りで�
 
 以下では，表\ref{tab:func1}に示した順に，各関数の処理内容を説明する．はじめに，displaySetup関数について説明する．
 この関数は，matrix.begin()を呼び出した後，消灯フレームを一度描画してから\SI{200}{ms}待機する．これは，begin()直後の最初のloadFrame()は反映されない場合があるための対策である．
-% displaySetup関数をコード\ref{lst:disp_setup}に示す．
+displaySetup関数をコード\ref{lst:disp_setup}に示す．
 
-% \begin{lstlisting}[caption={displaySetup関数}, label={lst:disp_setup}]
-% void displaySetup() {
-%     matrix.begin();
-%     uint32_t warmUp[3] = {0, 0, 0};
-%     matrix.loadFrame(warmUp);
-%     delay(200);
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={displaySetup関数}, label={lst:disp_setup}]
+void displaySetup() {
+    matrix.begin();
+    uint32_t warmUp[3] = {0, 0, 0};
+    matrix.loadFrame(warmUp);
+    delay(200);
+}
+\end{lstlisting}
 
 次に，displayBPM関数について説明する．この関数は，loop関数から受け取ったBPM段階番号（1〜5）をbpmTable[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．
-% displayBPM関数の処理の流れを図\ref{fig:flow_displaybpm}に示す．
-% また，displayBPM関数をコード\ref{lst:disp_displaybpm}に示す．
+displayBPM関数の処理の流れを図\ref{fig:flow_displaybpm}に示す．
+また，displayBPM関数をコード\ref{lst:disp_displaybpm}に示す．
 
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=0.72\textwidth]{figs/flow_displaybpm.pdf}
-%     \caption{displayBPM関数の処理フローチャート}
-%     \label{fig:flow_displaybpm}
-% \end{figure}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figs/flow_displaybpm.pdf}
+    \caption{displayBPM関数の処理フローチャート}
+    \label{fig:flow_displaybpm}
+\end{figure}
 \FloatBarrier
 
 
-% \begin{lstlisting}[caption={displayBPM関数}, label={lst:disp_displaybpm}]
-% void displayBPM(uint8_t stepNumber) {
-%     if (stepNumber < 1 || stepNumber > 5) return;
-%     uint8_t bpm = bpmTable[stepNumber - 1];
-% 
-%     memset(frameBuffer, 0, sizeof(frameBuffer));
-% 
-%     int digits[3];
-%     int numDigits;
-%     if (bpm >= 100) {
-%         numDigits = 3;
-%         digits[0] = bpm / 100;
-%         digits[1] = (bpm / 10) % 10;
-%         digits[2] = bpm % 10;
-%     } else if (bpm >= 10) {
-%         numDigits = 2;
-%         digits[0] = bpm / 10;
-%         digits[1] = bpm % 10;
-%     } else {
-%         numDigits = 1;
-%         digits[0] = bpm;
-%     }
-% 
-%     int totalWidth = numDigits * FONT_WIDTH + (numDigits - 1) * 1;
-%     int startX     = (MATRIX_COLS - totalWidth) / 2;
-% 
-%     for (int i = 0; i < numDigits; i++) {
-%         drawDigit(digits[i], startX + i * (FONT_WIDTH + 1));
-%     }
-% 
-%     uint32_t bitmap[3] = {0, 0, 0};
-%     for (int row = 0; row < MATRIX_ROWS; row++) {
-%         for (int col = 0; col < MATRIX_COLS; col++) {
-%             if (frameBuffer[row][col]) {
-%                 int n = row * MATRIX_COLS + col;
-%                 bitmap[n / 32] |= (1UL << (31 - (n % 32)));
-%             }
-%         }
-%     }
-%     matrix.loadFrame(bitmap);
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={displayBPM関数}, label={lst:disp_displaybpm}]
+void displayBPM(uint8_t stepNumber) {
+    if (stepNumber < 1 || stepNumber > 5) return;
+    uint8_t bpm = bpmTable[stepNumber - 1];
+
+    memset(frameBuffer, 0, sizeof(frameBuffer));
+
+    int digits[3];
+    int numDigits;
+    if (bpm >= 100) {
+        numDigits = 3;
+        digits[0] = bpm / 100;
+        digits[1] = (bpm / 10) % 10;
+        digits[2] = bpm % 10;
+    } else if (bpm >= 10) {
+        numDigits = 2;
+        digits[0] = bpm / 10;
+        digits[1] = bpm % 10;
+    } else {
+        numDigits = 1;
+        digits[0] = bpm;
+    }
+
+    int totalWidth = numDigits * FONT_WIDTH + (numDigits - 1) * 1;
+    int startX     = (MATRIX_COLS - totalWidth) / 2;
+
+    for (int i = 0; i < numDigits; i++) {
+        drawDigit(digits[i], startX + i * (FONT_WIDTH + 1));
+    }
+
+    uint32_t bitmap[3] = {0, 0, 0};
+    for (int row = 0; row < MATRIX_ROWS; row++) {
+        for (int col = 0; col < MATRIX_COLS; col++) {
+            if (frameBuffer[row][col]) {
+                int n = row * MATRIX_COLS + col;
+                bitmap[n / 32] |= (1UL << (31 - (n % 32)));
+            }
+        }
+    }
+    matrix.loadFrame(bitmap);
+}
+\end{lstlisting}
 
 次に，drawDigit関数について説明する．この関数は，引数の数字が0から9の範囲内であるかを確認した後，縦方向の中央寄せオフセットを算出し，独自フォント配列から該当する数字のドットパターンを1ドットずつ読み取ってフレームバッファの指定位置に書き込む．
-% drawDigit関数をコード\ref{lst:disp_drawdigit}に示す．
+drawDigit関数をコード\ref{lst:disp_drawdigit}に示す．
 
-% \begin{lstlisting}[caption={drawDigit関数}, label={lst:disp_drawdigit}]
-% void drawDigit(int digit, int x_offset) {
-%     if (digit < 0 || digit > 9) return;
-%     const int y_offset = (MATRIX_ROWS - FONT_HEIGHT) / 2;
-%     for (int y = 0; y < FONT_HEIGHT; y++) {
-%         for (int x = 0; x < FONT_WIDTH; x++) {
-%             int col = x_offset + x;
-%             int row = y_offset + y;
-%             if (col >= 0 && col < MATRIX_COLS && row >= 0 && row < MATRIX_ROWS) {
-%                 frameBuffer[row][col] = font3x5[digit][y * FONT_WIDTH + x];
-%             }
-%         }
-%     }
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={drawDigit関数}, label={lst:disp_drawdigit}]
+void drawDigit(int digit, int x_offset) {
+    if (digit < 0 || digit > 9) return;
+    const int y_offset = (MATRIX_ROWS - FONT_HEIGHT) / 2;
+    for (int y = 0; y < FONT_HEIGHT; y++) {
+        for (int x = 0; x < FONT_WIDTH; x++) {
+            int col = x_offset + x;
+            int row = y_offset + y;
+            if (col >= 0 && col < MATRIX_COLS && row >= 0 && row < MATRIX_ROWS) {
+                frameBuffer[row][col] = font3x5[digit][y * FONT_WIDTH + x];
+            }
+        }
+    }
+}
+\end{lstlisting}
 
 最後に，clearDisplay関数について説明する．この関数は，BPM値を初期値(-1)にリセットし，全消灯フレームをmatrix.loadFrame()で描画して表示のリセットを行う．
-% clearDisplay関数をコード\ref{lst:disp_cleardisplay}に示す．
+clearDisplay関数をコード\ref{lst:disp_cleardisplay}に示す．
 
-% \begin{lstlisting}[caption={clearDisplay関数}, label={lst:disp_cleardisplay}]
-% void clearDisplay() {
-%     currentBPM = -1;
-%     uint32_t blank[3] = {0, 0, 0};
-%     matrix.loadFrame(blank);
-% }
-% \end{lstlisting}
+\begin{lstlisting}[caption={clearDisplay関数}, label={lst:disp_cleardisplay}]
+void clearDisplay() {
+    currentBPM = -1;
+    uint32_t blank[3] = {0, 0, 0};
+    matrix.loadFrame(blank);
+}
+\end{lstlisting}
 
 
 最後に，中継機デバイスのモータ回転速度を実測するために用いたプログラムであるLaserIntervalTestについて説明する．このプログラムは中継機デバイス本体には搭載せず，開発段階で観覧車に設置したレーザーとCdSセルを用いて，各PWM出力値における実際の回転周期を計測するために使用したものであり，表\ref{tab:pwm_lut}に示した実測周期の値はこのプログラムによって得られている．
@@ -1751,7 +1760,9 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
 
 \subsubsection{内部設計}
 \label{sec:gakki_naibu}
-本節では，楽器デバイスにおける音色表現を担うソフトウェア（Processing）の内部設計について説明する．楽器デバイスは，Arduinoから受信した発音指示をもとに，Processing上で波形を合成して音を鳴らす構成となっている．合成方式は，あらかじめ実在の楽器音をFFT解析して得た周波数・振幅データ（ルックアップテーブル，以下LUT）をもとに多数の正弦波を重ね合わせる加算合成を基本とし，これに息や弦の摩擦音を模したノイズ成分を加えることで音色を再現している．
+本節では，楽器デバイスの内部設計について説明する．楽器デバイスのソフトウェアは，PC上で音色表現を担うProcessingプログラムと，レーザー受光の検知および楽器デバイス間の同期を担うArduinoプログラム（douki\_saigo）の2つで構成される．まず前者のProcessingプログラムについて説明する．
+
+楽器デバイスは，Arduinoから受信した発音指示をもとに，Processing上で波形を合成して音を鳴らす構成となっている．合成方式は，あらかじめ実在の楽器音をFFT解析して得た周波数・振幅データ（ルックアップテーブル，以下LUT）をもとに多数の正弦波を重ね合わせる加算合成を基本とし，これに息や弦の摩擦音を模したノイズ成分を加えることで音色を再現している．
 
 続いて，Processingプログラムのファイル構成を示す．表\ref{table:gakki_files}の通り，各ファイルは機能ごとに分割されている．
 
@@ -1797,7 +1808,8 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
 
 ここからは，シリアル通信によるArduinoとの連携，LUTデータの管理（DataUtils），発音命令の委譲（InstrumentPlayer），残響エフェクト（AddEffect），デバッグ用自動演奏（NoteSampler），各楽器クラスによる音色合成の順に説明する．
 まず，Arduinoとのシリアル通信および発音ディスパッチについて説明する．
-楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，定数arduinoNumberによって，このProcessingインスタンスがどの楽器として動作するかを切り替える．
+楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，プログラム内で定義した楽器番号の定数によって，このProcessingインスタンスがどの楽器として動作するかを切り替える．
+Arduinoからのシリアル通信は，改行で区切られたテキストメッセージとして受信され，カンマで分割したうえで先頭のヘッダにより処理を分岐する．発音指示のメッセージには，音程，音の長さ，発音開始時と終了時の強さ，音色の種別の組が1音符分以上含まれており，これを解析して担当楽器のクラスへ発音命令として委譲する．このほか，BPM変更のメッセージを受信した場合は演奏テンポを，音量変更のメッセージを受信した場合は出力音量を，それぞれ受信値に応じて更新する．
 
 % 使用する変数・関数の仕様と処理内容について説明する．
 
@@ -2750,6 +2762,7 @@ for(int i = 0; i < numHarmonics; i++) {
 % \paragraph{楽器デバイスの同期方式（douki\_saigo）}
 次に，各楽器デバイスの同期方式を担うArduinoプログラムについて説明する．楽器デバイスは，指揮デバイスからの演奏開始指示を受けた後，中継機デバイスの回転に伴うレーザー光をCdSセルで検知することでおおまかなBPMを推定し，さらに楽器デバイス同士のUDP通信によって発音タイミングを細かく補正することで，複数台のArduino間での同期を実現している．
 この同期方式では，ドラムを担当するArduinoを基準時刻源（マスター）とし，ピアノ・ストリングス・フルートを担当する3台のArduinoをスレーブとするマスタースレーブ方式が採用されている．
+また，各Arduinoは，1拍を24分割したTickと呼ばれる時間単位で内部時刻を刻んでおり，起動からの通算Tick数（以下，globalTick）を共有の基準時刻として同期に用いる．
 
 続いて，同期プログラムのファイル構成を示す．表\ref{table:douki_files}の通り，各ファイルは担当する楽器ごとに用意されている．
 
@@ -2796,11 +2809,11 @@ flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPア
     \hline
     'N' & マスター → 各スレーブ & 多数決により決定した確定BPMのブロードキャスト\\
     \hline
-    'T' & スレーブ → マスター & 自身のglobalTickの報告（diff算出依頼）\\
+    'T' & スレーブ → マスター & 自身のglobalTickの報告（ずれ算出の依頼）\\
     \hline
-    'R' & マスター → スレーブ & T受信時点でのdiff（Tick差分）の返信\\
+    'R' & マスター → スレーブ & 'T'受信時点での両者のglobalTickの差（以下，diff）の返信\\
     \hline
-    'O' & マスター → スレーブ & 演奏開始タイミング（startGlobalTick）の指示\\
+    'O' & マスター → スレーブ & 演奏を開始すべきglobalTick値の指示\\
     \hline
     \end{tabular}
 \end{table}
@@ -2812,7 +2825,7 @@ flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPア
 % 検知ロジックの詳細な実装は\ref{sec:kan_naibu}項および付録に示すプログラム全文を参照されたい．
 
 次に，ドラム機（マスター）における同期状態管理について説明する．
-マスターは，stateという状態変数によって管理される5段階の状態遷移に沿って動作する．
+マスターは，stateという状態変数によって管理される5段階の状態遷移に沿って動作する．具体的には，BPMの安定を待つ待機状態，各スレーブとのずれの補正を行う同期状態，同期完了後の演奏開始準備状態，演奏中の状態，および停止状態の5段階である．
 
 \iffalse
 各状態の内容を表\ref{table:douki_master_state}に示す．
@@ -3001,7 +3014,7 @@ if (instId == drumInstId) {
 \fi
 
 次に，スレーブにおける同期処理について説明する．
-スレーブは，stateが0（BPM安定待ち）・1（マスターと同期中）・2（演奏中）・4（停止中）の4状態で動作し，'R'通信で受け取ったdiffをもとに自身のtickIvalを補正することでマスターとの同期を保つ．
+スレーブは，stateが0（BPM安定待ち）・1（マスターと同期中）・2（演奏中）・4（停止中）の4状態で動作し，'R'通信で受け取ったdiffの大きさに応じて自身のTickの周期を一時的に伸縮させることでマスターとの同期を保つ．
 
 \iffalse
 続いて，楽器デバイス（スレーブ）で使用する主な変数の仕様を表\ref{table:douki_slave_var}に示す．
@@ -3124,7 +3137,7 @@ void applyDiffCorrection(int32_t diff) {
 
 \fi
 
-最後に，'O'通信（マスターからの演奏開始指示）の受信処理について説明する．この処理は，指示されたstartGlobalTickと自身のglobalTickを比較し，まだ到達していなければwaitingForStartを立てて待機し，すでに超過していれば超過分だけcurTickをオフセットして即座に演奏へ合流する．
+最後に，'O'通信（マスターからの演奏開始指示）の受信処理について説明する．この処理は，指示された演奏開始時刻（globalTick値）と自身のglobalTickを比較し，まだ到達していなければ開始待ちの状態で待機し，すでに超過していれば超過分だけ楽譜の再生位置を進めて即座に演奏へ合流する．
 なお，'O'通信の受信および状態遷移に関する処理の詳細な実装は付録に示すプログラム全文を参照されたい．
 
 プログラム全文は付録に示す．
