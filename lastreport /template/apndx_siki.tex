@@ -1,4 +1,5 @@
 \section{指揮デバイスのプログラムソース}
+\label{sec:apndx_siki}
 本節では，指揮デバイスの制御プログラムの全文を示す．ファイル構成は\ref{sec:siki_naibu}節の表\ref{table:siki_files}の通りである．
 
 \subsection{Controller\_simultaneous.ino}
@@ -10,14 +11,15 @@
 #include <Wire.h>
 #include <math.h>
 
-// Wi-Fi接続情報
+// Wi-Fi のネットワーク名(hackathon001-WPA2)
 const char SSID[] = "hackathon001-WPA2";
+// その Wi-Fi のパスワード(hackathon001)
 const char PASS[] = "hackathon001";
 
 const uint8_t input_PIN = 3; // スイッチの状態を読み取るピン
-bool switch_status;
-bool before_switch_status = 0;
-bool isButtonPlaying = false;
+bool switch_status;// ボタンの状態を保持
+bool before_switch_status = 0;// 前回のボタンの状態を保持
+bool isButtonPlaying = false;// 開始・停止信号を交互に切り替えるフラグ
 
 SyncManager sync;
 PotManager pot;
@@ -47,6 +49,7 @@ void loop() {
     acc.update(sync, pot);
 }
 
+// 物理ボタンの押下を検知し，開始信号・停止信号のトグル送信と演奏状態フラグの反転を一括管理する．
 void button() {
     switch_status = digitalRead(input_PIN);
     if (switch_status == 0 && before_switch_status == 1) {
@@ -80,33 +83,35 @@ void button() {
 class AccManager {
 public:
     AccManager();
-    void setupADXL345();
-    // loop内で毎ループ呼ぶ
-    void update(SyncManager& sync, PotManager& pot);
-
+    // ADXL345（加速度センサー）のI2C初期化および計測開始の準備を行う．
+    void setupADXL345();  
+    // 20ms周期の時間管理と，閾値判定による指揮棒のシェイク動作検知を行う．
+    void update(SyncManager& sync, PotManager& pot); 
+    // potの予約フラグを確認し，変化があればsyncを通じてBPMや音量の段階番号を送信する．
     void updateShakedInfo(SyncManager& sync, PotManager& pot);
 
 private:
-    float readAccMagnitude();
-    void  recoverI2C();   // I2Cバスロックアップからの復旧（バスクリア＋再初期化）
+    float readAccMagnitude(); // I2Cで読み取ったXYZの3軸生データから合成ベクトル(加速度)を算出
+    void  recoverI2C(); // I2Cバスロックアップ(切断やノイズなどによりI2C通信が不能になったとき)からの復旧を行う．
 
-    const uint8_t ADXL345_ADDR = 0x53; // SDO/ALT ADDRESS ピンがGNDの場合
-    const uint8_t REG_POWER_CTL = 0x2D; // 加速度センサの電源管理をするスイッチ
-    const uint8_t REG_DATA_FORMAT = 0x31; // 測定する範囲を設定するスイッチ
-    const uint8_t REG_DATAX0 = 0x32; // 測定した値が書き込まれる場所
+    const uint8_t ADXL345_ADDR = 0x53; // 加速度センサー(ADXL345)のI2Cアドレスを定義
+    const uint8_t REG_POWER_CTL = 0x2D; // 加速度センサの電源管理をするスイッチを定義
+    const uint8_t REG_DATA_FORMAT = 0x31; // 測定範囲設定用レジスタのアドレスを定義
+    const uint8_t REG_DATAX0 = 0x32; // 測定した値が書き込まれる場所を定義
 
-    const float accThreshold = 110.0f; // 検知閾値 必要に応じて調整
-    const unsigned long shakeInterval = 750; // 多重検知防止インターバル [ms]
-    const unsigned long ACC_SAMPLE_INTERVAL = 20;
+    const float accThreshold = 110.0f; // 振ったと判断するための変化量の閾値を定義
+    const unsigned long shakeInterval = 750; // 連続検知を防止するための待機時間を定義
+    const unsigned long ACC_SAMPLE_INTERVAL = 20;// 加速度センサのサンプリング周期を定義
 
     // 内部変数
-    float currentAccVal = 0.0f; // 現在の加速度センサ値
-    float lastAccVal = 0.0f; // 前回の加速度センサ値
-    unsigned long lastDetectTime = 0; // 前回検知時刻 [ms]
-    unsigned long lastSampleTime = 0;
-    unsigned long lastRecoverMs  = 0;   // 復旧ログのスロットル用
+    float currentAccVal = 0.0f; // 加速度センサからの値を格納
+    float lastAccVal = 0.0f;  // 変化量算出のための直前の加速度センサ値を格納
+    unsigned long lastDetectTime = 0;  // 前回振ったことを検知した時間をms単位で格納
+    unsigned long lastSampleTime = 0;// 加速度センサの読み取り間隔を管理するための前回の時刻を格納
+    unsigned long lastRecoverMs  = 0;    // 復旧ログ処理の連続実行を防ぐための時刻を保持
 
-    bool isStarted = false; // 振られた判定のフラグ
+    // 振られたときに反転
+    bool isStarted = false; 
 };
 
 #endif
@@ -120,6 +125,7 @@ AccManager::AccManager(){
   // コンストラクタ（初期化処理なし）
 }
 
+// ADXL345（加速度センサー）のI2C初期化および計測開始の準備を行う．
 void AccManager::setupADXL345() {
   Wire.begin();
 
@@ -134,19 +140,19 @@ void AccManager::setupADXL345() {
   Wire.endTransmission();
 
   lastAccVal = readAccMagnitude();
-
+  
   Serial.println("GY-291 初期化完了");
-  Serial.print("閾値: ");
+  Serial.print("閾値: "); 
   Serial.print(accThreshold);
-  Serial.print("インターバル: ");
-  Serial.print(shakeInterval);
+  Serial.print("インターバル: "); 
+  Serial.print(shakeInterval); 
   Serial.println(" ms");
 }
 
-// ★loopから引っ越してきた時間管理とシェイク判定
+// 20ms周期の時間管理と，閾値判定による指揮棒のシェイク動作検知を行う．
 void AccManager::update(SyncManager& sync, PotManager& pot) {
   unsigned long now = millis();
-
+  
   if (now - lastSampleTime >= ACC_SAMPLE_INTERVAL) {
     lastSampleTime = now;
 
@@ -179,6 +185,7 @@ void AccManager::update(SyncManager& sync, PotManager& pot) {
   }
 }
 
+// I2Cで読み取ったXYZの3軸生データから合成ベクトル(加速度)を算出する．
 float AccManager::readAccMagnitude() {
   Wire.beginTransmission(ADXL345_ADDR);
   Wire.write(REG_DATAX0);
@@ -205,9 +212,7 @@ float AccManager::readAccMagnitude() {
   return sqrtf(fx * fx + fy * fy + fz * fz);
 }
 
-// I2Cバスのロックアップから復旧する。
-// スレーブがSDAを握ったまま固まった場合、SCLを手で9回叩いて解放し、
-// STOP条件を作ってから Wire を張り直し、ADXL345 を再初期化する。
+// I2Cバスロックアップ(切断やノイズなどによりI2C通信が不能になったとき)からの復旧を行う．
 void AccManager::recoverI2C() {
   unsigned long now = millis();
   if (now - lastRecoverMs >= 1000) {   // ログのスロットル（毎20msの連発を防ぐ）
@@ -240,6 +245,7 @@ void AccManager::recoverI2C() {
   Wire.endTransmission();
 }
 
+// potの予約フラグを確認し，変化があればsyncを通じてBPMや音量の段階番号を送信する．
 void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
   if (pot.bpmFrag) {
     sync.sendBPM(pot.getBpmStep());
@@ -256,7 +262,7 @@ void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
 
 \subsection{PotManager.h}
 \begin{lstlisting}[caption={PotManager.h}, label={lst:siki_pot_h}]
-// 可変抵抗器
+// 可変抵抗器管理クラス
 #ifndef POT_MANAGER_H
 #define POT_MANAGER_H
 
@@ -265,49 +271,57 @@ void AccManager::updateShakedInfo(SyncManager& sync, PotManager& pot) {
 
 class PotManager {
 public:
-    // コンストラクタ（ポート番号などを初期化する）
     PotManager();
-    //loop内で毎ループ呼ぶ
+    
+    // 20ms周期の時間管理を行い，可変抵抗器の値のサンプリング処理を駆動する．
     void update();
-    //現在の段階や変化を知るための窓口（ゲッター）
+    // カプセル化された現在のBPM段階番号（1〜5）を外部に返す．
     uint8_t getBpmStep() const { return currentBpmStep; }
+    // カプセル化された現在の音量段階番号（1〜5）を外部に返す．
     uint8_t getVolStep() const { return 6 - currentVolStep; }
 
-    bool bpmFrag = false;
-    bool volFrag = false;
+    
+    bool bpmFrag = false;// 値の変化時に指揮棒の振りと連動させるためのBPM送信予約フラグ
+    bool volFrag = false;// 値の変化時に指揮棒の振りと連動させるための音量送信予約フラグ
 
 private:
+    // 平滑化された平均アナログ値を，設計書に基づく境界値に照らし合わせて1〜5の段階番号に変換する．
     int calcStep(float val);
+    // BPM用可変抵抗器の値を移動平均で処理し，前回値からの変化を検知してフラグ（真偽値）を返す．
     bool bpmUpdatePotentiometers();
+    // 音量用可変抵抗器の値を移動平均で処理し，前回値からの変化を検知してフラグ（真偽値）を返す．
     bool volUpdatePotentiometers();
 
     // ピン定義
-    const int PIN_BPM = A0; // BPM用可変抵抗器
-    const int PIN_VOL = A1; // 音量用可変抵抗器
-    const unsigned long SAMPLE_INTERVAL = 20; // センサを読みとる周期
-    const int sampleSize = 10; // 移動平均のサンプル数
-    const int STEP_BOUNDARIES[4] = {300, 500, 650, 818};
+    const int PIN_BPM = A0;  // BPM変更用の可変抵抗器を接続するアナログ入力ピン番号を定義
+    const int PIN_VOL = A1; // 音量変更用の可変抵抗器を接続するアナログ入力ピン番号を定義
+    const unsigned long SAMPLE_INTERVAL = 20; // 可変抵抗器の値を読み取るサンプリング周期
+    const int sampleSize = 10; // 移動平均算出のためのサンプル数を定義
+    const int STEP_BOUNDARIES[4] = {300, 500, 650, 818};// アナログ入力値を5段階に変換するための閾値
 
     // 内部変数
-    unsigned long lastSampleTime = 0; // 前回サンプリング時刻
-    int   bpmSamples[10] = {0}; // BPMサンプル配列
-    long  bpmTotal = 0; // サンプル合計値
-    float averageBpmVal = 0.0f; // BPM移動平均値
+    unsigned long lastSampleTime = 0; // 前回のサンプリング時刻
+    
+    int   bpmSamples[10] = {0}; // BPM用のサンプル値を保持するための配列
+    long  bpmTotal = 0; // bpmSamples内の累積合計を格納
+    float averageBpmVal = 0.0f; // 算出されたBPM用のアナログ入力の平均値を格納
+   
+    int   volSamples[10] = {0};  // 音量用のサンプル値を保持するための配列
+    long  volTotal = 0; // volSamples内の累積合計を格納
+    float averageVolVal = 0.0f; // 算出された音量用のアナログ入力の平均値を格納
+    
+    int  bpmReadIndex = 0;// BPMの配列内での現在の書き込み位置を管理するインデックス
+    int  volReadIndex = 0;// Volumeの配列内での現在の書き込み位置を管理するインデックス
+    bool bpmBufferFull = false;// BPM用の移動平均バッファが初回サンプルで満たされたかを判定するフラグ
+    bool volBufferFull = false;// 音量用の移動平均バッファが初回サンプルで満たされたかを判定するフラグ
 
-    int   volSamples[10] = {0}; // 音量サンプル配列
-    long  volTotal = 0; // サンプル合計値
-    float averageVolVal = 0.0f; // 音量移動平均値
-
-    int  bpmReadIndex = 0;
-    int  volReadIndex = 0;
-    bool bpmBufferFull = false;
-    bool volBufferFull = false;
-
-    uint8_t currentBpmStep = 0; // BPM段階 (1〜5)
-    uint8_t currentVolStep = 0; // 音量段階 (1〜5)
-    int prevBpmStep = 0;
-    int prevVolStep = 0;
-
+    // 算出されたBPMの5段階のレベル（1～5）を格納
+    uint8_t currentBpmStep = 0; 
+    // 算出された音量の5段階のレベル（1～5）を格納
+    uint8_t currentVolStep = 0; 
+    
+    int prevBpmStep = 0;// 前回のBPM段階を保持
+    int prevVolStep = 0;// 前回の音量段階を保持
 };
 
 #endif
@@ -321,7 +335,7 @@ PotManager::PotManager(){
   // コンストラクタ（初期化処理なし）
 }
 
-// ★loopから引っ越してきた時間管理
+// 20ms周期の時間管理を行い，可変抵抗器の値のサンプリング処理を駆動する．
 void PotManager::update() {
   unsigned long now = micros();
   if (now - lastSampleTime >= SAMPLE_INTERVAL) {
@@ -331,6 +345,7 @@ void PotManager::update() {
   }
 }
 
+// 平滑化された平均アナログ値を，設計書に基づく境界値に照らし合わせて1〜5の段階番号に変換する．
 int PotManager::calcStep(float val) {
   if      (val <= STEP_BOUNDARIES[0]) return 1;
   else if (val <= STEP_BOUNDARIES[1]) return 2;
@@ -339,58 +354,46 @@ int PotManager::calcStep(float val) {
   else                                return 5;
 }
 
+// BPM用可変抵抗器の値を移動平均で処理し，前回値からの変化を検知してフラグ（真偽値）を返す．
 bool PotManager::bpmUpdatePotentiometers() {
   bpmTotal -= bpmSamples[bpmReadIndex];
-
   bpmSamples[bpmReadIndex] = analogRead(PIN_BPM);
-
   bpmTotal += bpmSamples[bpmReadIndex];
 
   bpmReadIndex = (bpmReadIndex + 1) % sampleSize;
-
   if (bpmReadIndex == 0) bpmBufferFull = true;
-
   if (!bpmBufferFull) return false;
 
   averageBpmVal = (float)bpmTotal / sampleSize;
-
   currentBpmStep = calcStep(averageBpmVal);
 
   if (currentBpmStep != prevBpmStep) {
     Serial.println("------ BPMパラメータ更新 ------");
-
     Serial.print("[BPM] 平均センサ値="); Serial.print(averageBpmVal, 1);
     Serial.print("  段階=");          Serial.print(currentBpmStep);
-
     prevBpmStep = currentBpmStep;
     return true;
   }
   return false;
 }
 
+// 音量用可変抵抗器の値を移動平均で処理し，前回値からの変化を検知してフラグ（真偽値）を返す．
 bool PotManager::volUpdatePotentiometers() {
   volTotal -= volSamples[volReadIndex];
-
   volSamples[volReadIndex] = analogRead(PIN_VOL);
-
   volTotal += volSamples[volReadIndex];
 
   volReadIndex = (volReadIndex + 1) % sampleSize;
-
   if (volReadIndex == 0) volBufferFull = true;
-
   if (!volBufferFull) return false;
 
   averageVolVal = (float)volTotal / sampleSize;
-
   currentVolStep = calcStep(averageVolVal);
 
   if(currentVolStep != prevVolStep){
     Serial.println("------ VOLパラメータ更新 ------ ");
-
     Serial.print("[VOL] 平均センサ値="); Serial.print(averageVolVal, 1);
     Serial.print("  段階=");          Serial.print(6 - currentVolStep);
-
     prevVolStep = currentVolStep;
     return true;
   }
@@ -406,39 +409,39 @@ bool PotManager::volUpdatePotentiometers() {
 #include <WiFiS3.h>
 #include <WiFiUdp.h>
 
-//楽器の個別IP（ユニキャスト用）
-extern IPAddress fluteIP;
-extern IPAddress pianoIP;
-extern IPAddress stringsIP;
-extern IPAddress drumIP;
-
-//観覧車の個別IP（ユニキャスト用）
-extern IPAddress ferrisWheelIP;
-
-//チャンネル（マルチキャスト用）
-extern IPAddress ferrisWheelGroup; // 観覧車だけが聴くチャンネル（現在未使用）
-extern IPAddress instrumentGroup;  // 楽器全員が聴くチャンネル
+extern IPAddress fluteIP;// フルートのIPアドレス
+extern IPAddress pianoIP;// ピアノのIPアドレス
+extern IPAddress stringsIP;// ストリングスのIPアドレス
+extern IPAddress drumIP;// ドラムのIPアドレス
+extern IPAddress ferrisWheelIP;// 観覧車（送信）のIPアドレス
+extern IPAddress ferrisWheelGroup; // 観覧車（送信）のIPアドレス(マルチキャスト用)
+extern IPAddress instrumentGroup;  // 楽器全体のIPアドレス
 
 class SyncManager {
 public:
     // コンストラクタ（ポート番号などを初期化する）
     SyncManager();
-    // Wi-FiとUDPを準備する関数
+    
+    // setup内で一度だけ呼び出される関数であり，Wi-FiとUDPを準備している．
     void begin(const char ssid[], const char pass[]);
-    // 演奏開始合図（'S'）を全機へ同時に送信する自作関数
+    
+    // 演奏開始合図（'S'）とBPMの段階番号をラウンドロビン(順次割り当て)で送信．
     void sendStart(uint8_t stepNumber);
-   // BPM情報を送信する関数（引数の型を追加）
+    
+    // BPM情報を観覧車へユニキャスト送信するための関数．
     void sendBPM(uint8_t stepNumber);
-    // 音量情報を送信する関数（引数の型を追加）
+    
+    // 音量情報を各楽器機へラウンドロビンでユニキャスト送信するための関数．
     void sendVolume(uint8_t stepNumber);
-    // 演奏終了合図('E')を全機へ同時に送信する関数
+    
+    // 演奏終了合図（'E'）を全機へラウンドロビンで送信する関数．
     void sendEnd();
 
 private:
-    // 複数ターゲットへラウンドロビンで3回冗長送信を行う共通処理。
-    // ターゲットごとに3連射してから次のターゲットへ進む方式だと、後方の
+    // ラウンドロビン方式で到達時間差を無くし，かつパケットロス対策として3回冗長送信を行うための共通処理．
+    // （※ターゲットごとに3連射してから次のターゲットへ進む方式だと、後方の
     // ターゲットほど到達が遅れて機器間に無視できない時間差が生まれるため、
-    // 1周ごとに全ターゲットへ送ってから次の周に進む方式にしている。
+    // 1周ごとに全ターゲットへ送ってから次の周に進む方式にしている。）
     void packetRoundRobin(const uint8_t packet[], uint8_t b, const IPAddress targets[], uint8_t targetCount);
 };
 
@@ -449,22 +452,25 @@ private:
 \begin{lstlisting}[caption={SyncManager.cpp}, label={lst:siki_sync_cpp}]
 #include "SyncManager.h"
 
-const uint16_t TARGET_PORT = 5005;
-const uint16_t LOCAL_PORT = 8080;
+
+const uint16_t TARGET_PORT = 5005;// ターゲットとなるポート番号
+const uint16_t LOCAL_PORT = 8080;// 自身のポート番号
 WiFiUDP Udp;
 
-IPAddress fluteIP(192, 168, 11, 14);
-IPAddress pianoIP(192, 168, 11, 12);
-IPAddress stringsIP(192, 168, 11, 13);
-IPAddress drumIP(192, 168, 11, 11);
-IPAddress ferrisWheelIP(192, 168, 11, 10);   // 観覧車ユニキャスト
-IPAddress ferrisWheelGroup(239, 255, 0, 1);  // 未使用（マルチキャスト不安定のため）
-IPAddress instrumentGroup(239, 255, 0, 2);
+
+IPAddress fluteIP(192, 168, 11, 14);// フルートのIPアドレス
+IPAddress pianoIP(192, 168, 11, 12);// ピアノのIPアドレス
+IPAddress stringsIP(192, 168, 11, 13);// ストリングスのIPアドレス
+IPAddress drumIP(192, 168, 11, 11);// ドラムのIPアドレス
+IPAddress ferrisWheelIP(192, 168, 11, 10);   // 観覧車（送信）のIPアドレス
+IPAddress ferrisWheelGroup(239, 255, 0, 1);  // 観覧車（送信）のIPアドレス(マルチキャスト用) ※未使用
+IPAddress instrumentGroup(239, 255, 0, 2);// 楽器全体のIPアドレス
 
 SyncManager::SyncManager() {
     // コンストラクタ（今回は初期化処理なし）(インスタンスが作られた瞬間に，自動的に一番最初に1回だけ実行される特殊な関数)
 }
-// Wi-FiおよびUDPの初期化フェーズ
+
+// setup内で一度だけ呼び出される関数であり，Wi-FiとUDPを準備している．
 void SyncManager::begin(const char ssid[], const char pass[]) {
     WiFi.begin(ssid, pass); // Wi-Fi接続処理を開始
     // 接続状態が「WL_CONNECTED（接続完了）」になるまでループ待機
@@ -472,9 +478,10 @@ void SyncManager::begin(const char ssid[], const char pass[]) {
     }
     Udp.begin(LOCAL_PORT); // 自身のポートを開放し、UDP通信を有効化
 }
-// 演奏開始合図（'S'）を全機へラウンドロビンで同時送信
+
+// 演奏開始合図（'S'）とBPMの段階番号をラウンドロビン(順次割り当て)で送信．
 void SyncManager::sendStart(uint8_t stepNumber) {
-    // 設計書通りの2バイト固定長ペイロード（第1バイト:ヘッダ'S', 第2バイト:ダミー0x00）
+    // 設計書通りの2バイト固定長ペイロード（第1バイト:ヘッダ'S', 第2バイト:BPM段階番号）
     uint8_t startPacket[2] = {'S', stepNumber};
     // ドラムはisInstJoinを'S'受信時にリセットするため、他機より早く
     // 届かせたい。ただしラウンドロビン送信なら全ターゲットへの到達は
@@ -482,28 +489,29 @@ void SyncManager::sendStart(uint8_t stepNumber) {
     IPAddress targets[] = {drumIP, ferrisWheelIP, pianoIP, stringsIP, fluteIP};
     packetRoundRobin(startPacket, 2, targets, 5);
 }
-// BPM情報の送信（引数で段階番号を受け取る）
-// 'B' は観覧車のみが受信するため、観覧車へユニキャスト送信
+
+// BPM情報を観覧車へユニキャスト送信するための関数．
 void SyncManager::sendBPM(uint8_t stepNumber){
     uint8_t bpmPacket[2] = {'B',stepNumber};
     IPAddress targets[] = {ferrisWheelIP};
     packetRoundRobin(bpmPacket, 2, targets, 1);
 }
-//音量情報の送信（引数で段階番号を受け取る）
-// 'V' は全楽器機が受信するため、各楽器機へユニキャスト送信
+
+// 音量情報を各楽器機へラウンドロビンでユニキャスト送信するための関数．
 void SyncManager::sendVolume(uint8_t stepNumber){
     uint8_t volumePacket[2] = {'V',(uint8_t)(6 - stepNumber)};
     IPAddress targets[] = {fluteIP, pianoIP, stringsIP, drumIP};
     packetRoundRobin(volumePacket, 2, targets, 4);
 }
-//演奏終了合図（'E'）を全機へラウンドロビンで同時送信
+
+// 演奏終了合図（'E'）を全機へラウンドロビンで送信する関数．
 void SyncManager::sendEnd(){
     uint8_t endPacket[2] = {'E', 0x00};
     IPAddress targets[] = {drumIP, ferrisWheelIP, pianoIP, stringsIP, fluteIP};
     packetRoundRobin(endPacket, 2, targets, 5);
 }
 
-// 複数ターゲットへのラウンドロビン3回冗長送信（パケットロス対策）
+// ラウンドロビン方式で到達時間差を無くし，かつパケットロス対策として3回冗長送信を行うための共通処理．
 // 1周目で全ターゲットに1回ずつ送り、20ms空けてから2周目、3周目と繰り返す。
 // ターゲットごとに3連射してから次へ進む方式だと、後方のターゲットほど
 // 到達が遅れて機器間で無視できない時間差が生まれるため、この方式にしている。

@@ -1,4 +1,5 @@
 \section{楽器デバイス（Processing）のプログラムソース}
+\label{sec:apndx_processing}
 本節では，楽器デバイスにおける音色表現を担うProcessingプログラムの全文を示す．
 
 \subsection{SoundProcessingCode.pde}
@@ -6,15 +7,10 @@
 import ddf.minim.*;
 import ddf.minim.analysis.*;
 import ddf.minim.effects.*;
-//import ddf.minim.signals.*;
-//import ddf.minim.spi.*;
 import ddf.minim.ugens.*;
 
-//import ddf.minim.*;
-//import ddf.minim.ugens.*;
-//import ddf.minim.analysis.*;
-
-//import ddf.minim.effects.*; // 追加
+import java.util.Arrays;
+import java.util.Comparator;
 
 import processing.serial.*;
 Serial myPort;
@@ -23,30 +19,27 @@ Minim minim;
 AudioOutput out;
 FFT fft;
 
+// 受信した値を保持する
 int musicBPM = 120;
-
-String timbre = "Flute";
-
-byte soundOctave = 60;
-byte soundDoReMi = 9;
-
-byte soundStartVelocity = 96;
-byte soundEndVelocity = 96;
-
-
-
-
-
 float currentMasterVolume = 1.0;
 
-// 0:なし　1:フルート　2:ストリングス　3:ピアノ　4:ドラム
-final byte arduinoNumber = 3;
+
+// デバック発音用
+String timbre = "Flute";
+byte soundOctave = 60;
+byte soundDoReMi = 9;
+byte soundStartVelocity = 96;
+byte soundEndVelocity = 96;
 
 boolean isDebugMode = true;
 
 
+// 自身の担当するArduinoの番号
+// 0:なし　1:フルート　2:ストリングス　3:ピアノ　4:ドラム
+final byte arduinoNumber = 3;
 
-// 反響音用
+
+// 空間の残響音をまとめるミキサー
 Summer longOut;
 Summer shortOut;
 
@@ -67,57 +60,44 @@ void setup()
   minim = new Minim(this);
   out = minim.getLineOut(Minim.MONO, 1024);
   
-  // --- 1. エフェクト専用のバス（部屋）を3つだけ作る ---
-  // 1. ストリングス専用のバス（通り道）を生成 (UGen)
-  /*longOut = new Summer();
-  // 2. 新しいUGen形式の反響音エフェクトを生成 (UGen)
-  SimpleConvolutionUGen longReverb = new SimpleConvolutionUGen(20000, 0.17f);
-  // 3. 【超重要】すべてを .patch() で数珠繋ぎ（シグナルチェーン）にする
-  longOut.patch(longReverb);  // ミキサーの音を、反響音エフェクトへ流す
-  longReverb.patch(out); */        // 反響音エフェクトの音を、全体の出口へ流す
-  
+  // --- リバーブ（残響）の初期化 ---
+  // 長い残響用（ピアノ、ストリングスなど）
   longOut = new Summer();
   AddReverb longReverb = new AddReverb(15000, 0.20f);
   longOut.patch(longReverb);
   longReverb.patch(out);
   
+  // 短い残響用（ドラムなど）
   shortOut = new Summer();
   AddReverb shortReverb = new AddReverb(2000, 0.25f);
   shortOut.patch(shortReverb);
   shortReverb.patch(out);
   
   
-  player = new InstrumentPlayer(out); // thisとoutを渡す
-  
-  // ★ここに追記：過去2000サンプル（約45ミリ秒分）を参照する反響音を適用
-  //out.patch(new SimpleConvolutionEffect(15000));
-  
-  //out.setTempo (musicBPM);
-  //currentWaveform = Waves.SINE;
-  
+  player = new InstrumentPlayer(out);
   utils = new DataUtils();
-  // 1. float型の二次元配列を取得
-  //float[][] Note_f = utils.GetLUT("Note");
-  //// 2. Note_fと同じ大きさで、int型の二次元配列「Note」を作成
-  //Note = new int[Note_f.length][Note_f[0].length];
-  //// 3. 2重ループで1要素ずつint型に変換して代入
-  //for (int i = 0; i < Note_f.length; i++) {
-  //  for (int j = 0; j < Note_f[i].length; j++) {
-  //    Note[i][j] = int(Note_f[i][j]); // 小数点以下は切り捨て
-  //  }
-  //}
   
-  out.setGain(-6.0f);
+  // 演奏用楽譜データの取得
+  float[][] Note_f = utils.GetLUT("Note");
+  Note = new int[Note_f.length][Note_f[0].length];
+  for (int i = 0; i < Note_f.length; i++) {
+    for (int j = 0; j < Note_f[i].length; j++) {
+      Note[i][j] = int(Note_f[i][j]);
+    }
+  }
+  
+  out.setGain(-6.0f); // 音割れ防止のためマスター音量を下げる
   
   fft = new FFT(out.bufferSize(), out.sampleRate());
   
   
-  
+  // --- Processing内演奏用の別スレッド ---
   audioThread = new Thread(new Runnable() {
     public void run() {
       while (true) {
         if (isPlaying && isDebugMode) {
           long getTime = System.nanoTime();
+          // 設定したBPMに基づくインターバルで発音処理を呼び出す
           while (getTime - lastTime >= interval) {
             SoundPlay();
             lastTime += interval;
@@ -125,44 +105,27 @@ void setup()
           }
         }
         
-        
-        // CPUの暴走（負荷100%）を防ぐため、1ミリ秒だけ休憩させる
-        // これにより、毎秒1000回の頻度で正確にタイマーがチェックされます
-        //try {
-        //  Thread.sleep(interval / 1000000000 *2); 
-        //  //Thread.sleep(1);
-        //} catch (InterruptedException e) {
-        //  break; // エラーが起きたらループを抜ける
-        //}
-        
-        
-        // ➔ 休憩（sleep）を廃止し、CPUに「超高速空回り中」と伝えるだけにする
-        //Thread.onSpinWait(); 
-        
-        
-        
         else {
           // 停止中はCPUを休ませる
           try { Thread.sleep(100); } catch (InterruptedException e) {}
         }
-
-        // ➔ sleep(1) を廃止し、これに置き換える
+        
         if (isPlaying) {
-          Thread.onSpinWait(); // CPUに「今は待機中だよ」と伝えて効率化する（Java 9以降）
+          // 演奏中のwhileの回転速度を抑制
+          Thread.onSpinWait();
         }
       }
     }
   });
-  audioThread.start(); // スレッドをスタート！
-  //fpsCheckStartTime = System.nanoTime();
+  audioThread.start();
   
   
-  // シリアル通信開始処理
+  // --- シリアル通信の開始処理 ---
   println("=== 利用可能なシリアルポート ===");
   String portList[] = Serial.list();
   println(portList); // ポート一覧を確認
   myPort = new Serial(this, portList[2], 115200); // ポートは適切に変更
-  myPort.bufferUntil('\n'); // 開業まで溜めてから
+  myPort.bufferUntil('\n'); // 改行コードまでバッファリング
   println("受信待機中・・・");
   println("==========");
   
@@ -173,8 +136,8 @@ void setup()
 void draw()
 {
   background(0);
-  //if (!(isPlaying && isDebugMode)) {
-  // --- オシロスコープの描画 ---
+  
+  // --- オシロスコープの描画（時間領域の波形表示） ---
   stroke(255);
   for (int i=0; i < out.bufferSize() - 1; i++) {
     float x1 = map(i, 0, out.bufferSize(), 0, width);
@@ -182,8 +145,8 @@ void draw()
     line(x1, 150 - out.left.get(i)*250, x2, 150 - out.left.get(i+1)*250);
   }
   
-  // --- スペクトルアナライザの描画 ---
-  fft.forward(out.mix);
+  // --- スペクトルアナライザの描画（周波数領域の振幅表示） ---
+  fft.forward(out.mix); // FFT解析の実行
   stroke(255, 0, 255);
   
   for(int i = 0; i < fft.specSize() - 1; i++) {
@@ -191,7 +154,8 @@ void draw()
     float f1 = fft.indexToFreq(i);
     float f2 = fft.indexToFreq(i+1);
     
-    // 表示範囲(20〜20000Hz)から外れる場合は線を描画しない
+    // 可聴域 (20〜20000Hz) のみを描画
+    // 表示範囲から外れる場合は線を描画しない
     if (f2 < 20 || f1 > 20000) continue;
     
     float amp1 = fft.getBand(i);
@@ -207,12 +171,12 @@ void draw()
     line(x1, y1, x2, y2);
   }
   
-  // --- 周波数の目盛りとラベルの描画 (X軸) ---
+  // --- 周波数の目盛りとラベルの描画 (X軸・対数スケール) ---
   fill(255);
   textSize(12);
   textAlign(CENTER, TOP);
   
-  // 添付画像通りの目盛りとラベルの配列
+  // 添付目盛りとラベルの配列
   float[] labelFreqsX = {20, 30, 40, 50, 60, 80, 100, 200, 300, 400, 500,
                          800, 1000, 2000, 3000, 4000, 6000, 8000, 10000, 20000};
   String[] labelStrsX = {"20", "30", "40", "50", "60", "80", "100", "200", "300", "400", "500",
@@ -221,7 +185,7 @@ void draw()
   for (int i = 0; i < labelFreqsX.length; i++) {
     float x = FreqToX(labelFreqsX[i]);
     
-    stroke(100); // 縦線（薄いグレー）
+    stroke(100); // 縦線
     line(x, 300, x, 820);
     
     fill(200);
@@ -236,9 +200,9 @@ void draw()
     // スペクトルアナライザの描画と同じ計算式を使用
     float y = 800 - amp * 4;
     
-    // オシロスコープの描画領域（Y=300より上）に被らない場合のみ描画
+    // オシロスコープの描画領域（Y=300より上）に被らないように描画
     if (y >= 320) {
-      stroke(50); // 横線（暗いグレー）
+      stroke(50); // 横線
       line(40, y, width, y); // 数値ラベルと被らないようにX=40から開始
       
       fill(200);
@@ -246,37 +210,12 @@ void draw()
     }
   }
   
-  // 操作説明
-  //fill(200);
-  //textAlign(LEFT, TOP);
-  //text("Press 'p' to play song. Press '1'-'6' to change waveform.", 20, 20);
-  //}
-  
-  
-  /*
-  if (isPlaying && isDebugMode) {
-    long getTime = System.nanoTime();
-    // 現在の時間と、前回記録した時間の差分を計算
-    // if ではなく while にすることで、遅れた分（数tick分）をこの1フレーム内で一気に処理します
-    while (getTime - lastTime >= interval) {
-      tick++;             
-      SoundPlay();
-      lastTime += interval; // すっきりした累積補正の式
-    }
-  }
-  */
-  /*
-  long a = System.nanoTime();
-  fps ++;
-  if (fpsCheckStartTime + 1000000000L <= a) {
-    fpsCheckStartTime += 1000000000L;
-    println(fps);
-    fps = 0;
-  }
-  */
+  // デバック用操作説明
+  fill(200);
+  textAlign(LEFT, TOP);
+  text("octave:1~7    C~B:A~J  C#~A#:W,E,T~U     type:Z,C~M     StartVelocity:0~>  EndVelocity:^~_     MusicStart:shift+A~J   MusicStop:shift+Q", 20, 20);
 }
-//long fpsCheckStartTime;
-//int fps = 0;
+
 
 // --- 周波数を対数スケールのX座標に変換する関数 ---
 float FreqToX(float f) {
@@ -293,34 +232,25 @@ float FreqToX(float f) {
 
 
 
-//音符数と遅延の関係を調査したときに使用
-//int noteChecker = 0;
 
+// --- シリアル通信の受信イベント ---
 void serialEvent(Serial p) {
   //println("受信");
-  // 改行まで文字列を読み込む
-  String inString = p.readStringUntil('\n');
   
-  // 何も読み込めなかった場合は処理停止
-  if (inString == null) return;
+  String inString = p.readStringUntil('\n'); // 改行まで文字列を読み込む
+  if (inString == null) return; // 何も読み込めなかった場合は処理停止
   
-  // 末尾の改行コードや余分な空白を削除
-  inString = trim(inString); 
+  inString = trim(inString); // 末尾の改行コードや余分な空白を削除
+  String[] list = split(inString, ','); // カンマで分割して配列にする
+  if (list.length <= 1) return; // データが空の場合は処理停止
   
-  // カンマで分割して配列にする
-  String[] list = split(inString, ',');
-  
-  // データが空の場合は処理停止
-  if (list.length <= 1) return;
-  
-  // ヘッダとデータ数
+  // データの識別用ヘッダとデータ数
   String header = list[0];
   int listLength = list.length - 1;
   
-  //　ヘッダによる分岐
   switch (header) {
     
-    // 発音指示
+    // 発音指示 (形式: N, 音程, 長さ, 開始音量, 終了音量, 楽器タイプ...)
     case "N" :
       if (listLength % 5 != 0) break;
       for (int i = 5; i <= listLength; i += 5) {
@@ -328,7 +258,7 @@ void serialEvent(Serial p) {
         float pitch, duration, startVel, endVel, type;
         try {
           pitch    = float(list[i-4]);
-          duration = float(list[i-3]) * (2.5f / musicBPM); // 60000÷(BPM*24)
+          duration = float(list[i-3]) * (2.5f / musicBPM); // 長さをtickからミリ秒に変換
           startVel = float(list[i-2]);
           endVel   = float(list[i-1]);
           type     = int(list[i]);
@@ -338,11 +268,7 @@ void serialEvent(Serial p) {
         }
         // 数値の場合のみ処理続行
         
-        /*if (pitch  == 72) {
-          if (noteChecker == 0) noteChecker -= millis();
-          else {noteChecker += millis(); println("所要時間: " + noteChecker); noteChecker = 0;}
-        }*/
-        
+        // 自身のデバイス番号に合致する楽器を鳴らす
         switch (arduinoNumber) {
           case 1 :
             player.PlayFlute(pitch, duration, startVel, endVel, currentMasterVolume);
@@ -356,7 +282,7 @@ void serialEvent(Serial p) {
             else if (type == 2) player.PlayHorn(pitch, duration, startVel, endVel, currentMasterVolume);
             break;
           case 4 :
-            int a = int(list[i-4]) % 12;
+            int a = int(list[i-4]) % 12; // MIDIノートからドラム種類を判別
             if      (a == 0) player.PlayKick(currentMasterVolume, startVel);
             else if (a == 3) player.PlaySnare(currentMasterVolume, startVel, endVel);
             else if (a == 4) player.PlayHiHat(currentMasterVolume, startVel);
@@ -366,7 +292,7 @@ void serialEvent(Serial p) {
       }
       break;
       
-    // BPM変更指示（60~180）
+    // BPM変更指示 (形式: B, 更新BPM)
     case "B" :
       if (listLength != 1) break;
       int getBPM;
@@ -382,7 +308,7 @@ void serialEvent(Serial p) {
       musicBPM = constrain(getBPM, minimumBPM, maximumBPM);
       break;
       
-    // マスターボリューム変更指示（0~255）
+    // マスターボリューム変更指示 (形式: V, 更新ボリューム)
     case "V" :
       if (listLength != 1) break;
       float getVolume;
@@ -408,55 +334,64 @@ void serialEvent(Serial p) {
 
 
 
-
+// キーボードによるデバッグ発音用
 void Play()
 {
   switch(timbre){
     case "Flute":
+      //long a = System.nanoTime();
       player.PlayFlute(soundOctave + soundDoReMi, 2.0f, soundStartVelocity, soundEndVelocity, 1.0f);
+      //a = millis()-a;
+      //println("経過時間: " + a);
       break;
-    //case "Flure2":
-    //  player.PlayFlute(soundOctave + soundDoReMi + 128, 4.0f, soundStartVelocity, soundEndVelocity, 1.0f);
-    //  break;
     case "Strings":
+      //long a = System.nanoTime();
       player.PlayStrings(soundOctave + soundDoReMi, 1.0f, soundStartVelocity, soundEndVelocity, 1.0f);
+      //a = millis()-a;
+      //println("経過時間: " + a);
       break;
     case "Drum":
+      //long a = System.nanoTime();
       if (soundDoReMi == 0) {
         player.PlayKick(1.0f, soundStartVelocity);
-      } else if (soundDoReMi == 1) {
-        player.PlaySnareOld(1.0f, soundStartVelocity);
-      } else if (soundDoReMi == 2) {
-        player.PlayHiHatOld(1.0f, soundStartVelocity);
       } else if (soundDoReMi == 3) {
         player.PlaySnare(1.0f, soundStartVelocity, soundEndVelocity);
       } else if (soundDoReMi == 4) {
         player.PlayHiHat(1.0f, soundStartVelocity);
-      } //else if (soundDoReMi == 5) {
-      //  player.PlayCymbal(1.0f, soundStartVelocity);
-      //}
+      }
+      //a = millis()-a;
+      //println("経過時間: " + a);
       break;
     case "Piano":
-      //int a = millis();
+      //long a = System.nanoTime();
       player.PlayPiano(soundOctave + soundDoReMi, 10.0f, soundStartVelocity, 1.0f);
       //a = millis()-a;
       //println("経過時間: " + a);
       break;
     case "Horn":
+      //long a = System.nanoTime();
       player.PlayHorn(soundOctave + soundDoReMi, 1.0f, soundStartVelocity, soundEndVelocity, 1.0f);
+      //a = millis()-a;
+      //println("経過時間: " + a);
       break;
     case "Trumpet":
+      //long a = System.nanoTime();
       player.PlayTrumpet(soundOctave + soundDoReMi, 1.0f, soundStartVelocity, soundEndVelocity, 1.0f);
+      //a = millis()-a;
+      //println("経過時間: " + a);
       break;
   }
 }
 
 
 
+// キー入力
 void keyPressed() {
   if (isDebugMode == false) return;
   switch (key)
   {
+    
+  // オクターブ変更
   case '1':
     soundOctave = 24;
     break;
@@ -479,6 +414,7 @@ void keyPressed() {
     soundOctave = 96;
     break;
     
+  // 強弱変更
   case '0':
     soundStartVelocity = 127;
     break;
@@ -528,6 +464,7 @@ void keyPressed() {
     soundEndVelocity = 16;
     break;
     
+  // 発音
   case 'a':
     soundDoReMi = 0;
     Play();
@@ -577,14 +514,11 @@ void keyPressed() {
     Play();
     break;
     
+  // 楽器変更
   case 'z':
   case 'Z':
     timbre = "Flute";
     break;
-  //case 'x':
-  //case 'X':
-  //  timbre = "Flure2";
-  //  break;
   case 'c':
   case 'C':
     timbre = "Strings";
@@ -600,24 +534,6 @@ void keyPressed() {
   case 'n':
   case 'N':
     timbre = "Horn";
-    //Oscil sawOsc = new Oscil(37, 0.1, Waves.SQUARE);
-    //sawOsc.patch(new HighPassSP(500f, out.sampleRate())).patch(out);
-    //sawOsc = new Oscil(199, 0.01, Waves.SQUARE);
-    //sawOsc.patch(new HighPassSP(1000f, out.sampleRate())).patch(out);
-    //sawOsc = new Oscil(347, 0.01, Waves.SAW);
-    //sawOsc.patch(new HighPassSP(1800f, out.sampleRate())).patch(out);
-    //sawOsc = new Oscil(433, 0.01, Waves.SQUARE);
-    //sawOsc.patch(new HighPassSP(2200f, out.sampleRate())).patch(out);
-    //sawOsc = new Oscil(859, 0.01, Waves.SAW);
-    //sawOsc.patch(new HighPassSP(5000f, out.sampleRate())).patch(out);
-    //sawOsc = new Oscil(2100, 0.01, Waves.SAW);
-    //sawOsc.patch(new HighPassSP(9000f, out.sampleRate())).patch(out);
-    //sawOsc = new Oscil(71, 0.01, Waves.SQUARE);
-    //sawOsc.patch(new HighPassSP(600f, out.sampleRate())).patch(out);
-    //sawOsc = new Oscil(47, 0.01, Waves.SAW);
-    //sawOsc.patch(new HighPassSP(550f, out.sampleRate())).patch(out);
-    //sawOsc = new Oscil(13, 0.01, Waves.SAW);
-    //sawOsc.patch(new HighPassSP(300f, out.sampleRate())).patch(out);
     break;
   case 'm':
   case 'M':
@@ -627,7 +543,7 @@ void keyPressed() {
     
     
     
-    
+    // 演奏
     case 'A' : // 酒場でブギウギ
       tick = 1536;
       returnTick = new int[][] {{2880, 1728, 48}, {2784, 2880, 281}, {4512, 1728, 48}};
@@ -638,12 +554,12 @@ void keyPressed() {
       isPlaying = true;
       break;
       
-    case 'S' : // かえるのうた（オクターブ５）
+    case 'S' : // かえるのうた
       tick = 0;
       returnTick = new int[][] {{1536, 0, 0}};
       returnIndex = 0;
       noteIndex = 0;
-      interval = GetInterval( 120*2 );
+      interval = GetInterval( 120 );
       lastTime = System.nanoTime();
       isPlaying = true;
       break;
@@ -680,8 +596,8 @@ void keyPressed() {
       
     case 'H' : // 序曲_終盤なし
       tick = 13632;
-      //returnTick = new int[][] {{16488, 14952, 2899}}; // ピアノ用
-      returnTick = new int[][] {{16488, 14952, 3053}}; // ストリングス用
+      returnTick = new int[][] {{16488, 14952, 2899}}; // ピアノ用
+      //returnTick = new int[][] {{16488, 14952, 3053}}; // ストリングス用
       //returnTick = new int[][] {{16488, 14952, 2985}}; // フルート用
       returnIndex = 0;
       noteIndex = 2638;
@@ -712,9 +628,16 @@ void keyPressed() {
 
 \subsection{Utils.pde}
 \begin{lstlisting}[caption={Utils.pde}, label={lst:proc_utils}]
+// ==========================================
+// 波形データ(JSON)のロードと、
+// ピッチ・ベロシティに合わせたプロファイル生成を担うクラス
+// ==========================================
 class DataUtils {
+  
+  // デバック用の楽譜
   private float[][] note;
   
+  // 各楽器の強度別（FF/MF/PP）スペクトルプロファイル
   private float[][][] fluteFFLUT, fluteMFLUT, flutePPLUT;
   
   private float[][][] violinFFLUT, violinMFLUT, violinPPLUT;
@@ -740,6 +663,7 @@ class DataUtils {
     
     // JSONファイルからデータをロードする
     
+    // --- 楽譜・演奏データの読み込み ---
     //note = Load2LUT("序曲_フルート冒頭_processing.json");
     //note = Load2LUT("序曲_フルート中盤_processing.json");
     //note = Load2LUT("序曲_ピアノ冒頭_processing.json");
@@ -752,11 +676,12 @@ class DataUtils {
     //note = Load2LUT("かえるのうた8小節ver「酒場でブギウギ(強弱付き)」「王宮のメヌエット(強弱なし)」「トルコ行進曲」_processing.json");
     //note = Load2LUT("共通部分0706_processing.json");
     //note = Load2LUT("ドラム0706_1_processing.json");
-    //note = Load2LUT("ピアノ0706_1_processing.json");
-    note = Load2LUT("ストリングス0706_1_processing.json");
+    note = Load2LUT("ピアノ0706_1_processing.json");
+    //note = Load2LUT("ストリングス0706_1_processing.json");
     //note = Load2LUT("フルート0706_1_processing.json");
     
     
+    // --- 各楽器のLUTの読み込み ---
     fluteFFLUT = Load3LUT("fluteFFLUT.json");
     fluteMFLUT = Load3LUT("fluteMFLUT.json");
     flutePPLUT = Load3LUT("flutePPLUT.json");
@@ -764,15 +689,12 @@ class DataUtils {
     violinFFLUT = Load3LUT("violinFFLUT.json");
     violinMFLUT = Load3LUT("violinMFLUT.json");
     violinPPLUT = Load3LUT("violinPPLUT.json");
-    
     violaFFLUT = Load3LUT("violaFFLUT.json");
     violaMFLUT = Load3LUT("violaMFLUT.json");
     violaPPLUT = Load3LUT("violaPPLUT.json");
-    
     celloFFLUT = Load3LUT("celloFFLUT.json");
     celloMFLUT = Load3LUT("celloMFLUT.json");
     celloPPLUT = Load3LUT("celloPPLUT.json");
-    
     bassFFLUT = Load3LUT("bassFFLUT.json");
     bassMFLUT = Load3LUT("bassMFLUT.json");
     bassPPLUT = Load3LUT("bassPPLUT.json");
@@ -790,17 +712,9 @@ class DataUtils {
     pianoWobbleDepthMFLUT = Load2LUT("pianoWobbleDepthsMF.json");
     pianoWobbleDepthPPLUT = Load2LUT("pianoWobbleDepthsPP.json");
     
-    // ドラムのLUTをロード
     kickLUT  = Load2LUT("kickLUT.json");
     snareLUT = Load2LUT("snareLUT.json");
     hihatLUT = Load2LUT("hihatLUT.json");
-    
-    
-    
-    
-    
-    
-    
     
     hornFFLUT = Load3LUT("hornFFLUT.json");
     hornMFLUT = Load3LUT("hornMFLUT.json");
@@ -814,14 +728,14 @@ class DataUtils {
   }
   
   
-  // JSONファイルを読み込んで float[][] 配列に変換する便利関数
+  // JSONファイルを読み込んで float[][] に変換する関数
   float[][] Load2LUT(String fileName) {
     JSONArray jsonArray = loadJSONArray(fileName);
     float[][] lut = new float[jsonArray.size()][];
     
     for (int i = 0; i < jsonArray.size(); i++) {
       if (jsonArray.isNull(i)) {
-        lut[i] = null; // 今までの仕様通り、存在しない音程は null にする
+        lut[i] = null; // 存在しない音程は null にする
         continue;
       }
       JSONArray row = jsonArray.getJSONArray(i);
@@ -831,14 +745,14 @@ class DataUtils {
           lut[i][j] = row.getFloat(j);
         }
       } else {
-        lut[i] = null; // データが欠損している部分は null にする（今までの仕様通り）
+        lut[i] = null; // データが欠損している部分は null にする
       }
     }
     return lut;
   }
   
   
-  // JSONファイルを読み込んで float[][][] の3次元可変長配列に変換する関数
+  // JSONファイルを読み込んで float[音程][ピーク][周波数・振幅] に変換する関数
   float[][][] Load3LUT(String fileName) {
     JSONArray jsonArray = loadJSONArray(fileName);
     // 第1次元（音程の数）を確定
@@ -847,7 +761,7 @@ class DataUtils {
     for (int i = 0; i < jsonArray.size(); i++) {
       // JSON上で null になっている、または要素が欠損している場合の処理
       if (jsonArray.isNull(i)) {
-        lut[i] = null; // 今までの仕様通り、存在しない音程は null にする
+        lut[i] = null; // 存在しない音程は null にする
         continue;
       }
       
@@ -876,126 +790,13 @@ class DataUtils {
   
   
   
-  // ① 汎用版：特定のLUTから、指定したピッチの倍音レシピを安全に取り出す関数
-  /*
-  float[] GetProfileForPitch(float pitch, float[][] lut, int numHarmonics, int baseMidiNote) {
-    
-    float[] result = new float[numHarmonics];
-    
-    // LUTの要素数から自動的に最高音を算出して安全にクランプする
-    float maxMidiNote = baseMidiNote + lut.length - 1;
-    float clampedPitch = constrain(pitch, baseMidiNote, maxMidiNote);
-    
-    int baseIndexLower = floor(clampedPitch) - baseMidiNote;
-    int baseIndexUpper = ceil(clampedPitch) - baseMidiNote;
-    
-    // 下に向かって一番近い有効データを探す
-    int lowerIndex = baseIndexLower;
-    while (lowerIndex >= 0 && lut[lowerIndex] == null) { lowerIndex--; }
-    
-    // 上に向かって一番近い有効データを探す
-    int upperIndex = baseIndexUpper;
-    while (upperIndex < lut.length && lut[upperIndex] == null) { upperIndex++; }
-    
-    
-    // ==============================================
-    // 限界値のセーフティーネット
-    // ==============================================
-    // 上に有効データが一つも無かったら、下のデータを採用する（最高音の延長）
-    if (upperIndex >= lut.length) upperIndex = lowerIndex;
-    
-    // 下に有効データが一つも無かったら、上のデータを採用する（最低音の延長）
-    if (lowerIndex < 0) lowerIndex = upperIndex; 
-    
-    if (lowerIndex < 0 && upperIndex >= lut.length) {
-      // どちらにもデータが無い場合のフォールバック（基音のみ1.0）
-      float[] fallback = new float[numHarmonics];
-      fallback[0] = 1.0f;
-      return fallback;
-    }
-    
-    float lowerMidi = lowerIndex + baseMidiNote;
-    float upperMidi = upperIndex + baseMidiNote;
-    
-    float[] lowerProfile = lut[lowerIndex];
-    float[] upperProfile = lut[upperIndex];
-    
-    float t = 0;
-    if (upperMidi > lowerMidi) {
-      t = (clampedPitch - lowerMidi) / (upperMidi - lowerMidi);
-    }
-    
-    for (int i = 0; i < numHarmonics; i++) {
-      result[i] = lerp(lowerProfile[i], upperProfile[i], t);
-    }
-    
-    return result;
-  }
-  */
   
-  /*
-  // ① 刷新版：特定の3次元LUTから、指定したピッチに「最も近い有効データ」を生のまま取り出す関数
+  
+  // 特定の3次元LUTから、指定したピッチに「最も近い有効データ」を取り出し、正確なピッチへシフトして返す関数
   // 戻り値：float[ピーク数][2] -> [h][0]:周波数(Hz), [h][1]:振幅
   float[][] GetProfileForPitch(float pitch, float[][][] lut, int baseMidiNote) {
     
-    // LUTの要素数から自動的に最高音を算出して安全にクランプする
-    float maxMidiNote = baseMidiNote + lut.length - 1;
-    float clampedPitch = constrain(pitch, baseMidiNote, maxMidiNote);
-    
-    // 四捨五入(round)で、最もピッチが近いサンプルのインデックスを狙う
-    int targetIndex = round(clampedPitch) - baseMidiNote;
-    targetIndex = constrain(targetIndex, 0, lut.length - 1);
-    
-    // もし狙ったインデックスがnull（データ欠損）の場合、最も近い「有効なデータ」を探索する
-    int finalIndex = targetIndex;
-    if (lut[finalIndex] == null) {
-      int lowerIndex = finalIndex;
-      while (lowerIndex >= 0 && lut[lowerIndex] == null) { lowerIndex--; }
-      
-      int upperIndex = finalIndex;
-      while (upperIndex < lut.length && lut[upperIndex] == null) { upperIndex++; }
-      
-      // 上下のうち、存在する方、あるいはより近い方を採用する
-      if (lowerIndex >= 0 && upperIndex < lut.length) {
-        if ((finalIndex - lowerIndex) <= (upperIndex - finalIndex)) {
-          finalIndex = lowerIndex;
-        } else {
-          finalIndex = upperIndex;
-        }
-      } else if (lowerIndex >= 0) {
-        finalIndex = lowerIndex;
-      } else if (upperIndex < lut.length) {
-        finalIndex = upperIndex;
-      } else {
-        // 万が一、LUT全体が空っぽだった場合の完全フォールバック（MIDIピッチから計算した基音のみ生成）
-        float f0 = 440.0f * pow(2.0f, (clampedPitch - 69.0f) / 12.0f);
-        float[][] fallback = new float[1][2];
-        fallback[0][0] = f0;   // 周波数
-        fallback[0][1] = 1.0f; // 振幅
-        return fallback;
-      }
-    }
-    
-    // 見つかった有効なサンプルのデータをディープコピーして返す（参照渡しによるデータ破壊を防ぐため）
-    float[][] sourceProfile = lut[finalIndex];
-    int numPeaks = sourceProfile.length;
-    float[][] result = new float[numPeaks][2];
-    
-    for (int h = 0; h < numPeaks; h++) {
-      result[h][0] = sourceProfile[h][0]; // 周波数 (Hz)
-      result[h][1] = sourceProfile[h][1]; // 振幅
-    }
-    
-    return result;
-  }
-  */
-  
-  
-  // ① 確定修正版：特定の3次元LUTから、指定したピッチに「最も近い有効データ」を取り出し、正確なピッチへシフトして返す関数
-  // 戻り値：float[ピーク数][2] -> [h][0]:周波数(Hz), [h][1]:振幅
-  float[][] GetProfileForPitch(float pitch, float[][][] lut, int baseMidiNote) {
-    
-    // 【バグ解決の核心1】ユーザーが要求した本来のピッチ（小数ビブラートや範囲外のC3/A7など）を完全に生のまま保持
+    // 要求した本来のピッチ（小数ビブラートや範囲外のC3/A7など）を保持
     float originalPitch = pitch;
     
     // LUTの要素数から自動的に最高音を算出し、インデックス探索用のみ安全にクランプする
@@ -1006,15 +807,15 @@ class DataUtils {
     int targetIndex = round(searchPitch) - baseMidiNote;
     targetIndex = constrain(targetIndex, 0, lut.length - 1);
     
-    // もし狙ったインデックスがnull（データ欠損）の場合、最も近い「有効なデータ」を探索する
+    // データが欠損している場合は隣接する有効データを探索する
     int finalIndex = targetIndex;
-    println(finalIndex);
+    //println(finalIndex);
     if (lut[finalIndex] == null) {
       int lowerIndex = finalIndex;
-      while (lowerIndex >= 0 && lut[lowerIndex] == null) { lowerIndex--; }
+      while (lowerIndex >= 0 && lut[lowerIndex] == null) lowerIndex--;
       
       int upperIndex = finalIndex;
-      while (upperIndex < lut.length && lut[upperIndex] == null) { upperIndex++; }
+      while (upperIndex < lut.length && lut[upperIndex] == null) upperIndex++;
       
       // 上下のうち、存在する方、あるいは要求された元のピッチ（searchPitch）により近い方を採用する
       if (lowerIndex >= 0 && upperIndex < lut.length) {
@@ -1028,7 +829,7 @@ class DataUtils {
       } else if (upperIndex < lut.length) {
         finalIndex = upperIndex;
       } else {
-        // 万が一、LUT全体が空っぽだった場合の完全フォールバック（MIDIピッチから計算した基音のみ生成）
+        // 万が一、LUT全体が空だった場合: 基音のみ生成
         float f0 = 440.0f * pow(2.0f, (originalPitch - 69.0f) / 12.0f);
         float[][] fallback = new float[1][2];
         fallback[0][0] = f0;   // 周波数
@@ -1036,7 +837,7 @@ class DataUtils {
         return fallback;
       }
     }
-    println(finalIndex);
+    //println(finalIndex);
     
     // 見つかったサンプルのデータを取得
     float[][] sourceProfile = lut[finalIndex];
@@ -1044,21 +845,18 @@ class DataUtils {
     float[][] result = new float[numPeaks][2];
     
     // =================================================================
-    // 【バグ解決の核心2：流用元ピッチからの絶対距離によるシフト計算】
+    // 流用元データから要求ピッチへのシフト倍率を計算
     // =================================================================
     // 流用元のサンプルが本来持っている「正しい基準MIDIノート番号」を逆算
     float sourceMidi = finalIndex + baseMidiNote;
     
-    // 制限のない本来の要求ピッチ（originalPitch）と、流用元（sourceMidi）のガチの差分（半音単位）を計算。
-    // これにより、範囲外のC3を弾いた時（例：48 - 59 = -11半音）でも正確なスケーリング係数が算出されます！
+    // 制限のない本来の要求ピッチ（originalPitch）と、流用元（sourceMidi）の差分（半音単位）を計算
     float pitchShiftFactor = pow(2.0f, (originalPitch - sourceMidi) / 12.0f);
     // =================================================================
     
     for (int h = 0; h < numPeaks; h++) {
-      // 元のデータが持っている「実測の生の周波数構造」に対して、計算した倍率を掛け算する
-      // これにより、インハーモニシティのデコボコを100%維持したまま、滑らかにピッチがスケーリングされます
       result[h][0] = sourceProfile[h][0] * pitchShiftFactor; 
-      result[h][1] = sourceProfile[h][1]; // 振幅はそのままコピー
+      result[h][1] = sourceProfile[h][1];
     }
     
     return result;
@@ -1067,107 +865,7 @@ class DataUtils {
   
   
   
-  
-  // ② 汎用版：ピッチとベロシティの2軸から、最終的な倍音レシピを生成する関数
-  /*
-  float[] GetDynamicProfile(float pitch, float velocity, String type, int numHarmonics, int baseMidiNote, float basePower) {
-    float[] profile = new float[numHarmonics];
-    
-    // 3つのLUTから、現在のピッチに応じた倍音構成をそれぞれ取得
-    float[] profileFF, profilePP, profileMF;
-    
-    switch (type)
-    {
-    case "Flute":
-      profilePP = GetProfileForPitch(pitch, flutePPLUT, numHarmonics, baseMidiNote);
-      profileMF = GetProfileForPitch(pitch, fluteMFLUT, numHarmonics, baseMidiNote);
-      profileFF = GetProfileForPitch(pitch, fluteFFLUT, numHarmonics, baseMidiNote);
-      break;
-    case "Violin":
-      profilePP = GetProfileForPitch(pitch, violinPPLUT, numHarmonics, baseMidiNote);
-      profileMF = GetProfileForPitch(pitch, violinMFLUT, numHarmonics, baseMidiNote);
-      profileFF = GetProfileForPitch(pitch, violinFFLUT, numHarmonics, baseMidiNote);
-      break;
-    case "Viola":
-      profilePP = GetProfileForPitch(pitch, violaPPLUT, numHarmonics, baseMidiNote);
-      profileMF = GetProfileForPitch(pitch, violaMFLUT, numHarmonics, baseMidiNote);
-      profileFF = GetProfileForPitch(pitch, violaFFLUT, numHarmonics, baseMidiNote);
-      break;
-    case "Cello":
-      profilePP = GetProfileForPitch(pitch, celloPPLUT, numHarmonics, baseMidiNote);
-      profileMF = GetProfileForPitch(pitch, celloMFLUT, numHarmonics, baseMidiNote);
-      profileFF = GetProfileForPitch(pitch, celloFFLUT, numHarmonics, baseMidiNote);
-      break;
-    case "Bass":
-      profilePP = GetProfileForPitch(pitch, bassPPLUT, numHarmonics, baseMidiNote);
-      profileMF = GetProfileForPitch(pitch, bassMFLUT, numHarmonics, baseMidiNote);
-      profileFF = GetProfileForPitch(pitch, bassFFLUT, numHarmonics, baseMidiNote);
-      break;
-    case "Piano":
-      profilePP = GetProfileForPitch(pitch, pianoPPLUT, numHarmonics, baseMidiNote);
-      profileMF = GetProfileForPitch(pitch, pianoMFLUT, numHarmonics, baseMidiNote);
-      profileFF = GetProfileForPitch(pitch, pianoFFLUT, numHarmonics, baseMidiNote);
-      break;
-    default:
-      println("Error: LUT type '" + type + "'が見つかりません!! ピアノを適用しました。");
-      profilePP = GetProfileForPitch(pitch, pianoPPLUT, numHarmonics, baseMidiNote);
-      profileMF = GetProfileForPitch(pitch, pianoMFLUT, numHarmonics, baseMidiNote);
-      profileFF = GetProfileForPitch(pitch, pianoFFLUT, numHarmonics, baseMidiNote);
-      break;
-    }
-    
-    // ベロシティ(0〜127)を0.0〜1.0に正規化
-    float normVel = constrain(velocity, 0, 127) / 127.0f;
-    
-    // ユーザー定義のベロシティ閾値
-    float threshPP = 32.0f / 127.0f;
-    float threshMF = 80.0f / 127.0f;
-    float threshFF = 112.0f / 127.0f;
-    
-    for (int i = 0; i < numHarmonics; i++) {
-      if (normVel <= threshPP) {
-        // 0〜32 (無音〜pp) の間は、波形の形はppのまま固定（音量だけが小さくなる）
-        profile[i] = profilePP[i];
-        
-      } else if (normVel <= threshMF) {
-        // 32〜80 (pp〜mf) の間を補間
-        float t = map(normVel, threshPP, threshMF, 0.0f, 1.0f);
-        profile[i] = lerp(profilePP[i], profileMF[i], t);
-        
-      } else if (normVel <= threshFF) {
-        // 80〜112 (mf〜ff) の間を補間
-        float t = map(normVel, threshMF, threshFF, 0.0f, 1.0f);
-        profile[i] = lerp(profileMF[i], profileFF[i], t);
-        
-      } else {
-        // 112〜127 (ff〜fff) の間は、波形の形はffのまま固定（音量は最大へ向かう）
-        profile[i] = profileFF[i];
-      }
-    }
-    
-    // 合計値に対する割合（シェア）による音量算出
-    float totalSum = 0;
-    for (int i = 0; i < numHarmonics; i++) {
-      totalSum += profile[i]; 
-    }
-    
-    // ベロシティに応じた「目標の全体音量（パイの大きさ）」を決定する
-    // 音量(0.0)の場合はここでtargetVolumeが0になり、完全に無音になります
-    float targetVolume = basePower * pow(normVel, 0.7f);
-    
-    // 各倍音の割合(シェア)を計算し、目標音量を掛け合わせる
-    for (int i = 0; i < numHarmonics; i++) {
-      // profile[i] / totalSum が「割合(0.0〜1.0)」。そこにtargetVolumeを掛ける。
-      // +0.0001f は、ゼロ除算（0で割ってエラーになること）を防ぐためのおまじないです。
-      profile[i] = (profile[i] / (totalSum + 0.0001f)) * targetVolume; 
-    }
-    
-    return profile;
-  }
-  */
-  
-  
-  // ② 刷新版：ピッチとベロシティの2軸から、最終的な「周波数と音量のペア」の2次元配列を生成する関数
+  // ピッチとベロシティの2軸から、最終的な「周波数と音量のペア」の2次元配列を生成する関数
   // 戻り値：float[ピーク数][2] -> [h][0]:周波数(Hz), [h][1]:最終音量
   float[][] GetDynamicProfile(float pitch, float velocity, String type, int baseMidiNote, float basePower) {
     
@@ -1226,7 +924,7 @@ class DataUtils {
     // ベロシティ(0〜127)を0.0〜1.0に正規化
     float normVel = constrain(velocity, 0, 127) / 127.0f;
     
-    // ユーザー定義のベロシティ閾値
+    // ベロシティ閾値
     float thresholdPP = 32.0f / 127.0f;
     float thresholdMF = 80.0f / 127.0f;
     float thresholdFF = 112.0f / 127.0f;
@@ -1234,14 +932,11 @@ class DataUtils {
     // 現在のベロシティ層に応じて、ベースとなる波形プロファイル（周波数・振幅の骨組み）を決定
     float[][] baseProfile;
     float t = 0;
-    //boolean needInterpolation = false;
-    //float[][] lowerProfile = null;
-    //float[][] upperProfile = null;
     
     if (normVel <= thresholdPP) {
       baseProfile = profilePP;
     } else if (normVel <= thresholdMF) {
-      // pp ～ mf の間：構造が近い方のスペクトル形状を選択（あるいは、より高度に処理するためのフラグ設定）
+      // pp ～ mf の間：構造が近い方のスペクトル形状を選択
       t = map(normVel, thresholdPP, thresholdMF, 0.0f, 1.0f);
       baseProfile = (t < 0.5f) ? profilePP : profileMF;
     } else if (normVel <= thresholdFF) {
@@ -1252,73 +947,24 @@ class DataUtils {
       baseProfile = profileFF;
     }
     
-    //if (normVel >= thresholdFF) baseProfile = profileFF;
-    //else if (normVel >= thresholdMF) baseProfile = profileMF;
-    //else baseProfile = profilePP;
     
-    // 決定した形状ベース（baseProfile）を元に、最終出力用の2次元配列を確保
+    // 振幅が閾値以上の有効なピークのみを抽出してエネルギー計算
     int numPeaks = baseProfile.length;
     int validCount = 0;
     float ampThreshold = 0.05f;
-    // 1. まずは有効なデータの数をカウントするだけ（上限は変更しない）
+    // 有効なデータの数をカウント
     for (int h = 0; h < numPeaks; h++) { 
       if (baseProfile[h][1] >= ampThreshold) validCount++; 
     }
-    // 2. 判明した有効な数で、ぴったりサイズの配列を初期化
+    // 判明した有効なサイズの配列
     float[][] finalProfile = new float[validCount][2];
     
-    
-    // 周波数は選択したベースサンプルの値を100%そのまま継承（濁りを防ぐ）
-    //float totalSum = 0;
-    //for (int h = 0; h < numPeaks; h++) { 
-    //  if(baseProfile[h][1] < 0.05f) continue;
-    //  finalProfile[h][0] = baseProfile[h][0]; // 周波数 (Hz) 固定
-    //  finalProfile[h][1] = baseProfile[h][1]; // 振幅の初期値
-    //  //totalSum += finalProfile[h][1];
-    //}
-    
-    
-    //// ベロシティに応じた「目標の全体音量（エネルギーの総量）」の計算
-    //float targetVolume = basePower * pow(normVel, 0.9f);
-    
-    //// 全体のエネルギー配分（シェア）を計算し、各ピークに最終音量を割り当てる
-    ///*for (int h = 0; h < numPeaks; h++) {
-    //  //finalProfile[h][1] = (finalProfile[h][1] / (totalSum + 0.0001f)) * targetVolume;
-    //  finalProfile[h][1] = finalProfile[h][1] * targetVolume;
-    //}*/
-    
-    //float energy = 0;
-    //for(int h = 0; h < numPeaks; h++){
-    //  energy += baseProfile[h][1] * baseProfile[h][1];
-    //}
-    //float gain = targetVolume / sqrt(energy + 1e-9f);
-    
-    //for (int h = 0; h < numPeaks; h++) {
-    //  /*float freq = baseProfile[h][0]; // 周波数 (Hz)
-      
-    //  // --- 低音ブーストの計算 ---
-    //  // 例：200Hz以下を緩やかに持ち上げるカーブ（ローシェルフ風）
-    //  float bassBoost = 1.0f;
-    //  if (freq < 400.0f) {
-    //      // 400Hz未満なら、低い周波数ほど最大1.5倍までゲインを上げる
-    //      // (400 - freq) / 400 で 0.0〜1.0 のブレンド率を作り、0.5fを掛ける
-    //      bassBoost += ( (400.0f - freq) / 400.0f ) * 0.1f; 
-    //  }*/
-      
-    //  // 最終的なゲインを適用
-    //  finalProfile[h][1] = baseProfile[h][1] * gain;
-    //  //finalProfile[h][1] *= bassBoost;
-    //}
-    
-    // 有効なピークの数をカウントするための変数
     int validPeakCount = 0;
     float energy = 0;
-
+    
     for (int h = 0; h < numPeaks; h++) { 
       // 0.05未満のデータは完全に無視してスキップ
-      if(baseProfile[h][1] < ampThreshold) { 
-        continue; 
-      }
+      if(baseProfile[h][1] < ampThreshold) continue; 
       
       // 有効なデータだけを finalProfile の前から順に詰める
       finalProfile[validPeakCount][0] = baseProfile[h][0]; // 周波数 (Hz) 固定
@@ -1327,19 +973,14 @@ class DataUtils {
       // 除外されなかった「有効なピークだけ」でエネルギーを計算
       energy += baseProfile[h][1] * baseProfile[h][1];
       
-      // 次の保存先へインデックスを進める
       validPeakCount++; 
     }
     
-    // ベロシティに応じた「目標の全体音量（エネルギーの総量）」の計算
+    // エネルギー総量をもとにゲインを正規化
     float targetVolume = basePower * pow(normVel, 0.9f);
-    
-    // ゲインの算出
     float gain = targetVolume / sqrt(energy + 1e-9f);
     
-    // 最終的なゲインを適用（※元の numPeaks ではなく、validPeakCount まで回す！）
     for (int i = 0; i < validPeakCount; i++) {
-      // すでに finalProfile に格納されている振幅に対してゲインを掛け算する
       finalProfile[i][1] *= gain; 
     }
     
@@ -1349,7 +990,7 @@ class DataUtils {
   
   
   
-  
+  // クラスの外部からJSONデータを使用したいときの関数
   float[][] GetLUT(String type) {
     switch (type) {
       case "Note":
@@ -1388,11 +1029,15 @@ class DataUtils {
         return null; // 存在しない名前が指定された場合は null を返す
     }
   }
-};
+}
 \end{lstlisting}
 
 \subsection{InstrumentPlayer.pde}
 \begin{lstlisting}[caption={InstrumentPlayer.pde}, label={lst:proc_player}]
+// ==========================================
+// 楽器の発音を管理するクラス
+// 各楽器のインスタンスを生成し、AudioOutputへ割り当てる
+// ==========================================
 class InstrumentPlayer {
   AudioOutput out;
 
@@ -1400,67 +1045,51 @@ class InstrumentPlayer {
     this.out = out; // Mainから渡された出力を保持する
   }
 
+  // フルート
   void PlayFlute(float midiNote, float duration, float startVel, float endVel, float masterVol) {
     out.playNote(0.0f, duration, 
       new FluteInstrument(midiNote, duration, startVel, endVel, masterVol));
   }
   
+  // ストリングス
   void PlayStrings(float midiNote, float duration, float startVel, float endVel, float masterVol) {
     out.playNote(0.0f, duration, 
       new StringsInstrument(midiNote, duration, startVel, endVel, masterVol));
   }
   
+  // ピアノ
   void PlayPiano(float midiNote, float duration, float velocity, float masterVol) {
     out.playNote(0.0f, duration, 
       new PianoInstrument(midiNote, velocity, masterVol));
   }
    
-  // キックを鳴らす関数
+  // キック
   void PlayKick(float masterVol, float velocity) {
-    // out.playNote(開始時間, 鳴らす長さ, 音色クラス);
-    // ドラムはエンベロープ側で長さを制御するため、第2引数のdurationは適当な値(1.0など)でOKです。
-    //out.playNote(0, 0.1, new KickInstrument(masterVol, velocity));
     out.playNote(0, 0.1, new KickInstrument(masterVol, velocity));
   }
   
-  // スネアを鳴らす関数
-  void PlaySnareOld(float masterVol, float velocity) {
-    out.playNote(0, 0.5, new SnareInstrumentOld(masterVol, velocity));
-  }
-  
-  // スネアver2を鳴らす関数
+  // スネア
   void PlaySnare(float masterVol, float velocity, float sinAmp) {
     out.playNote(0, 0.3, new SnareInstrument(masterVol, velocity, sinAmp));
   }
   
-  // クローズハイハットを鳴らす関数
-  void PlayHiHatOld(float masterVol, float velocity) {
-    out.playNote(0, 0.2, new HiHatInstrumentOld(masterVol, velocity));
-  }
-  
-  // クローズハイハットver2を鳴らす関数
+  // クローズハイハット
   void PlayHiHat(float masterVol, float velocity) {
     out.playNote(0, 0.15, new HiHatInstrument(masterVol, velocity));
   }
   
   
-  
-  
-  
-  
-  
+  // ホルン
   void PlayHorn(float midiNote, float duration, float startVel, float endVel, float masterVol) {
     out.playNote(0.0f, duration, 
       new HornInstrument(midiNote, duration, startVel, endVel, masterVol));
   }
+  
+  // トランペット
   void PlayTrumpet(float midiNote, float duration, float startVel, float endVel, float masterVol) {
     out.playNote(0.0f, duration, 
       new TrumpetInstrument(midiNote, duration, startVel, endVel, masterVol));
   }
-  
-  //void PlayCymbal(float masterVol, float velocity) {
-  //  out.playNote(0, 0.2, new CymbalInstrument(masterVol, velocity));
-  //}
 }
 \end{lstlisting}
 
@@ -1488,6 +1117,8 @@ long GetInterval (int playBPM) {
 
 
 void SoundPlay() {
+  
+  // 楽譜の読み取りをスキップしたり戻ったりする
   if (tick == returnTick[returnIndex][0]) {
     tick = returnTick[returnIndex][1];
     noteIndex = returnTick[returnIndex][2];
@@ -1495,15 +1126,15 @@ void SoundPlay() {
     if (returnIndex == returnTick.length) returnIndex = 0;
   }
   
+  // 楽譜データを参照して発音する音符があれば音を鳴らす
   if (noteIndex < Note.length) {
-    //long a = System.nanoTime();
-    float durationTuning = interval / 1000000000.0f;
+    float durationTuning = interval / 1000000000.0f; // tickから秒への変換
     while (Note[noteIndex][0] == tick) {
       float duration = float(Note[noteIndex][1]) * durationTuning;
       float pitch = float(Note[noteIndex][2]);
       float startVelocity = float(Note[noteIndex][3]);
-      float endVelocity = float(Note[noteIndex][4]);          //startVelocity=127; endVelocity=127;
-      float type = (Note[noteIndex].length == 6) ? float(Note[noteIndex][5]) : 0;
+      float endVelocity = float(Note[noteIndex][4]);
+      float type = (Note[noteIndex].length == 6) ? float(Note[noteIndex][5]) : 0; // typeがない楽譜データにも対応
       switch (timbre) {
         case "Flute": case "Flute2":
           player.PlayFlute(pitch, duration, startVelocity, endVelocity, 1.0f);
@@ -1517,10 +1148,8 @@ void SoundPlay() {
           else if (type == 2) player.PlayHorn(pitch, duration, startVelocity, endVelocity, 1.0f);
           break;
         case "Drum":
-          int a = int(pitch) % 12;
+          int a = int(pitch) % 12; // MIDIノートからドラム種類を判別
           if      (a == 0) player.PlayKick(1.0f, startVelocity);
-          //else if (a == 1) player.PlaySnareOld(1.0f, startVelocity);
-          //else if (a == 2) player.PlayHiHatOld(1.0f, startVelocity);
           else if (a == 3) player.PlaySnare(1.0f, startVelocity, endVelocity);
           else if (a == 4) player.PlayHiHat(1.0f, startVelocity);
           break;
@@ -1536,7 +1165,6 @@ void SoundPlay() {
       noteIndex ++;
       if (noteIndex == Note.length) break;
     }
-    //println(System.nanoTime() - a);
   }
 }
 
@@ -1545,169 +1173,48 @@ void SoundPlay() {
 
 
 int[][] Note = {
-// ドラム用楽譜（setupでの上書きをコメント文にすれば演奏可能）
+// （setupでの上書きをコメント文にすれば演奏可能）
 
 
   // 【1小節目】
-  {0, 96, 72, 96, 96, 0}, // [0] C5
+  {0, 480, 60, 96, 96, 0}, // [0] C4
 
-  // 【3小節目】
-  {192, 96, 74, 96, 96, 0}, // [1] D5
-
-  // 【5小節目】
-  {384, 96, 76, 96, 96, 0}, // [2] E5
-
-  // 【7小節目】
-  {576, 96, 77, 96, 96, 0}, // [3] F5
-
-  // 【9小節目】
-  {768, 96, 79, 96, 96, 0}, // [4] G5
+  // 【6小節目】
+  {480, 480, 62, 96, 96, 0}, // [1] D4
 
   // 【11小節目】
-  {960, 96, 81, 96, 96, 0}, // [5] A5
+  {960, 480, 64, 96, 96, 0}, // [2] E4
 
-  // 【13小節目】
-  {1152, 96, 83, 96, 96, 0}, // [6] B5
+  // 【16小節目】
+  {1440, 480, 65, 96, 96, 0}, // [3] F4
+
+  // 【21小節目】
+  {1920, 480, 67, 96, 96, 0}, // [4] G4
+
+  // 【26小節目】
+  {2400, 480, 69, 96, 96, 0}, // [5] A4
+
+  // 【31小節目】
+  {2880, 480, 71, 96, 96, 0}, // [6] B4
+
 
 };
-
-
-
-
-
-// int[][] Note;
 \end{lstlisting}
 
 \subsection{AddEffect.pde}
 \begin{lstlisting}[caption={AddEffect.pde}, label={lst:proc_addeffect}]
-/*import ddf.minim.AudioEffect;
-
-// 講義の「たたみ込み積分」をそのまま再現した自作エフェクトクラス
-class SimpleConvolutionEffect implements AudioEffect {
-  float[] impulseResponse; // h(τ) に相当するインパルス応答データ
-  float[] historyBuffer;   // 過去の音を記憶しておくバッファ
-  int bufferIndex = 0;
-  int kernelSize;          // ★過去の音をどれくらい参照するか（サンプル数）
-
-  SimpleConvolutionEffect(int size, float levrl) {
-    this.kernelSize = size;
-    impulseResponse = new float[kernelSize];
-    historyBuffer = new float[kernelSize];
-    
-    // 簡易的なインパルス応答を自動生成（指数関数的に減衰するノイズ ＝ 擬似的な部屋の響き）
-    for (int i = 0; i < kernelSize; i++) {
-      float decay = exp(-3.8f * i / kernelSize); // 過去にいくほど音が小さくなる重み
-      impulseResponse[i] = random(-1.0f, 1.0f) * decay * levrl; // 響きの強さを調整
-    }
-  }
-
-  // モノラル信号（現在のシステム）にリアルタイムでたたみ込み演算を行う関数
-  void process(float[] signal) {
-    for (int i = 0; i < signal.length; i++) {
-      float input = signal[i];
-      
-      // 1. 最新の入力を過去の記憶バッファに格納
-      historyBuffer[bufferIndex] = input;
-      
-      // 2. たたみ込み積分の計算（スライドの数式の再現）
-      float output = 0;
-      for (int j = 0; j < kernelSize; j++) {
-        // 過去へ遡るインデックスを計算
-        int idx = (bufferIndex - j + kernelSize) % kernelSize;
-        output += historyBuffer[idx] * impulseResponse[j];
-      }
-      
-      // 3. 元のクリーンな音に、生成された反響音を混ぜて出力
-      signal[i] = input + output;
-      
-      // 4. 記憶バッファの書き込み位置を1つ進める
-      bufferIndex = (bufferIndex + 1) % kernelSize;
-    }
-  }
-
-  // ステレオ用（Minimの仕様上必要ですが、中身はモノラル処理を両チャンネルに適用）
-  void process(float[] left, float[] right) {
-    process(left);
-    process(right);
-  }
-}
-
-*/
-
-
-
-
-
-/*
-// Minimの最新推奨規格「UGen」に従って生まれ変わった反響音クラス
-class SimpleConvolutionUGen extends UGen {
-  // 前のミキサー（stringsBus）から流れてくる音声信号を受け取るための「ポート（入り口）」
-  public UGenInput audio;
-  
-  float[] impulseResponse; // h(τ) に相当するインパルス応答データ
-  float[] historyBuffer;   // 過去の音を記憶しておくバッファ
-  int bufferIndex = 0;
-  int kernelSize;          // 過去の音をどれくらい参照するか（サンプル数）
-
-  SimpleConvolutionUGen(int size, float level) {
-    // 入力ポートを初期化
-    audio = new UGenInput(InputType.AUDIO);
-    
-    this.kernelSize = size;
-    impulseResponse = new float[kernelSize];
-    historyBuffer = new float[kernelSize];
-    
-    // 簡易的なインパルス応答を自動生成（指数関数的に減衰する部屋の響き）
-    for (int i = 0; i < kernelSize; i++) {
-      float decay = exp(-3.8f * i / kernelSize);
-      impulseResponse[i] = random(-1.0f, 1.0f) * decay * level;
-    }
-  }
-
-  // UGenの心臓部：Minimが音声を1サンプル処理するたびに自動で呼び出される関数
-  protected void uGenerate(float[] channels) {
-    // 1. 直前のミキサー（stringsBus）から流れてきた「現在の入力音」を1サンプル取得
-    float input = audio.getLastValue();
-    
-    // 2. 最新の入力を過去の記憶バッファに格納
-    historyBuffer[bufferIndex] = input;
-    
-    // 3. たたみ込み積分の計算（講義スライドの数式の完全再現）
-    float output = 0;
-    for (int j = 0; j < kernelSize; j++) {
-      int idx = (bufferIndex - j + kernelSize) % kernelSize;
-      output += historyBuffer[idx] * impulseResponse[j];
-    }
-    
-    // 4. 記憶バッファの書き込み位置を1つ進める
-    bufferIndex = (bufferIndex + 1) % kernelSize;
-    
-    // 5. 元の音に反響音を足し合わせる
-    float finalOutput = input + output;
-    
-    // 6. 出力先へ音を流し込む（ループにすることでモノラル・ステレオどちらにも自動対応！）
-    for (int i = 0; i < channels.length; i++) {
-      channels[i] = finalOutput;
-    }
-  }
-}*/
-
-
-
-
-
-
-// Minimの最新推奨規格「UGen」に従って生まれ変わった反響音クラス（完全ステレオ対応版）
+// ==========================================
+// 空間反響音（リバーブ）を生成するクラス
+// ==========================================
 class AddReverb extends UGen {
   public UGenInput audio;
   
   float[] impulseResponse;
   
-  // ★改造ポイント1：記憶バッファを左右の耳で完全に独立させる
+  // 左右ごとの記憶バッファ
   float[] historyBufferL;
   float[] historyBufferR;
   
-  // UGenの uGenerate は1サンプルフレーム（左右同時）ごとに呼ばれるため、時間は共通（1つ）でOK
   int bufferIndex = 0;
   int kernelSize;
 
@@ -1726,19 +1233,18 @@ class AddReverb extends UGen {
     }
   }
 
-  // UGenの心臓部
+  // 音声の1サンプルフレームごとに呼び出される処理
   protected void uGenerate(float[] channels) {
-    // ★改造ポイント2：入力音を「配列」として取得し、左右の音を別々に取り出す
+    // 入力音を「配列」として取得し、左右の音を別々に取り出す
     float[] inputs = audio.getLastValues();
     float inL = inputs[0]; 
-    // もし入力がモノラル（1ch）だった場合は、右耳用にも左と同じ音を入れるセーフティガード
-    float inR = (inputs.length > 1) ? inputs[1] : inL;
+    float inR = (inputs.length > 1) ? inputs[1] : inL; // モノラル時はL/R共通化
     
     // 最新の入力を左右それぞれの記憶バッファに格納
     historyBufferL[bufferIndex] = inL;
     historyBufferR[bufferIndex] = inR;
     
-    // ★改造ポイント3：たたみ込み積分の計算を、左右独立して行う
+    // たたみ込み積分の計算
     float outL = 0;
     float outR = 0;
     for (int j = 0; j < kernelSize; j++) {
@@ -1750,14 +1256,12 @@ class AddReverb extends UGen {
     // 記憶バッファの書き込み位置を1つ進める（左右共通の時間が進む）
     bufferIndex = (bufferIndex + 1) % kernelSize;
     
-    // ★改造ポイント4：出力先（channels）がモノラルかステレオかで安全に音を振り分ける
+    // 結果を出力先のチャンネルに合成
     if (channels.length == 1) {
-      // 出力先がモノラルの場合
-      channels[0] = inL + outL;
+      channels[0] = inL + outL; // モノラルの出力
     } else if (channels.length >= 2) {
-      // 出力先がステレオの場合
-      channels[0] = inL + outL; // 左チャンネルの出力
-      channels[1] = inR + outR; // 右チャンネルの出力
+      channels[0] = inL + outL; // 左の出力
+      channels[1] = inR + outR; // 右の出力
     }
   }
 }
@@ -1766,145 +1270,45 @@ class AddReverb extends UGen {
 \subsection{Flute.pde}
 \begin{lstlisting}[caption={Flute.pde}, label={lst:proc_flute}]
 // ==========================================
-// トリル専用 LFOウェーブテーブル（台形波）の生成と保持
+// フルート（Flute）のクラス
 // ==========================================
-Wavetable trillWave = CreateTrapezoidWave();
-
-// 台形波（角の丸いパルス波）を生成して返す関数
-Wavetable CreateTrapezoidWave() {
-  int waveSize = 1024; // 波形の解像度
-  float[] waveData = new float[waveSize];
-  
-  // 傾斜（スロープ）の幅を設定。
-  // 全体の何%を「移動時間」に使うか。例えば 0.15 なら 15% がスロープ、85%が平らな部分になる。
-  float slopeRatio = 0.5f;
-  // この数値を 0.05（より矩形波に近い、素早い指の動き）や 0.3（もったりとしたゆっくりな指の動き）に変更することで
-  // トリルの「ニュアンス（奏者の癖）」までプログラミングできるようになる。
-  
-  for (int i = 0; i < waveSize; i++) {
-    float phase = (float)i / waveSize; // 1周期を -1.0 〜 +1.0 の間で描く
-    
-    if (phase < 0.5f) { // 前半（高い音に向かう部分）
-      float localPhase = phase / 0.5f; // 0.0 〜 1.0 に正規化
-      if (localPhase < slopeRatio) {
-        // 立ち上がりのスロープ（-1.0 から +1.0 へ滑らかに移動）
-        // smoothstep関数(3x^2 - 2x^3)を使って、S字カーブを描いてより滑らかにする
-        float t = localPhase / slopeRatio;
-        waveData[i] = -1.0f + 2.0f * (3*t*t - 2*t*t*t); // smoothstep
-      } else {
-        // 平らな部分（高い音を維持）
-        waveData[i] = 1.0f;
-      }
-    
-    } else {
-      // 後半（低い音に戻る部分）
-      float localPhase = (phase - 0.5f) / 0.5f; // 0.0 〜 1.0 に正規化
-      if (localPhase < slopeRatio) {
-        // 立ち下がりのスロープ（+1.0 から -1.0 へ滑らかに移動）
-        float t = localPhase / slopeRatio;
-        waveData[i] = 1.0f - 2.0f * (3*t*t - 2*t*t*t); // smoothstep
-      } else {
-        // 平らな部分（低い音を維持）
-        waveData[i] = -1.0f;
-      }
-    }
-  }
-  
-  return new Wavetable(waveData);
-}
-
-
-
-
-
-
-
-
-
-
-
-
 class FluteInstrument implements Instrument {
-  byte numHarmonics/* = 15*/;
+  byte numHarmonics;
   
   ADSR masterEnv;
-  ADSR[] harmonicEnvs/* = new ADSR[numHarmonics]*/;
+  ADSR[] harmonicEnvs;
   
-  Line[] wobbleLines;    // 6/12【追加】倍音ウナリ（AM）用のフェードライン
-  float[] wobbleFactors; // 6/12【追加】倍音ごとの固有ウナリ比率の保持用
+  Line[] wobbleLines;
+  float[] wobbleFactors;
   
-  Line[] ampLines/* = new Line[numHarmonics]*/;
-  float[] startAmps/* = new float[numHarmonics]*/;
-  float[] endAmps/* = new float[numHarmonics]*/;
+  Line[] ampLines;
+  float[] startAmps;
+  float[] endAmps;
   
   ADSR breathEnv;
-  
-  
-  // ==========================================
-  // 【新規追加】 持続する空気の渦と管の共鳴（サブハーモニクス層）
-  // ==========================================
-  ADSR sustainEnv;
-  
-  // 【追加】持続ノイズの音量変化（クレッシェンド/デクレッシェンド）用
-  Line sustainAmpLine;
-  Line sustainWobbleLine; // 6/12【追加】持続ノイズのウナリ用のフェードライン
-  float startSustainVol;
-  float endSustainVol;
   
   
   
   FluteInstrument(float midiNote, float duration, float startVel, float endVel, float masterVol) {
     Summer mixer = new Summer();
     
-    //float masterAttackTime = 0.2f - constrain(startVel, 0, 127) / 127.0f * 0.15f;
     float masterAttackTime = 0.18f;
     masterAttackTime = min(masterAttackTime, duration - 0.1f);
     if (masterAttackTime < 0.035f) masterAttackTime = 0.035f;
     
-    // 【修正】masterEnv の一番最後の引数（リリース時間）を 0.3f から 0.4f に延ばす。
-    // 内部の音が 0.3秒 かけて完全に消え去るのを待ってから、安全にアンパッチさせるための余裕（バッファ）です。
-    // 【修正】masterEnv のリリース時間を、希望のフェードアウト時間（例：0.35秒）に設定
-    masterEnv = new ADSR(1.0f, masterAttackTime, 0.1f, 0.9f, 0.2f);
-    
+    masterEnv = new ADSR(1.0f, masterAttackTime, 0.1f, 0.9f, 0.18f);
     mixer.patch(masterEnv);
     
-    // ==========================================
-    // 【新規】トリル判定と実音の計算
-    // ==========================================
-    boolean isTrill = midiNote >= 128;
-    float actualMidiNote = isTrill ? midiNote - 128 : midiNote;
     
-    // 実音の周波数と、トリル先（全音上＝+2）の周波数
-    //float f0 = Frequency.ofMidiNote(actualMidiNote).asHz();
-    //float f0_trill = Frequency.ofMidiNote(actualMidiNote + 1).asHz(); // 半音トリルにしたい場合は +1 にする
-
-    // LUTの倍音プロファイル
-    // 10倍音、最低音59、LUT配列、フルートのパワー(1.4f)
-    //float[][] startProfile = utils.GetDynamicProfile( actualMidiNote, startVel, "Flute", 59, 1.3f);
-    //float[][] endProfile   = utils.GetDynamicProfile( actualMidiNote, endVel, "Flute", 59, 1.3f);
-    
-    //float volFactor = masterVol * 0.11f; 
-    
-    
-    //numHarmonics = (byte)startProfile.length;
-    // 【重要：NPE解決策】実際のデータ数に合わせて、動的に配列のメモリを確保する！
-    //harmonicEnvs = new ADSR[numHarmonics];
-    //ampLines     = new Line[numHarmonics];
-    //startAmps    = new float[numHarmonics];
-    //endAmps      = new float[numHarmonics];
-    
-    
-    // 変更6/12
-    // 1. 倍音レシピを安全に取り出すための基準ベロシティ（0除算・ロード不全の防止）
     float profileVel = (startVel > 0) ? startVel : endVel;
     if (profileVel <= 0) profileVel = 64.0f; // どちらも0の場合のセーフティ
     
-    // 2. 開始・終了のゲインファクターをフルートの特性（0.7乗カーブ）に基づいて独立計算
     float startGainFactor = pow(startVel / profileVel, 0.9f);
     float endGainFactor   = pow(endVel / profileVel, 0.9f);
     
-    // 安全にロードされた基準プロファイルを取得
-    float[][] startProfile = utils.GetDynamicProfile(actualMidiNote, profileVel, "Flute", 59, 1.3f);
+    // プロファイルを取得
+    float[][] startProfile = utils.GetDynamicProfile(midiNote, profileVel, "Flute", 59, 1.3f);
+    
     
     float volFactor = masterVol * 0.022f;
     
@@ -1912,248 +1316,78 @@ class FluteInstrument implements Instrument {
     
     harmonicEnvs  = new ADSR[numHarmonics];
     ampLines      = new Line[numHarmonics];
-    wobbleLines   = new Line[numHarmonics];    // 初期化を追加
-    wobbleFactors = new float[numHarmonics];   // 初期化を追加
+    wobbleLines   = new Line[numHarmonics];
+    wobbleFactors = new float[numHarmonics];
     startAmps     = new float[numHarmonics];
     endAmps       = new float[numHarmonics];
     
     
-    
-    
-    //float fundamentalFreq = 440.0 * pow(2.0, (actualMidiNote - 69) / 12.0);
     byte baseWaveNum = 0;
     for (byte i = 1; i < numHarmonics; i++) {
       if (startProfile[i-1][0] < startProfile[i][0]) baseWaveNum = i;
     }
     
     
-    // ==========================================
-    // 【新規】倍音ごとの自然な振幅揺らぎ（変動率ベース）
-    // ==========================================
-    // Pythonで解析した変動率(%)を参考に、基音の振幅に対して何倍の揺れ(±)を許容するかを設定。
-    // 実測データの変動率(%)から数式 [ Variation / 500 ] によって導出された、
-    // 倍音ごとの自然な振幅揺らぎ（AM変調）の深度設定。
-    float[] wobbleDepths = {0.1250f, 0.1616f, 0.2078f, 0.2340f, 0.2114f, 0.2742f, 0.3716f, 0.2946f, 0.7420f, 0.8796f, 
-                            0.7850f, 0.5070f, 0.6242f, 0.7654f, 0.6702f, 0.3898f, 0.8850f, 0.5942f, 0.3152f, 0.5030f};
+    // 倍音ごとの自然な振幅揺らぎ深度
+    float[] wobbleDepths = {0.1250f, 0.1616f, 0.2078f, 0.2340f, 0.2114f, 0.2742f, 0.3716f, 0.2946f, 0.7420f, 0.8796f, 0.7850f, 0.5070f, 0.6242f, 0.7654f, 0.6702f, 0.3898f, 0.8850f, 0.5942f, 0.3152f, 0.5030f};
     
-    // ==========================================
-    // 【新規】この音符全体の「呼吸のスピード」を決定
-    // forループの外で1つだけ定義し、全倍音で共有することで相殺を防ぐ
-    // ==========================================
-    float globalBreathSpeed = random(2.5f, 3.5f); // 生楽器の自然なビブラート周期
+    // 息遣い全体のスピード（全倍音で同期）
+    float globalBreathSpeed = random(2.5f, 3.5f);
     
     
     
-
-
-    // 1. 加算合成パート（7つのサイン波）
+    // --- 1. 加算合成パート ---
     for (int i = 0; i < numHarmonics; i++) {
-      /*
-      int h = i + 1;
-      // あなたがPythonで導き出した厳密なインハーモニシティ公式を適用
-      float B = 0.0005f; // インハーモニシティ係数
-      float inharmonicity = sqrt(1.0f + B * h * h);
-      float targetFreq = f0 * h * inharmonicity;
-      */
+      
       float targetFreq = startProfile[i][0];
       
       Oscil osc = new Oscil(targetFreq, 0.0f, Waves.SINE);
-      
-      // 【追加】初期位相を 0.0 〜 1.0 (0度〜360度) の間で完全にランダムに散らす
-      // これにより「カチッ」とした機械的なアタック音が消え、音割れ（ピーク）も防げる
       osc.setPhase(random(1.0f));
       
-      
-      //startAmps[i] = startProfile[i][1] * volFactor;
-      //endAmps[i] = endProfile[i] * volFactor;
-        // 聴覚特性（0.7乗）に完全同期させた、開始時から終了時への音量変化比率を算出
-        //float velRatio = pow(endVel / (startVel + 0.0001f), 0.7f);
-      // 【確定修正】すでにvolFactorが掛けられたstartAmpsに対して、正しいべき乗比率を乗算する
-      //endAmps[i]   = startAmps[i] * pow(endVel / (startVel + 0.0001f), 0.7f);
-      
-      // 6/12追加
-      // 独立した開始・終了音量を厳密に算出
+      // 開始・終了音量を算出
       float baseAmp = startProfile[i][1] * volFactor;
       startAmps[i] = baseAmp * startGainFactor;
       endAmps[i]   = baseAmp * endGainFactor;
       
+      // ① ビブラート（FM変調）
+      float vibDepthHz = targetFreq * 0.0015f; 
+      Oscil freqController = new Oscil(globalBreathSpeed, vibDepthHz/10, Waves.SINE);
+      freqController.offset.setLastValue(targetFreq); 
+      freqController.patch(osc.frequency);
       
-      // ==========================================
-      // 【修正】LFOをトリルとビブラートで分岐
-      // ==========================================
-      //if (isTrill) {
-      //  // トリル時の上限周波数
-      //  //float trillFreq = f0_trill * (i+1) * inharmonicity;
-      //  float trillFreq = targetFreq * pow(2.0f, 1.0f/12.0f);
-        
-      //  // 矩形波LFOの中心を2つの音の真ん中に置き、振幅を「差の半分」にする
-      //  float centerFreq = (targetFreq + trillFreq) / 2.0f;
-      //  float ampFreq = abs(trillFreq - targetFreq) / 2.0f;
-        
-      //  // 7.5Hzのスピードで生成したグローバル変数 trillWave を使って瞬間的に音を切り替える
-      //  Oscil freqController = new Oscil(6.5f, ampFreq, trillWave);
-      //  freqController.offset.setLastValue(centerFreq);
-        
-      //  // トリル時のみ、オシレーターの周波数にLFOを接続する
-      //  freqController.patch(osc.frequency);
-        
-      //  wobbleLines[i] = null;   // トリル時はAM不要のため安全ガード
-      //  wobbleFactors[i] = 0.0f;
-        
-      //} else {
-        // 通常のビブラート（サイン波）
-        
-        // ==========================================
-        // ① 極小のピッチ揺れ (FM変調) の復活
-        // 以前の0.0132fを「0.003f」に激減させ、音痴にならない程度の「空気の揺らぎ」を作る
-        // ==========================================
-        float vibDepthHz = targetFreq * 0.0015f; 
-        Oscil freqController = new Oscil(globalBreathSpeed, vibDepthHz/10, Waves.SINE);
-        freqController.offset.setLastValue(targetFreq); 
-        freqController.patch(osc.frequency);
-        
-        // ==========================================
-        // ② 呼吸に同期した音量揺らぎ (AM変調)
-        // ==========================================
-        // この倍音の基準音量に対して、配列で設定した割合だけ揺らす
-        //float wobbleAmp = startAmps[i] * wobbleDepths[i]; 
-        //float wobbleAmp = startAmps[i] * random(0.1f, 0.3f);
-        
-        // 1.5Hz 〜 3.5Hz の間で、倍音ごとにランダムなスピードで揺らす
-        // 【修正】ランダムではなく、統一された globalBreathSpeed を使う！
-        //Oscil ampLFO = new Oscil(globalBreathSpeed, wobbleAmp, Waves.SINE);
-        
-        // 位相（スタート位置）は少しだけバラけさせると、音が立体的になります
-        //ampLFO.setPhase(random(1.0f)); 
-        
-        // ampLFOを osc.amplitude にパッチ(追加)する。
-        // Minimでは複数のUGenを同じ入力にパッチすると「加算(Sum)」されるため、
-        // ampLines の基準値に対して、ampLFO が ±wobbleAmp の揺れを足し引きしてくれます。
-        //ampLFO.patch(osc.amplitude);
-        
-        // --- 音量揺らぎ（AM変調）のフェード構造化 ---
-        wobbleFactors[i] = random(0.1f, 0.2f); 
-        wobbleFactors[i] = wobbleDepths[i]; 
-        wobbleLines[i] = new Line();
-        Oscil ampLFO = new Oscil(globalBreathSpeed, 0.0f, Waves.SINE); // 初期振幅は0
-        ampLFO.setPhase(random(1.0f)); 
-        
-        wobbleLines[i].patch(ampLFO.amplitude); // 新設LineをLFOの振幅へ接続
-        ampLFO.patch(osc.amplitude);
-      //}
+      // ② 音量揺らぎ (AM変調)
+      wobbleFactors[i] = random(0.1f, 0.2f); 
+      wobbleFactors[i] = wobbleDepths[i]; 
+      wobbleLines[i] = new Line();
+      Oscil ampLFO = new Oscil(globalBreathSpeed, 0.0f, Waves.SINE);
+      ampLFO.setPhase(random(1.0f));
+      wobbleLines[i].patch(ampLFO.amplitude);
+      ampLFO.patch(osc.amplitude);
       
       ampLines[i] = new Line();
       ampLines[i].patch(osc.amplitude); 
       
-      float attackTime = (i == baseWaveNum) ? 0.058f : 0.395f; 
-      
-      // 【修正】内部のサイン波のリリースを 0.3f から 10.0f（10秒）にして、急激な角を作らせない
+      float attackTime = (i == baseWaveNum) ? 0.058f : 0.395f;
       harmonicEnvs[i] = new ADSR(1.0f, attackTime/3, 1.0f, 0.7f, 10.0f);
       osc.patch(harmonicEnvs[i]);
       harmonicEnvs[i].patch(mixer);
     }
     
     
-    
-    // ==========================================
-    // 2. 息のノイズ（Chiff）パートの実測値アップデート
-    // =========================================
-    // 0.0〜1.0 のベロシティ割合を計算（ノイズの音量調整用）
+    // --- 2. 息のノイズパート ---
     float startNorm = constrain(startVel, 0, 127) / 127.0f;
-    
-    // 中低音の破裂音（ドスッという音）になるため、少しだけ音量を上げます（0.01f -> 0.02f）
     float attackNoiseVol = masterVol * 0.008f * pow(startNorm, 0.9f); 
     Noise breathNoise = new Noise(attackNoiseVol, Noise.Tint.WHITE);
     
-    // 【修正】ハイパス(HP)からバンドパス(BP)に変更。
-    // 3500Hz付近の「シュッ」という音だけを残し、耳障りな高音を削る。
-    // 【修正】実測データに基づき、3500Hzから 581.4Hz に変更！
-    // 473Hzの山も一緒に拾うため、レゾナンスを 0.3 から 0.15 に下げて帯域を広げる
     MoogFilter breathFilter = new MoogFilter(581.4f, 0.15f);
     breathFilter.type = MoogFilter.Type.BP;
     
     breathEnv = new ADSR(1.0f, 0.001f, 0.2f, 0.0f, 0.0f);
     
-    breathNoise.patch(breathFilter);
-    breathFilter.patch(breathEnv);
-    breathEnv.patch(mixer);
-    
-    
-    /*
-    // ==========================================
-    // 3. 【新規追加】持続する空気の渦と管の共鳴（サブハーモニクス層）
-    // ==========================================
-    float endNorm = constrain(endVel, 0, 127) / 127.0f; // 【追加】終了時のベロシティ割合
-    
-    // 【修正】開始時と終了時のノイズ音量を計算して保持する
-    startSustainVol = masterVol * 0.005f * pow(startNorm, 0.9f);
-    endSustainVol   = masterVol * 0.005f * pow(endNorm, 0.9f);
-    
-    // ピンクノイズで低音の「フオォォ」という空気感を出す
-    // 【修正】Noiseの初期音量は0.0fにし、音量制御はLineに任せる
-    Noise sustainNoise = new Noise(0.0f, Noise.Tint.PINK);
-    
-    // 【追加】持続ノイズのボリュームつまみにLineを接続
-    sustainAmpLine = new Line();
-    sustainAmpLine.patch(sustainNoise.amplitude);
-    
-    // ==========================================
-    // 【新規】持続ノイズ自体にも「息の乱れ」を適用する
-    // サイン波の第1倍音と同等のスピードと深さでノイズを揺らす
-    // ==========================================
-    //float noiseWobbleAmp = startSustainVol * 0.20f; // 20%揺らす
-    //Oscil sustainWobble = new Oscil(random(1.5f, 3.0f), noiseWobbleAmp, Waves.SINE);
-    //sustainWobble.setPhase(random(1.0f));
-    //sustainWobble.patch(sustainNoise.amplitude); // Lineの音量にLFOの揺れを加算
-    // ==========================================
-    
-    // 6/12変更
-    // --- 持続ノイズの息の乱れも完全にフェードさせる ---
-    sustainWobbleLine = new Line();
-    Oscil sustainWobble = new Oscil(random(1.5f, 3.0f), 0.0f, Waves.SINE); // 初期振幅は0
-    sustainWobble.setPhase(random(1.0f));
-    
-    sustainWobbleLine.patch(sustainWobble.amplitude); // 新設LineをノイズLFOの振幅へ接続
-    sustainWobble.patch(sustainNoise.amplitude);      // LFO出力をノイズ振幅へ（加算）
-    
-    // ローパスフィルターで高音を削りつつ、2500Hz付近に共鳴(レゾナンス0.5)の山を作る
-    MoogFilter sustainFilter = new MoogFilter(2500f, 0.5f);
-    sustainFilter.type = MoogFilter.Type.LP;
-    
-    // 音が鳴っている間ずっと持続するエンベロープ（サイン波のアタックに合わせる）
-    // 【修正】持続ノイズのリリースも 0.3f から 10.0f（10秒）にする
-    sustainEnv = new ADSR(1.0f, 0.058f, 0.0f, 1.0f, 10.0f);
-    
-    sustainNoise.patch(sustainFilter);
-    sustainFilter.patch(sustainEnv);
-    sustainEnv.patch(mixer);
-    */
+    breathNoise.patch(breathFilter).patch(breathEnv).patch(mixer);
   }
   
   
-  /*
-  void noteOn(float dur) {
-    masterEnv.noteOn();
-    
-    // ====================================================
-    // 【修正】Lineの寿命に、リリース時間（0.4秒）分の猶予を足す！
-    // これにより、減衰中もLineが生き残り、オシレーターの音量が突然0.0fにリセットされるのを防ぐ
-    // ====================================================
-    // 【微調整】masterEnvのリリース時間(0.35f)より少し長ければOK
-    float safeDur = dur + 0.5f;
-    
-    for(int i=0; i<numHarmonics; i++) {
-      harmonicEnvs[i].noteOn();
-      ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
-    }
-    
-    breathEnv.noteOn();
-    sustainEnv.noteOn(); // 【追加】持続ノイズをオン
-    sustainAmpLine.activate(safeDur, startSustainVol, endSustainVol); // 【追加】発音と同時に、持続ノイズの音量変化をスタートさせる
-    
-    masterEnv.patch(out); 
-  }*/
-  // 6/12変更
   void noteOn(float dur) {
     masterEnv.noteOn();
     float safeDur = dur + 0.5f;
@@ -2161,10 +1395,8 @@ class FluteInstrument implements Instrument {
     for(int i = 0; i < numHarmonics; i++) {
       harmonicEnvs[i].noteOn();
       
-      // 1. 各倍音のベース音量をフェード
       ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
       
-      // 2. 通常ビブラート時のみ、ウナリ（AM）の深さも比例フェードさせる
       if (wobbleLines[i] != null) {
         float factor = wobbleFactors[i];
         wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
@@ -2172,11 +1404,6 @@ class FluteInstrument implements Instrument {
     }
     
     breathEnv.noteOn();
-    //sustainEnv.noteOn(); 
-    
-    // 3. 持続ノイズの全体音量と、そのウナリの深さを同時に追従フェード
-    //sustainAmpLine.activate(safeDur, startSustainVol, endSustainVol); 
-    //sustainWobbleLine.activate(safeDur, startSustainVol * 0.20f, endSustainVol * 0.20f); 
     
     masterEnv.patch(longOut); 
   }
@@ -2185,12 +1412,9 @@ class FluteInstrument implements Instrument {
   
   void noteOff() {
     masterEnv.noteOff();
+    
     for(int i=0; i<numHarmonics; i++) harmonicEnvs[i].noteOff();
     
-    // 【削除】breathEnv は既に無音なので noteOff を呼ばない（空撃ちグリッチ防止）
-    // breathEnv.noteOff();
-    
-    //sustainEnv.noteOff(); // 【追加】持続ノイズをオフ
     masterEnv.unpatchAfterRelease(longOut); 
   }
 }
@@ -2198,31 +1422,16 @@ class FluteInstrument implements Instrument {
 
 \subsection{Strings.pde}
 \begin{lstlisting}[caption={Strings.pde}, label={lst:proc_strings}]
-import java.util.Arrays;
-import java.util.Comparator;
-
 // ==========================================
-// 究極のストリングス・インストゥルメント (ビブラート数式モデル実装版)
+// ストリングス（Strings）のクラス
+// （ヴァイオリン・ビオラ・チェロ・コントラバス）
 // ==========================================
 class StringsInstrument implements Instrument {
-  //byte numHarmonics = 30;
-  //Summer mixer;
+  
   ADSR masterEnv; 
-  //ADSR[] harmonicEnvs = new ADSR[numHarmonics];
   
-  /*
-  Line[] ampLines = new Line[numHarmonics];
-  float[] startAmps = new float[numHarmonics];
-  float[] endAmps = new float[numHarmonics];
+  byte maxTotalOscils = 40;
   
-  // ビブラートの深さをコントロールするためのLine
-  Line[] vibDepthLines = new Line[numHarmonics];
-  float[] targetVibDepths = new float[numHarmonics]; // 各倍音の最終的な揺れ幅(Hz)を保存
-  */
-  
-  // クラス上部のメンバー変数宣言部分の修正
-  byte maxTotalOscils = 40; // クロスフェード時に2つの楽器が混ざるため、多めに確保
-  Oscil[] oscils = new Oscil[maxTotalOscils];
   Line[] ampLines = new Line[maxTotalOscils];
   Line[] vibDepthLines = new Line[maxTotalOscils];
   
@@ -2230,27 +1439,16 @@ class StringsInstrument implements Instrument {
   float[] endAmps = new float[maxTotalOscils];
   float[] targetVibDepths = new float[maxTotalOscils];
   
-  byte totalActiveOscils = 0; // 今回の音で実際に生成されたオシレーターの総数
+  byte totalActiveOscils = 0;
   
-  Line[] wobbleLines = new Line[maxTotalOscils]; // 【新規追加】ウナリのフェード用ライン 6/12
+  Line[] wobbleLines = new Line[maxTotalOscils];
   
-  //Noise biteNoise;
-  //MoogFilter biteFilter;
-  //ADSR biteEnv;
-  //ADSR hissEnv;
   
-  //Noise hissNoise;
-  //MoogFilter hissFilter;
-  //Line hissAmpLine;
-  //Oscil hissWobble;
-  //float startHissVol, endHissVol;
   
   StringsInstrument(float midiNote, float duration, float startVel, float endVel, float masterVol) {
     Summer mixer = new Summer();
     
-    // =========================================================
-    // 6/13【新設計】音符の長さに応じた動的アタックエンベロープ
-    // =========================================================
+    // 音符の長さに応じた動的アタック（弓を弾くスピード）
     float attackTime = 0.3f - constrain(startVel, 0, 127) / 127.0f * 0.25f;
     attackTime = min(attackTime, duration - 0.1f);
     if (attackTime < 0.035f) attackTime = 0.035f;
@@ -2259,220 +1457,20 @@ class StringsInstrument implements Instrument {
     masterEnv = new ADSR(1.0f, attackTime, 0.5f, 0.9f, 0.12f);
     mixer.patch(masterEnv); 
     
-    //float f0 = Frequency.ofMidiNote(midiNote).asHz();
     float volFactor = masterVol * 0.020f; 
     
-    //float startNorm = constrain(startVel, 0, 127) / 127.0f;
-    //float endNorm   = constrain(endVel, 0, 127) / 127.0f;
     
     
-    // =========================================================
-    // 【データ分析から導いた数式①】ビブラートスピード
-    // 低音(G3=55)はゆっくり、高音(E7=100)は速く。さらに人間らしいランダムな揺らぎを付加。
-    // =========================================================
+    // --- 自然なビブラートの数式 ---
     float baseVibSpeed = map(midiNote, 48, 100, 5.2f, 6.5f);
     float globalVibSpeed = baseVibSpeed + random(-0.2f, 0.2f);
     
-    // =========================================================
-    // 【データ分析から導いた数式②】ビブラートの深さ（Cents）
-    // 低音は浅く(±10cents)、高音は深く(±25cents)揺れる。異常な暴走はここでカットされる。
-    // =========================================================
     float fmDepthCents = map(midiNote, 48, 100, 10.0f, 20.0f) * random(0.9f, 1.0f) * 0.2f;
     
     
-    /*
-    // =========================================================
-    // 【クロスフェード処理】オーケストラ・ストリングスの4Wayブレンド
-    // =========================================================
-    
-    // コントラバス：最低音 C1 (MIDI 24)
-    float[][] bassStart   = utils.GetDynamicProfile(midiNote, startVel, "Bass", 24, 0.9f);
-    float[][] bassEnd     = utils.GetDynamicProfile(midiNote, endVel, "Bass", 24, 0.9f);
-
-    // チェロ：最低音 C2 (MIDI 36)
-    float[][] celloStart  = utils.GetDynamicProfile(midiNote, startVel, "Cello", 36, 0.9f);
-    float[][] celloEnd    = utils.GetDynamicProfile(midiNote, endVel, "Cello", 36, 0.9f);
-    
-    // ビオラ：最低音 C3 (MIDI 48)
-    float[][] violaStart  = utils.GetDynamicProfile(midiNote, startVel, "Viola", 48, 0.9f);
-    float[][] violaEnd    = utils.GetDynamicProfile(midiNote, endVel, "Viola", 48, 0.9f);
-    
-    // バイオリン：最低音 G3 (MIDI 55)
-    float[][] violinStart = utils.GetDynamicProfile(midiNote, startVel, "Violin", 55, 0.9f);
-    float[][] violinEnd   = utils.GetDynamicProfile(midiNote, endVel, "Violin", 55, 0.9f);
-    
-    float[] startProfile = new float[numHarmonics];
-    float[] endProfile = new float[numHarmonics];
-    
-    // ---------------------------------------------------------
-    // ベースとなるブレンド割合の計算 (合計が必ず1.0になるように分配)
-    // ---------------------------------------------------------
-    float baseBassRatio = 0.0f;
-    float baseCelloRatio = 0.0f;
-    float baseViolaRatio = 0.0f;
-    float baseViolinRatio = 0.0f;
-    
-    if (midiNote <= 36) {
-      // C2(36) 以下はコントラバスの独壇場
-      baseBassRatio = 1.0f;
-    } else if (midiNote <= 48) {
-      // C2(36) 〜 C3(48) : コントラバスからチェロへ滑らかにクロスフェード
-      baseBassRatio = map(midiNote, 36, 48, 1.0f, 0.0f);
-      baseCelloRatio = 1.0f - baseBassRatio;
-    } else if (midiNote <= 60) {
-      // C3(48) 〜 C4(60) : チェロからビオラへ滑らかにクロスフェード
-      baseCelloRatio = map(midiNote, 48, 60, 1.0f, 0.0f);
-      baseViolaRatio = 1.0f - baseCelloRatio;
-    } else if (midiNote <= 72) {
-      // C4(60) 〜 C5(d) : ビオラからバイオリンへ滑らかにクロスフェード
-      baseViolaRatio = map(midiNote, 60, 72, 1.0f, 0.0f);
-      baseViolinRatio = 1.0f - baseViolaRatio;
-    } else {
-      // C5(72) 以上はバイオリンの独壇場
-      baseViolinRatio = 1.0f;
-    }
-    
-    float bassBlendStart = baseBassRatio, bassBlendEnd = baseBassRatio;
-    float celloBlendStart = baseCelloRatio, celloBlendEnd = baseCelloRatio;
-    float violaBlendStart = baseViolaRatio, violaBlendEnd = baseViolaRatio;
-    float violinBlendStart = baseViolinRatio, violinBlendEnd = baseViolinRatio;
-    
-    // ---------------------------------------------------------
-    // 【特例パッチ】 D6(86) と D#6/Eb6(87) の波形破綻への対応
-    // mf(80)まではバイオリン本来の音色。そこからff(112)に向かってビオラを混ぜる
-    // ---------------------------------------------------------
-    if (midiNote == 86 || midiNote == 87) {
-      float threshMF = 80.0f / 127.0f;
-      float threshFF = 112.0f / 127.0f;
-      
-      if (startNorm > threshMF) {
-        float clampedStart = constrain(startNorm, threshMF, threshFF);
-        violinBlendStart = map(clampedStart, threshMF, threshFF, 1.0f, 0.3f);
-        violaBlendStart = 1.0f - violinBlendStart;
-      }
-      if (endNorm > threshMF) {
-        float clampedEnd = constrain(endNorm, threshMF, threshFF);
-        violinBlendEnd = map(clampedEnd, threshMF, threshFF, 1.0f, 0.3f);
-        violaBlendEnd = 1.0f - violinBlendEnd;
-      }
-      
-      bassBlendStart = 0.0f; bassBlendEnd = 0.0f;
-      celloBlendStart = 0.0f; celloBlendEnd = 0.0f;
-    }
-    // ---------------------------------------------------------
-    
-    // 4つの楽器のプロファイルを、計算した割合で混ぜ合わせる
-    for (int i = 0; i < numHarmonics; i++) {
-      startProfile[i] = (bassStart[i] * bassBlendStart) + (celloStart[i] * celloBlendStart) + (violaStart[i] * violaBlendStart) + (violinStart[i] * violinBlendStart);
-      endProfile[i]   = (bassEnd[i]   * bassBlendEnd)   + (celloEnd[i]   * celloBlendEnd)   + (violaEnd[i]   * violaBlendEnd)   + (violinEnd[i]   * violinBlendEnd);
-    }
-    // =========================================================
     
     
-    
-    // ==================================================
-    // 【インハーモニシティ係数(B)の動的計算セクション】
-    // ==================================================
-    
-    // 1. 各楽器の基準B係数（解析結果の中央値から設定）
-    float bBassBase   = 0.000070f;
-    float bCelloBase  = 0.000065f;
-    float bViolaBase  = 0.000055f;
-    float bViolinBase = 0.000052f;
-    
-    // 2. 各楽器の基準となる開放弦周波数（正規化用）
-    float fRefBass   = 32.7f;  // C1相当
-    float fRefCello  = 65.4f;  // C2相当
-    float fRefViola  = 130.8f; // C3相当
-    float fRefViolin = 196.0f; // G3相当
-    
-    // 3. 現在の楽器ブレンド状態に合わせた「基準B」と「基準周波数」を算出
-    float blendedBBase = (bBassBase * baseBassRatio) + (bCelloBase * baseCelloRatio) 
-                       + (bViolaBase * baseViolaRatio) + (bViolinBase * baseViolinRatio);
-                       
-    float blendedFRef  = (fRefBass * baseBassRatio) + (fRefCello * baseCelloRatio) 
-                       + (fRefViola * baseViolaRatio) + (fRefViolin * baseViolinRatio);
-    
-    // 4. 【核心】ピッチの2乗に比例してBを増幅させる（ハイポジション効果の再現）
-    // あなたの観察通り、C5(523Hz)において約0.00006になるようスケーリングされます
-    float B = blendedBBase * pow(f0 / blendedFRef, 2.0f);
-    
-    // 異常値ガード（物理的に破綻しない範囲に制限）
-    B = constrain(B, 0.00001f, 0.0005f);
-    
-    // ==================================================
-    
-    
-    
-    for (int i = 0; i < numHarmonics; i++) {
-      int h = i + 1;
-      // 動的に計算された B を適用
-      float inharmonicity = sqrt(1.0f + B * h * h);
-      float targetFreq = f0 * h * inharmonicity; 
-      
-      // 【改善】アンチエイリアス (20000Hz超えの倍音は、生成処理自体をストップしてCPUを節約)
-      if (targetFreq > 22050.0f) {
-        continue; // ここでループを抜け、これ以上高い倍音は作らない
-      }
-      
-      float finalStartAmp = startProfile[i] * volFactor;
-      float finalEndAmp = endProfile[i] * volFactor;
-      
-      // アンチエイリアス (20000Hz超えの強制ミュート)
-      //if (targetFreq > 20000.0f) {
-      //  finalStartAmp = 0.0f;
-      //  finalEndAmp = 0.0f;
-      //}
-      
-      Oscil osc = new Oscil(targetFreq, 0.0f, Waves.SINE);
-      osc.setPhase(0.0f); // ストリングスの核（エッジ）
-      
-      // =========================================================
-      // ピッチ揺れ (Delayed FM変調) の準備
-      // セント(Cents)を周波数(Hz)の揺れ幅に変換して配列に保存しておく
-      // =========================================================
-      float vibDepthRatio = pow(2.0f, fmDepthCents / 1200.0f) - 1.0f;
-      targetVibDepths[i] = targetFreq * vibDepthRatio; 
-      
-      // 揺れの深さをコントロールするLFO（最初は振幅0でスタート）
-      Oscil freqController = new Oscil(globalVibSpeed, 0.0f, Waves.SINE);
-      freqController.offset.setLastValue(targetFreq); 
-      freqController.patch(osc.frequency);
-      
-      // ビブラートの深さを0から目標値へ変化させるLine
-      vibDepthLines[i] = new Line();
-      vibDepthLines[i].patch(freqController.amplitude);
-      
-      // =========================================================
-      // 音量揺らぎ (AM変調) の適用
-      // 高次倍音ほど激しく揺れる（15%〜60%）
-      // =========================================================
-      startAmps[i] = finalStartAmp;
-      endAmps[i] = finalEndAmp;
-      
-      float wobbleDepth = map(i, 0, numHarmonics - 1, 0.15f, 0.60f);
-      float wobbleAmp = startAmps[i] * wobbleDepth; 
-      
-      Oscil ampLFO = new Oscil(globalVibSpeed, wobbleAmp, Waves.SINE);
-      ampLFO.setPhase(random(1.0f)); 
-      ampLFO.patch(osc.amplitude);
-      
-      ampLines[i] = new Line();
-      ampLines[i].patch(osc.amplitude); 
-      
-      //harmonicEnvs[i] = new ADSR(1.0f, 0.2f, 0.0f, 1.0f, 0.3f);
-      //osc.patch(harmonicEnvs[i]);
-      //harmonicEnvs[i].patch(mixer);
-      
-      // 【修正1】harmonicEnvsを削除し、純粋にミキサーへ送る
-      osc.patch(mixer);
-    }
-    */
-    
-    // =========================================================
-    // 【クロスフェード処理】オーケストラ・ストリングスの4Wayブレンド
-    // =========================================================
-    // 1. 各楽器のブレンド割合の計算 (合計が必ず1.0になるように分配)
+    // --- 楽器セクションのクロスフェード比率 ---
     float baseBassRatio = 0.0f;
     float baseCelloRatio = 0.0f;
     float baseViolaRatio = 0.0f;
@@ -2493,351 +1491,42 @@ class StringsInstrument implements Instrument {
       baseViolinRatio = 1.0f;
     }
     
-    //float bassBlend = baseBassRatio;
-    //float celloBlend = baseCelloRatio;
-    //float violaBlend = baseViolaRatio;
-    //float violinBlend = baseViolinRatio;
-    
-    float bassBlend = 0.0f;
-    float celloBlend = 0.0f;
-    float violaBlend = 0.0f;
-    float violinBlend = 1.0f;
-    
-    /*
-    // 【特例パッチ】 D6(86) と D#6/Eb6(87) の波形破綻への対応
-    if (midiNote == 86 || midiNote == 87) {
-      float threshMF = 80.0f / 127.0f;
-      float threshFF = 112.0f / 127.0f;
-      if (startNorm > threshMF) {
-        violinBlend = map(constrain(startNorm, threshMF, threshFF), threshMF, threshFF, 1.0f, 0.0f);
-        violaBlend = 1.0f - violinBlend;
-      }
-      bassBlend = 0.0f; celloBlend = 0.0f;
-    }
-    */
+    float bassBlend = baseBassRatio;
+    float celloBlend = baseCelloRatio;
+    float violaBlend = baseViolaRatio;
+    float violinBlend = baseViolinRatio;
     
     
-    /*
-    // ---------------------------------------------------------
-    // 2. 新設計：各楽器のプロファイルを「必要な分だけ」動的にオシレーター化して配置
-    // ---------------------------------------------------------
-    totalActiveOscils = 0; // カウンターリセット
     
-    // ループ処理を共通化するための構造化（内部用の一時クラスや処理の連続実行）
-    // 比率が 0.0 より大きい楽器だけを狙い撃ちしてオシレーターを生成する（安全装置・負荷対策）
     
-    if (bassBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, startVel, "Bass", 24, 0.9f);
-      createInstrumentOscillators(pStart, bassBlend, volFactor, globalVibSpeed, fmDepthCents, mixer);
-    }
-    if (celloBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, startVel, "Cello", 36, 0.9f);
-      createInstrumentOscillators(pStart, celloBlend, volFactor, globalVibSpeed, fmDepthCents, mixer);
-    }
-    if (violaBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, startVel, "Viola", 48, 0.9f);
-      createInstrumentOscillators(pStart, violaBlend, volFactor, globalVibSpeed, fmDepthCents, mixer);
-    }
-    if (violinBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, startVel, "Violin", 55, 0.9f);
-      createInstrumentOscillators(pStart, violinBlend, volFactor, globalVibSpeed, fmDepthCents, mixer);
-    }
-    */
-    /* 
-    // ---------------------------------------------------------
-    // 2. 改修版：各楽器のプロファイルを「動的な上限数」でオシレーター化
-    // ---------------------------------------------------------
-    // --- コンストラクタ下部：各楽器呼び出しの直前に追加 ---
-    //float velRatio = pow(endVel / (startVel + 0.0001f), 0.7f);
-    float velRatio = pow((endVel + 0.0001f) / (startVel + 0.0001f), 0.9f);
-    
-    totalActiveOscils = 0; // カウンターリセット
-    
-    if (bassBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, startVel, "Bass", 24, 0.9f);
-      // ユーザー様提案のルール：1.0未満（ブレンド時）なら20、単一なら30を上限とする
-      int maxPeaks = (bassBlend < 1.0f) ? 20 : 30;
-      createInstrumentOscillators(pStart, bassBlend, maxPeaks, volFactor, globalVibSpeed, fmDepthCents, mixer, velRatio);
-    }
-    
-    if (celloBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, startVel, "Cello", 36, 0.9f);
-      int maxPeaks = (celloBlend < 1.0f) ? 20 : 30;
-      createInstrumentOscillators(pStart, celloBlend, maxPeaks, volFactor, globalVibSpeed, fmDepthCents, mixer, velRatio);
-    }
-    
-    if (violaBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, startVel, "Viola", 48, 0.9f);
-      int maxPeaks = (violaBlend < 1.0f) ? 20 : 30;
-      createInstrumentOscillators(pStart, violaBlend, maxPeaks, volFactor, globalVibSpeed, fmDepthCents, mixer, velRatio);
-    }
-    
-    if (violinBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, startVel, "Violin", 55, 0.9f);
-      int maxPeaks = (violinBlend < 1.0f) ? 20 : 30;
-      createInstrumentOscillators(pStart, violinBlend, maxPeaks, volFactor, globalVibSpeed, fmDepthCents, mixer, velRatio);
-    }
-    */
-    
-    // 更新日6/12
-    // =========================================================
-    // 【新設計】開始・終了ベロシティから音量変化を正しくスケーリング
-    // =========================================================
-    // 1. 倍音レシピを安全に取り出すための基準ベロシティ（0除算・無音化の防止）
+    // 開始・終了時ベロシティによる音量変化
     float profileVel = (startVel > 0) ? startVel : endVel;
     if (profileVel <= 0) profileVel = 64.0f; // 両方0の場合の完全セーフティ
     
-    // 2. 開始時と終了時の実際の音量ゲインファクターを、0.9乗カーブに基づいて個別に計算
     float startGainFactor = pow(startVel / profileVel, 0.9f);
     float endGainFactor   = pow(endVel / profileVel, 0.9f);
     
-    // ---------------------------------------------------------
-    // 2. 各楽器のプロファイルを動的にオシレーター化して配置
-    // ---------------------------------------------------------
+    // 各楽器のプロファイルごとにオシレーター群を生成
     totalActiveOscils = 0; // カウンターリセット
+    // GetDynamicProfileにはプロファイル、createInstrumentOscillatorsにはファクターを渡す
+    if (bassBlend > 0.0f) createInstrumentOscillators(utils.GetDynamicProfile(midiNote, profileVel, "Bass", 24, 0.9f), bassBlend, (bassBlend < 1.0f) ? 20 : 30, volFactor, globalVibSpeed, fmDepthCents, mixer, startGainFactor, endGainFactor);
+    if (celloBlend > 0.0f) createInstrumentOscillators(utils.GetDynamicProfile(midiNote, profileVel, "Cello", 36, 0.9f), celloBlend, (celloBlend < 1.0f) ? 20 : 30, volFactor, globalVibSpeed, fmDepthCents, mixer, startGainFactor, endGainFactor);
+    if (violaBlend > 0.0f) createInstrumentOscillators(utils.GetDynamicProfile(midiNote, profileVel, "Viola", 48, 0.9f), violaBlend, (violaBlend < 1.0f) ? 20 : 30, volFactor, globalVibSpeed, fmDepthCents, mixer, startGainFactor, endGainFactor);
+    if (violinBlend > 0.0f) createInstrumentOscillators(utils.GetDynamicProfile(midiNote, profileVel, "Violin", 55, 0.9f), violinBlend, (violinBlend < 1.0f) ? 20 : 30, volFactor, globalVibSpeed, fmDepthCents, mixer, startGainFactor, endGainFactor);
     
-    if (bassBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, profileVel, "Bass", 24, 0.9f); // profileVelを渡す
-      int maxPeaks = (bassBlend < 1.0f) ? 20 : 30;
-      createInstrumentOscillators(pStart, bassBlend, maxPeaks, volFactor, globalVibSpeed, fmDepthCents, mixer, startGainFactor, endGainFactor); // ファクターを渡す
-    }
-    
-    if (celloBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, profileVel, "Cello", 36, 0.9f);
-      int maxPeaks = (celloBlend < 1.0f) ? 20 : 30;
-      createInstrumentOscillators(pStart, celloBlend, maxPeaks, volFactor, globalVibSpeed, fmDepthCents, mixer, startGainFactor, endGainFactor);
-    }
-    
-    if (violaBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, profileVel, "Viola", 48, 0.9f);
-      int maxPeaks = (violaBlend < 1.0f) ? 20 : 30;
-      createInstrumentOscillators(pStart, violaBlend, maxPeaks, volFactor, globalVibSpeed, fmDepthCents, mixer, startGainFactor, endGainFactor);
-    }
-    
-    if (violinBlend > 0.0f) {
-      float[][] pStart = utils.GetDynamicProfile(midiNote, profileVel, "Violin", 55, 0.9f);
-      int maxPeaks = (violinBlend < 1.0f) ? 20 : 30;
-      createInstrumentOscillators(pStart, violinBlend, maxPeaks, volFactor, globalVibSpeed, fmDepthCents, mixer, startGainFactor, endGainFactor);
-    }
-    
-    
-    /*
-    // =========================================================
-    // 【データ分析から導いた数式③】 摩擦ノイズ(Bite)の動的パラメータ
-    // =========================================================
-    // 1. 各楽器の基準値を設定（Python解析データより）
-    float biteCutoffBass   = 1150f;  float biteDecayBass   = 0.180f;
-    float biteCutoffCello  = 1840f;  float biteDecayCello  = 0.093f;
-    float biteCutoffViola  = 3280f;  float biteDecayViola  = 0.116f;
-    float biteCutoffViolin = 3370f;  float biteDecayViolin = 0.035f;
-
-    // 2. 現在の音階（クロスフェード割合）に合わせてパラメータをブレンド
-    float blendedBiteCutoff = (biteCutoffBass * baseBassRatio) + (biteCutoffCello * baseCelloRatio) 
-                            + (biteCutoffViola * baseViolaRatio) + (biteCutoffViolin * baseViolinRatio);
-                            
-    float blendedBiteDecay  = (biteDecayBass * baseBassRatio) + (biteDecayCello * baseCelloRatio) 
-                            + (biteDecayViola * baseViolaRatio) + (biteDecayViolin * baseViolinRatio);
-
-    // グラフの傾向（高音ほどノイズが短く・高くなる）を少し加味する微調整
-    // 基音(f0)が上がるにつれて、カットオフを少し上げ、ディケイを少し短くする
-    float pitchFactor = map(midiNote, 24, 84, 0.8f, 1.2f);
-    float finalBiteCutoff = constrain(blendedBiteCutoff * pitchFactor, 80f, 6000f);
-    float finalBiteDecay  = constrain(blendedBiteDecay / pitchFactor, 0.01f, 0.3f);
-
-
-    // --- 摩擦ノイズ層（Bite）の生成 ---
-    // アタックの強さ(ベロシティ)に応じてノイズ音量を変える
-    float biteVol = masterVol * 0.001f * startNorm; 
-    
-    Noise biteNoise = new Noise(biteVol, Noise.Tint.WHITE);
-    MoogFilter biteFilter = new MoogFilter(finalBiteCutoff, 0.2f); // 動的カットオフを適用
-    biteFilter.type = MoogFilter.Type.LP; 
-    
-    // Attackは固定(超短く)、Decayに動的パラメータを適用
-    biteEnv = new ADSR(1.0f, 0.1f, finalBiteDecay, 0.0f, 0.1f);
-    
-    biteNoise.patch(biteFilter);
-    biteFilter.patch(biteEnv);
-    // (biteEnvは直接outへ出すためmixerには繋がない)
-    */
-    
-    
-    /* 【持続ノイズHiss削除　6/12】
-    // --- 共鳴ノイズ層（Hiss） ---
-    startHissVol = masterVol * 0.001f * startNorm;
-    endHissVol   = masterVol * 0.001f * endNorm;
-    
-    Noise hissNoise = new Noise(0.0f, Noise.Tint.PINK);
-    hissAmpLine = new Line();
-    hissAmpLine.patch(hissNoise.amplitude);
-    
-    Oscil hissWobble = new Oscil(globalVibSpeed, startHissVol * 0.3f, Waves.SINE);
-    hissWobble.setPhase(random(1.0f));
-    hissWobble.patch(hissNoise.amplitude);
-    
-    MoogFilter hissFilter = new MoogFilter(1500f, 0.15f);
-    hissFilter.type = MoogFilter.Type.HP;
-    hissEnv = new ADSR(1.0f, 0.05f, 0.0f, 1.0f, 0.1f);
-    
-    hissNoise.patch(hissFilter);
-    hissFilter.patch(hissEnv); 
-    hissEnv.patch(mixer);
-    */
   }
   
-  /*
-  // 各楽器のピークデータをグローバルなオシレーター配列に安全に展開するヘルパー関数
-  private void createInstrumentOscillators(float[][] profile, float blendRatio, float volFactor, float globalVibSpeed, float fmDepthCents, Summer mixer) {
-    if (profile == null) return;
-    
-    byte numPeaks = (byte)profile.length;
-    for (byte h = 0; h < numPeaks; h++) {
-      // 安全装置：配列の上限を超えないようにガード
-      if (totalActiveOscils >= MAX_TOTAL_OSCILS) break;
-      
-      float targetFreq = profile[h][0]; // Pythonが実測した、非整数倍音が含まれる生の周波数
-      float rawAmp     = profile[h][1]; // 正規化された振幅
-      
-      // 20000Hz超えの超音波は生成をスキップしてCPUを徹底節約（アンチエイリアス）
-      if (targetFreq > 22050.0f) continue;
-      
-      // 【核心】元のスペクトル振幅に、全体のボリュームと「この楽器のブレンド比率」を掛け合わせる
-      float finalStartAmp = rawAmp * volFactor * blendRatio;
-      float finalEndAmp   = finalStartAmp * (endHissVol / (startHissVol + 0.0001f)); // 代案2の音量比率の維持
-      
-      int idx = totalActiveOscils;
-      startAmps[idx] = finalStartAmp;
-      endAmps[idx]   = finalEndAmp;
-      
-      // オシレーターとエンベロープの生成
-      oscils[idx] = new Oscil(targetFreq, 0.0f, Waves.SINE);
-      oscils[idx].setPhase(0.0f);
-      
-      // ビブラート（FM変調）の適用
-      float vibDepthRatio = pow(2.0f, fmDepthCents / 1200.0f) - 1.0f;
-      targetVibDepths[idx] = targetFreq * vibDepthRatio;
-      
-      Oscil freqController = new Oscil(globalVibSpeed, 0.0f, Waves.SINE);
-      freqController.offset.setLastValue(targetFreq);
-      freqController.patch(oscils[idx].frequency);
-      
-      vibDepthLines[idx] = new Line();
-      vibDepthLines[idx].patch(freqController.amplitude);
-      
-      // 音量揺らぎ（AM変調）の適用 (高次倍音ほど激しく揺らす特性は継承)
-      float wobbleDepth = map(idx, 0, MAX_TOTAL_OSCILS - 1, 0.15f, 0.60f);
-      float wobbleAmp = startAmps[idx] * wobbleDepth;
-      
-      Oscil ampLFO = new Oscil(globalVibSpeed, wobbleAmp, Waves.SINE);
-      ampLFO.setPhase(random(1.0f));
-      ampLFO.patch(oscils[idx].amplitude);
-      
-      ampLines[idx] = new Line();
-      ampLines[idx].patch(oscils[idx].amplitude);
-      
-      oscils[idx].patch(mixer);
-      
-      totalActiveOscils++; // 生成に成功したら総数をインクリメント
-    }
-  }
-  */
-  /*
-  // 各楽器のピークデータを、振幅選別フィルタを通した上で安全にオシレーター展開するヘルパー関数
-  private void createInstrumentOscillators(final float[][] profile, float blendRatio, int maxPeaks, float volFactor, float globalVibSpeed, float fmDepthCents, Summer mixer, float velRatio) {
-    if (profile == null || profile.length == 0) return;
-    
-    int rawLength = profile.length;
-    // 実際に採用する山の数を決定（データ数と制限数の小さい方）
-    final int limitPeaks = min(maxPeaks, rawLength);
-    
-    // ---------------------------------------------------------
-    // 【振幅選別フィルタ】振幅が大きい順にインデックスをソートする
-    // ---------------------------------------------------------
-    Integer[] indices = new Integer[rawLength];
-    for (int i = 0; i < rawLength; i++) indices[i] = i;
-    
-    Arrays.sort(indices, new Comparator<Integer>() {
-      public int compare(Integer a, Integer b) {
-        // 振幅[1]の降順（大きい順）で並び替え
-        return Float.compare(profile[b][1], profile[a][1]);
-      }
-    });
-    
-    // 上位 N 個（limitPeaks分）だけを一度抽出し、一時配列に格納
-    float[][] filteredProfile = new float[limitPeaks][2];
-    for (int i = 0; i < limitPeaks; i++) {
-      filteredProfile[i][0] = profile[indices[i]][0]; // 周波数
-      filteredProfile[i][1] = profile[indices[i]][1]; // 振幅
-    }
-    
-    // ---------------------------------------------------------
-    // 【周波数再整列】Processing側（ビブラート計算など）の仕様に合わせ、周波数の低い順に戻す
-    // ---------------------------------------------------------
-    Arrays.sort(filteredProfile, new Comparator<float[]>() {
-      public int compare(float[] a, float[] b) {
-        // 周波数[0]の昇順（低い順）で並び替え
-        return Float.compare(a[0], b[0]);
-      }
-    });
-    
-    // ---------------------------------------------------------
-    // 3. 厳選されたピークデータのみをオシレーターとして生成・接続
-    // ---------------------------------------------------------
-    for (int h = 0; h < limitPeaks; h++) {
-      if (totalActiveOscils >= MAX_TOTAL_OSCILS) break;
-      
-      float targetFreq = filteredProfile[h][0]; // 周波数
-      float rawAmp     = filteredProfile[h][1]; // 厳選された強い振幅
-      
-      if (targetFreq > 22050.0f) continue;
-      
-      float finalStartAmp = rawAmp * volFactor * blendRatio;
-      float finalEndAmp   = finalStartAmp * velRatio;
-      
-      int idx = totalActiveOscils;
-      startAmps[idx] = finalStartAmp;
-      endAmps[idx]   = finalEndAmp;
-      
-      // オシレーターとビブラート（LFO）、AM変調の適用（既存の高品質ロジックをそのまま継承）
-      oscils[idx] = new Oscil(targetFreq, 0.0f, Waves.SINE);
-      oscils[idx].setPhase(0.0f);
-      
-      float vibDepthRatio = pow(2.0f, fmDepthCents / 1200.0f) - 1.0f;
-      targetVibDepths[idx] = targetFreq * vibDepthRatio;
-      
-      Oscil freqController = new Oscil(globalVibSpeed, 0.0f, Waves.SINE);
-      freqController.offset.setLastValue(targetFreq);
-      freqController.patch(oscils[idx].frequency);
-      
-      vibDepthLines[idx] = new Line();
-      vibDepthLines[idx].patch(freqController.amplitude);
-      
-      float wobbleDepth = map(idx, 0, MAX_TOTAL_OSCILS - 1, 0.15f, 0.60f);
-      float wobbleAmp = startAmps[idx] * wobbleDepth;
-      
-      Oscil ampLFO = new Oscil(globalVibSpeed, wobbleAmp, Waves.SINE);
-      ampLFO.setPhase(random(1.0f));
-      ampLFO.patch(oscils[idx].amplitude);
-      
-      ampLines[idx] = new Line();
-      ampLines[idx].patch(oscils[idx].amplitude);
-      
-      oscils[idx].patch(mixer);
-      
-      totalActiveOscils++;
-    }
-  }
-  */
-  // 更新日6/12
+  
+  
   private void createInstrumentOscillators(final float[][] profile, float blendRatio, int maxPeaks, float volFactor, float globalVibSpeed, float fmDepthCents, Summer mixer, float startGainFactor, float endGainFactor) {
     if (profile == null || profile.length == 0) return;
     
     int rawLength = profile.length;
     final int limitPeaks = min(maxPeaks, rawLength);
     
+    // 振幅の大きい成分から優先してピックアップ
     Integer[] indices = new Integer[rawLength];
     for (int i = 0; i < rawLength; i++) indices[i] = i;
-    
     Arrays.sort(indices, new Comparator<Integer>() {
       public int compare(Integer a, Integer b) {
         return Float.compare(profile[b][1], profile[a][1]);
@@ -2850,6 +1539,7 @@ class StringsInstrument implements Instrument {
       filteredProfile[i][1] = profile[indices[i]][1]; 
     }
     
+    // 抽出後、周波数順にソートし直す
     Arrays.sort(filteredProfile, new Comparator<float[]>() {
       public int compare(float[] a, float[] b) {
         return Float.compare(a[0], b[0]);
@@ -2862,17 +1552,15 @@ class StringsInstrument implements Instrument {
       float targetFreq = filteredProfile[h][0]; 
       float rawAmp     = filteredProfile[h][1]; 
       
-      //if (targetFreq > 22050.0f) continue;
-      if (targetFreq > 14000.0f) continue;
+      if (targetFreq > 16000.0f) continue;
       
-      // 6/13【新設：数学的倍音フィルター】
-      // 8000Hzから18000Hzにかけて、その倍音の振幅（パワー）を滑らかに 100% から 0% へ減衰させる
-      if (targetFreq > 7000.0f) {
-        float filterFactor = map(targetFreq, 7000.0f, 17000.0f, 1.0f, 0.0f);
-        rawAmp *= constrain(filterFactor, 0.0f, 1.0f); // 厳密に0〜1の範囲に固定して乗算
+      // 数学的高域フィルター：耳障りな超高域を削る
+      if (targetFreq > 6000.0f) {
+        float filterFactor = map(targetFreq, 6000.0f, 16000.0f, 1.0f, 0.0f);
+        rawAmp *= constrain(filterFactor, 0.0f, 1.0f);
       }
       
-      // 【確実なスケーリング】実際の開始音量と終了音量を個別に決定
+      // 実際の開始音量と終了音量を決定
       float baseAmp = rawAmp * volFactor * blendRatio;
       float finalStartAmp = baseAmp * startGainFactor;
       float finalEndAmp   = baseAmp * endGainFactor;
@@ -2881,139 +1569,87 @@ class StringsInstrument implements Instrument {
       startAmps[idx] = finalStartAmp;
       endAmps[idx]   = finalEndAmp;
       
-      oscils[idx] = new Oscil(targetFreq, 0.0f, Waves.SINE);
-      oscils[idx].setPhase(random(1.0f));
+      Oscil osc = new Oscil(targetFreq, 0.0f, Waves.SINE);
+      osc.setPhase(random(1.0f));
       
-      // --- ビブラート（FM変調）の適用 ---
+      
+      // --- ビブラート（FM変調） ---
       float vibDepthRatio = pow(2.0f, fmDepthCents / 1200.0f) - 1.0f;
       targetVibDepths[idx] = targetFreq * vibDepthRatio;
       
       Oscil freqController = new Oscil(globalVibSpeed, 0.0f, Waves.SINE);
       freqController.offset.setLastValue(targetFreq);
-      //freqController.patch(freqController.amplitude); // ※元のコードママ
-      freqController.patch(oscils[idx].frequency);
+      freqController.patch(osc.frequency);
       
       vibDepthLines[idx] = new Line();
       vibDepthLines[idx].patch(freqController.amplitude);
       
-      // --- 音量揺らぎ（AM変調）：ウナリ自体をフェードさせる革新的な設計 ---
+      
+      // --- 音量揺らぎ（AM変調） ---
       wobbleLines[idx] = new Line();
       Oscil ampLFO = new Oscil(globalVibSpeed, 0.0f, Waves.SINE);
       ampLFO.setPhase(random(1.0f));
       
-      wobbleLines[idx].patch(ampLFO.amplitude); // 新設LineをLFOの振幅へパッチ！これでウナリがフェードする
-      ampLFO.patch(oscils[idx].amplitude);      // LFOの出力をオシレーターへ（加算）
+      wobbleLines[idx].patch(ampLFO.amplitude);
+      ampLFO.patch(osc.amplitude);
+      
       
       // ベース音量の適用
       ampLines[idx] = new Line();
-      ampLines[idx].patch(oscils[idx].amplitude); // ベース音量変化をオシレーターへ（加算）
+      ampLines[idx].patch(osc.amplitude); 
       
-      oscils[idx].patch(mixer);
+      osc.patch(mixer);
       totalActiveOscils++;
     }
   }
   
   
   
-  /*
-  void noteOn(float dur) {
-    masterEnv.noteOn();
-    biteEnv.noteOn(); 
-    hissEnv.noteOn();
-    
-    float safeDur = dur + 0.7f; 
-    // ビブラートが最大になるまでの時間（0.5秒、または音符の長さの短い方）
-    float vibDelayTime = min(0.5f, dur); 
-    
-    
-    //for(int i = 0; i < numHarmonics; i++) {
-      // 【修正】インスタンスが生成されていない（null）場合は、それ以上の倍音はないのでループを終了する
-    //  if (ampLines[i] == null || vibDepthLines[i] == null) {
-    //    continue; 
-    //  }
-    //  
-    //  
-    //  ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
-    //  // 【実行】0Hzから目標の揺れ幅(Hz)へ、vibDelayTimeかけて徐々にビブラートを深くする
-    //  vibDepthLines[i].activate(vibDelayTime, 0.0f, targetVibDepths[i]);
-    //}
-    
-    // noteOn 内のループ部分の修正
-    for(int i = 0; i < totalActiveOscils; i++) {
-      if (ampLines[i] == null || vibDepthLines[i] == null) {
-        continue; 
-      }
-      ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
-      vibDepthLines[i].activate(vibDelayTime, 0.0f, targetVibDepths[i]);
-    }
-    
-    hissAmpLine.activate(safeDur, startHissVol, endHissVol);
-    
-    masterEnv.patch(out); 
-    biteEnv.patch(out); 
-  }
-  */
   
-  // 更新日6/12
   void noteOn(float dur) {
-    masterEnv.noteOn();
-    //biteEnv.noteOn(); 
-    //hissEnv.noteOn();
     
+    masterEnv.noteOn();
     float safeDur = dur + 0.7f; 
     float vibDelayTime = min(0.5f, dur); 
     
     for(int i = 0; i < totalActiveOscils; i++) {
-      if (ampLines[i] == null || vibDepthLines[i] == null || wobbleLines[i] == null) {
-        continue; 
-      }
-      // 1. ベース音量のフェード
+      if (ampLines[i] == null || vibDepthLines[i] == null || wobbleLines[i] == null) continue; 
+      
+      // 音量のフェード
       ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
       
-      // 2. ウナリ（AM変調）の揺れ幅フェード（ベース音量に比例してウナリの深さも綺麗に消える）
+      // ウナリのフェードダウン
       float wobbleDepth = map(i, 0, maxTotalOscils - 1, 0.15f, 0.60f);
       wobbleLines[i].activate(safeDur, startAmps[i] * wobbleDepth, endAmps[i] * wobbleDepth);
       
-      // 3. ビブラート（FM変調）の変化
+      // ビブラートの立ち上がり
       vibDepthLines[i].activate(vibDelayTime, 0.0f, targetVibDepths[i]);
     }
     
-    //hissAmpLine.activate(safeDur, startHissVol, endHissVol);
-    
     masterEnv.patch(longOut); 
-    //biteEnv.patch(longOut); 
   }
+  
   
   void noteOff() {
     masterEnv.noteOff();
-    //for(int i=0; i<numHarmonics; i++) harmonicEnvs[i].noteOff();
-    //biteEnv.noteOff(); 
-    //hissEnv.noteOff();
     masterEnv.unpatchAfterRelease(longOut); 
-    //biteEnv.unpatchAfterRelease(longOut);
   }
 }
 \end{lstlisting}
 
 \subsection{Piano.pde}
 \begin{lstlisting}[caption={Piano.pde}, label={lst:proc_piano}]
-
-//float[][] pianoDecayLUT;
-//float[][] pianoWobbleRateLUT;
-//float[][] pianoWobbleDepthLUT;
-
 // ==========================================
-// 究極のピアノ・インストゥルメント (デュアル・ストリング & ハイブリッドデータ駆動版)
+// ピアノ（Piano）のクラス
 // ==========================================
 class PianoInstrument implements Instrument {
-  // 分析データに合わせて最大80倍音まで生成
-  byte numHarmonics/* = 40*/;
+  byte numHarmonics;
   
-  ADSR masterEnv; // 全体の音の長さを管理し、離鍵時にミュートする（ダンパーフェルトの役割）
-  ADSR hammerEnv; // ハンマーが弦を叩く一瞬のノイズ用エンベロープ
+  ADSR masterEnv; // ダンパー（ミュート）の役割を担うマスター
+  ADSR hammerEnv; // ハンマーが弦を叩くノイズ用
   
-  // 個別の減衰（Damp）を管理するリスト。
-  // 芯の弦と共鳴弦でDampの数が変動するため、配列ではなくArrayListを使用します。
+  // 個別の減衰（Damp）を管理するリスト
+  // 芯の弦と共鳴弦でDampの数が変動するため、配列ではなくArrayListを使用
   ArrayList<Damp> damps = new ArrayList<Damp>();
   
   PianoInstrument(float midiNote, float velocity, float masterVol) {
@@ -3024,17 +1660,13 @@ class PianoInstrument implements Instrument {
     float thresholdMF = 80.0f / 127.0f;
     float thresholdFF = 112.0f / 127.0f;
     
-    // 現在のベロシティ層に応じて、ベースとなる波形プロファイル（周波数・振幅の骨組み）を決定
+    // ベロシティによる強弱層の判定
     String baseVelocity;
     float t = 0;
-    //boolean needInterpolation = false;
-    //float[][] lowerProfile = null;
-    //float[][] upperProfile = null;
-    
     if (velocity <= thresholdPP) {
       baseVelocity = "PP";
     } else if (velocity <= thresholdMF) {
-      // pp ～ mf の間：構造が近い方のスペクトル形状を選択（あるいは、より高度に処理するためのフラグ設定）
+      // pp ～ mf の間：構造が近い方のスペクトル形状を選択
       t = map(velocity, thresholdPP, thresholdMF, 0.0f, 1.0f);
       baseVelocity = (t < 0.5f) ? "PP" : "MF";
     } else if (velocity <= thresholdFF) {
@@ -3049,18 +1681,18 @@ class PianoInstrument implements Instrument {
     float[][]pianoWobbleRateLUT = utils.GetLUT("PianoWobbleRate" + baseVelocity);
     float[][]pianoWobbleDepthLUT = utils.GetLUT("PianoWobbleDepth" + baseVelocity);
     
+    
+    
     // ==========================================
     // 1. 全体のエンベロープ設定（ダンパーの挙動）
     // ==========================================
-    // 鍵盤を押している間は減衰を邪魔せず(Sustain=1.0)、離した瞬間(noteOff)に0.15秒でミュート
     masterEnv = new ADSR(1.0f, 0.001f, 0.4f, 0.5f, 0.09f);
     mixer.patch(masterEnv); 
     
-    //float f0 = Frequency.ofMidiNote(midiNote).asHz();
     float normVel = pow(constrain(velocity, 0, 127) / 127.0f, 0.9f);
-    float volFactor = masterVol * 0.022f; 
+    float volFactor = masterVol * 0.026f;
     
-    //volFactor *= (0.5 + (midiNote/254.0f));  // 必要かどうか検討 --> 不要
+    
     
     // ==========================================
     // 2. LUTデータの取得とインハーモニシティ設定
@@ -3068,34 +1700,13 @@ class PianoInstrument implements Instrument {
     // 強弱に応じた倍音構成（音色レシピ）を取得
     float[][] profile = utils.GetDynamicProfile(midiNote, velocity, "Piano", 21, 0.9f);
     
-    // 【修正の核心1】実測ピークデータから、今回のループ回数を動的に確定させる！
+    // 実測ピークデータから、今回のループ回数を動的に確定させる！
     numHarmonics = (byte)profile.length;
-    //if (numHarmonics > 30) numHarmonics = 30;
     
-    /*
-    // インハーモニシティ（弦の硬さによるピッチの上擦り）。高音ほどズレが大きくなる。
-    float B = 0.0001f * pow(f0 / 261.6f, 1.5f); 
-    B = constrain(B, 0.00002f, 0.003f);     
-    */
+    int lutIndex = constrain(round(midiNote) - 21, 0, 87); // A0(MIDI:21)基点
     
-    // 現在の音階のLUT配列用インデックス (A0(MIDI:21)を0とする)
-    int lutIndex = constrain(round(midiNote) - 21, 0, 87);
     
-    // Pythonで解析したJSONデータが欠損していないかチェック
-    // ※汎用メソッド LoadLUT で読み込んだ3つのグローバル配列を使用します
-    //boolean hasRawData = (pianoDecayLUT != null && pianoDecayLUT[lutIndex] != null);
-    // 【修正の核心2】コンパイル警告を完全に消し去るための厳格な3軸構造チェック
-    /*boolean hasRawData = false;
-    if (pianoDecayLUT != null && lutIndex < pianoDecayLUT.length && pianoDecayLUT[lutIndex] != null) {
-      if (pianoWobbleRateLUT != null && lutIndex < pianoWobbleRateLUT.length && pianoWobbleRateLUT[lutIndex] != null) {
-        if (pianoWobbleDepthLUT != null && lutIndex < pianoWobbleDepthLUT.length && pianoWobbleDepthLUT[lutIndex] != null) {
-          hasRawData = true;
-        }
-      }
-    }*/
-
-    // --- データ欠損時のバックアップ用（数式モデル）の事前計算 ---
-    // Pythonのグラフ解析から導き出した「ピアノの物理特性の傾向」を数式化
+    // --- データ欠損時用（数式モデル）の事前計算 ---
     float mathBaseDecay = 29.0f * pow(0.9757f, midiNote);
     if (midiNote < 40) mathBaseDecay = min(mathBaseDecay, 20.0f);            // 低音の物理的限界（頭打ち）
     if (midiNote >= 89) mathBaseDecay *= map(midiNote, 89, 108, 1.0f, 3.0f); // 超高音のダンパーレス構造による伸び
@@ -3105,32 +1716,26 @@ class PianoInstrument implements Instrument {
 
     // リバーブ（共鳴）が最大音量になるまでの時間。低音はゆっくり、高音は速く立ち上がる。
     float buildUpTime = map(midiNote, 21, 108, 3.0f, 0.5f);
+    
+    
 
     // ==========================================
     // 3. 弦のモデリング（デュアル・ストリング構造）
     // ==========================================
     for (int i = 0; i < numHarmonics; i++) {
       float amp = profile[i][1] * volFactor;
-      if (amp <= 0.0001f) continue; // 音量が極端に小さい倍音はCPU負荷軽減のためスキップ
-      // 省エネ設計
+      if (amp <= 0.0001f) continue; // 音量が極端に小さい倍音は負荷軽減のためスキップ
       
-      /*
-      int h = i + 1;
-      float inharmonicity = sqrt(1.0f + B * h * h);
-      float targetFreq = f0 * h * inharmonicity; // 実際の周波数
-      */
       
       float targetFreq = profile[i][0]; // 実測された上擦り済みの正確な周波数
       if (targetFreq > 22050.0f) continue; // 人間の可聴域を超えたらスキップ
       
       float decayTime, wobbleRate, wobbleDepth;
       
-      // 実測データ(JSON)があれば使い、なければ数式で補完する「ハイブリッド方式」
-      //if (hasRawData && i < pianoDecayLUT[lutIndex].length && pianoDecayLUT[lutIndex][i] > 0.1f) {
-      // 実測データ(JSON)の適用と数式補完
-      if (pianoDecayLUT != null && pianoWobbleRateLUT != null && pianoWobbleDepthLUT != null && 
-          pianoDecayLUT[lutIndex] != null &&
-          i < pianoDecayLUT[lutIndex].length) {
+      // JSONから減衰率・うなり速度を取得
+      // なければ数式モデル補完
+      if (pianoDecayLUT != null && pianoWobbleRateLUT != null && pianoWobbleDepthLUT != null 
+                && pianoDecayLUT[lutIndex] != null && i < pianoDecayLUT[lutIndex].length) {
         decayTime = pianoDecayLUT[lutIndex][i];
         wobbleRate = pianoWobbleRateLUT[lutIndex][i];
         wobbleDepth = pianoWobbleDepthLUT[lutIndex][i];
@@ -3141,26 +1746,28 @@ class PianoInstrument implements Instrument {
           decayTime = max(mathBaseDecay * harmonicDecayCurve, 0.1f);
         }
       } else {
-        // データがない場合は、インデックス14を底とする減衰のU字カーブを適用
+        // データがない場合
         float harmonicDecayCurve = (i <= 14) ? map(i, 0, 14, 1.0f, 0.3f) : map(i, 14, 80, 0.3f, 1.5f);
         decayTime = max(mathBaseDecay * harmonicDecayCurve, 0.1f);
         wobbleRate = mathBaseWobbleRate * (1.0f + i * 0.02f); 
         wobbleDepth = mathBaseDepth * pow(0.9f, i);
       }
       
-      decayTime *= 0.7;
+      decayTime *= 0.8;
+      
       
       // ----------------------------------------
-      // レイヤーA：アタックの芯（Dry弦）
+      // レイヤーA：アタックの芯となる弦
       // ----------------------------------------
       Oscil coreOsc = new Oscil(targetFreq, amp, Waves.SINE);
       // アタックのインパクトを最大化するため、位相(波のスタート位置)は0付近に固定
-      coreOsc.setPhase(random(0.0f, 0.1f)); 
+      coreOsc.setPhase(random(1.0f)); 
       
       // 0.001秒で素早く立ち上がり、それぞれの寿命(decayTime)で消えていく
       Damp coreDamp = new Damp(0.001f, decayTime);
       coreOsc.patch(coreDamp).patch(mixer);
       damps.add(coreDamp);
+      
       
       // ----------------------------------------
       // レイヤーB：時間差で来る響き（共鳴弦）
@@ -3171,14 +1778,15 @@ class PianoInstrument implements Instrument {
       if (reverbAmp > 0.0001f && wobbleRate > 0.0f) {
         // 周波数をわずかにズラす（Detune）ことで、芯の弦と干渉して自然な「うなり(Beat)」を生む
         Oscil resOsc = new Oscil(targetFreq + wobbleRate, reverbAmp, Waves.SINE);
-        //resOsc.setPhase(random(1.0f)); // 芯の弦と複雑に干渉させるため、位相は完全にランダム
+        resOsc.setPhase(random(1.0f));
         
-        // アタックタイムを buildUpTime に設定し、数秒かけてゆっくり音量を上げる
+        // 数秒かけてゆっくり音量を上げる
         Damp resDamp = new Damp(buildUpTime, decayTime);
         resOsc.patch(resDamp).patch(mixer);
         damps.add(resDamp);
       }
     }
+    
     
     // ==========================================
     // 4. ハンマーの打撃ノイズ（アタック）
@@ -3186,86 +1794,62 @@ class PianoInstrument implements Instrument {
     float hammerVol = masterVol * 0.003f * normVel; 
     Noise hammerNoise = new Noise(hammerVol, Noise.Tint.WHITE);
     
-    // 高音の鍵盤ほど、硬い「カチッ」としたノイズになるようにフィルターを調整
+    // 高音ほど硬い音にフィルタリング
     float hammerCutoff = map(midiNote, 21, 108, 600f, 4000f);
     MoogFilter hammerFilter = new MoogFilter(hammerCutoff, 0.1f);
     hammerFilter.type = MoogFilter.Type.LP; 
     
-    // 0.03秒で消滅する、極めてタイトなエンベロープ（ミュートの影響を受けない）
     hammerEnv = new ADSR(1.0f, 0.001f, 0.02f, 0.0f, 0.01f);
     
     hammerNoise.patch(hammerFilter).patch(hammerEnv);
   }
   
-  // ==========================================
-  // 発音と停止のコントロール
-  // ==========================================
+  
   void noteOn(float dur) {
     masterEnv.noteOn();
     hammerEnv.noteOn();
     
-    // 準備した芯の弦と共鳴弦のDamp（エンベロープ）を一斉にスタート
-    for (Damp d : damps) {
-      d.activate(); 
-    }
+    // 弦のDampを一斉にスタート
+    for (Damp d : damps) d.activate(); 
     
     masterEnv.patch(longOut); 
-    hammerEnv.patch(longOut); // ハンマーノイズは独立して出力
+    hammerEnv.patch(shortOut); // ハンマーノイズは独立して出力
   }
   
   void noteOff() {
-    masterEnv.noteOff(); // ここでダンパーペダルが降りてミュート開始
+    masterEnv.noteOff(); // ダンパーペダルを降ろす
     hammerEnv.noteOff(); 
     masterEnv.unpatchAfterRelease(longOut); 
-    hammerEnv.unpatchAfterRelease(longOut);
+    hammerEnv.unpatchAfterRelease(shortOut);
   }
 }
 \end{lstlisting}
 
 \subsection{Drum.pde}
 \begin{lstlisting}[caption={Drum.pde}, label={lst:proc_drum}]
-// ドラム用LUTの宣言 [インデックス][0:周波数, 1:強度, 2:衰退時間(Decay)]
-//float[][] kickLUT, snareLUT, hihatLUT;
-
-
-
-
-
-
-
-
-
-
-
 // ==========================================
 // 1. キック（Kick）のクラス
 // ==========================================
 class KickInstrument implements Instrument {
-  //Summer mixer;
-  ADSR masterEnv;
   
-  //Oscil[] tones;
+  ADSR masterEnv;
   ADSR[] harmonicEnvs;
-  //Line[] pitchSweeps;
 
   KickInstrument(float masterVol, float velocity) {
     Summer mixer = new Summer();
     
     float[][]kickLUT = utils.GetLUT("Kick");
     
-    // フルートと同じく、リリース時のバッファを持たせたマスターエンベロープ
     masterEnv = new ADSR(1.0f, 0.001f, 0.0f, 1.0f, 0.1f);
     mixer.patch(masterEnv);
     
-    //int numComponents = kickLUT.length;
     int numComponents = 50;
-    Oscil[] tones = new Oscil[numComponents];
     harmonicEnvs = new ADSR[numComponents];
     Line[] pitchSweeps = new Line[numComponents];
     
-    //float baseAmp = masterVol * pow(constrain(velocity, 0, 127) / 127.0f, 0.9f) * 25.0f;
     float baseAmp = masterVol * pow(constrain(velocity, 0, 127) / 127.0f, 0.9f) * 14.0f;
 
+    // LUTの成分から加算合成
     for (int i = 0; i < numComponents; i++) {
       if (kickLUT[i] == null || kickLUT[i].length < 3) continue;
       
@@ -3274,19 +1858,18 @@ class KickInstrument implements Instrument {
       float decayTime = kickLUT[i][2];
       float amp = (baseAmp * mag) / numComponents;
       
-      tones[i] = new Oscil(freq, amp, Waves.SINE);
-      //tones[i].setPhase(random(1.0f)); // 初期位相を散らしてアタックのピーク割れを防ぐ
+      Oscil tone = new Oscil(freq, amp, Waves.SINE);
+      tone.setPhase(random(1.0f)); // 初期位相を散らしてアタックのピーク割れを防ぐ
       
       // 個別の成分のエンベロープ
-      //harmonicEnvs[i] = new ADSR(1.0f, 0.001f, decayTime * 0.05f, 0.0f, 0.1f);
       harmonicEnvs[i] = new ADSR(1.0f, 0.001f, decayTime*0.5f, 0.0f, 0.1f);
       
       // ピッチスイープ
       pitchSweeps[i] = new Line(0.01f, freq * 1.5f, freq);
-      pitchSweeps[i].patch(tones[i].frequency);
+      pitchSweeps[i].patch(tone.frequency);
       
       // 結線: Oscil -> 個別ADSR -> Mixer
-      tones[i].patch(harmonicEnvs[i]);
+      tone.patch(harmonicEnvs[i]);
       harmonicEnvs[i].patch(mixer);
     }
   }
@@ -3296,7 +1879,6 @@ class KickInstrument implements Instrument {
     for (int i = 0; i < harmonicEnvs.length; i++) {
       if (harmonicEnvs[i] != null) harmonicEnvs[i].noteOn();
     }
-    // グローバルな out に直接パッチ！
     masterEnv.patch(shortOut);
   }
 
@@ -3305,197 +1887,23 @@ class KickInstrument implements Instrument {
     for (int i = 0; i < harmonicEnvs.length; i++) {
       if (harmonicEnvs[i] != null) harmonicEnvs[i].noteOff();
     }
-    // グローバルな out からアンパッチ！
     masterEnv.unpatchAfterRelease(shortOut);
   }
 }
+
+
+
+
 
 // ==========================================
 // 2. スネア（Snare）のクラス
 // ==========================================
-class SnareInstrumentOld implements Instrument {
-  //Summer mixer;
-  ADSR masterEnv;
-  
-  // LUT（胴鳴り・倍音）用
-  //Oscil[] tones;
-  ADSR[] harmonicEnvs;
-  //Line[] pitchSweeps;
-  
-  // ノイズ（スナッピー）用
-  //Noise snareNoise;
-  //HighPassSP snareFilter;
-  ADSR noiseEnv;
-
-  SnareInstrumentOld(float masterVol, float velocity) {
-    Summer mixer = new Summer();
-    masterEnv = new ADSR(1.0f, 0.001f, 0.0f, 1.0f, 0.1f);
-    mixer.patch(masterEnv);
-    
-    float baseAmp = masterVol * pow(constrain(velocity, 0, 127) / 127.0f, 0.9f) * 4.0f;
-    
-    float[][]snareLUT = utils.GetLUT("Snare");
-    
-    // --- 1. 胴鳴りパート (LUTによる加算合成) ---
-    int numComponents = snareLUT.length;
-    Oscil[] tones = new Oscil[numComponents];
-    harmonicEnvs = new ADSR[numComponents];
-    Line[] pitchSweeps = new Line[numComponents];
-
-    for (int i = 0; i < numComponents; i++) {
-      if (snareLUT[i] == null || snareLUT[i].length < 3) continue;
-      
-      float freq = snareLUT[i][0];
-      float mag = snareLUT[i][1];
-      float decayTime = snareLUT[i][2];
-      float amp = (baseAmp * mag) / numComponents;
-      
-      tones[i] = new Oscil(freq, amp, Waves.SINE);
-      tones[i].setPhase(random(1.0f)); 
-      
-      harmonicEnvs[i] = new ADSR(1.0f, 0.001f, decayTime * 0.7, 0.0f, 0.1f);
-      
-      // スネア特有：低音（胴鳴り）のみピッチスイープ
-      if (freq < 1000) {
-        pitchSweeps[i] = new Line(0.05f, freq * 1.5f, freq);
-        pitchSweeps[i].patch(tones[i].frequency);
-      }
-      
-      tones[i].patch(harmonicEnvs[i]);
-      harmonicEnvs[i].patch(mixer);
-    }
-    
-    // --- 2. スナッピーパート (ノイズによる減算合成) ---
-    // 以前の解析で導き出した数値をそのまま採用
-    float noiseVol = baseAmp * 0.022f; 
-    Noise snareNoise = new Noise(noiseVol, Noise.Tint.WHITE);
-    HighPassSP snareFilter = new HighPassSP(512, out.sampleRate()); // 7750Hz以上を通す
-    noiseEnv = new ADSR(1.0f, 0.003f, 0.15f, 0.0f, 0.1f); // ディケイ0.25秒
-    
-    // ノイズをフィルターし、エンベロープを通してミキサーへ合流
-    snareNoise.patch(snareFilter).patch(noiseEnv).patch(mixer);
-  }
-
-  void noteOn(float duration) {
-    masterEnv.noteOn();
-    for (int i = 0; i < harmonicEnvs.length; i++) {
-      if (harmonicEnvs[i] != null) harmonicEnvs[i].noteOn();
-    }
-    noiseEnv.noteOn();
-    masterEnv.patch(shortOut);
-  }
-
-  void noteOff() {
-    masterEnv.noteOff();
-    for (int i = 0; i < harmonicEnvs.length; i++) {
-      if (harmonicEnvs[i] != null) harmonicEnvs[i].noteOff();
-    }
-    noiseEnv.noteOff();
-    masterEnv.unpatchAfterRelease(shortOut);
-  }
-}
-
-// ==========================================
-// 3. クローズハイハット（Closed Hi-Hat）のクラス
-// ==========================================
-class HiHatInstrumentOld implements Instrument {
-  //Summer mixer;
-  ADSR masterEnv;
-  
-  //Oscil[] tones;
-  ADSR[] harmonicEnvs;
-  
-  //Noise hatNoise;
-  //HighPassSP hatFilter;
-  ADSR noiseEnv;
-
-  HiHatInstrumentOld(float masterVol, float velocity) {
-    Summer mixer = new Summer();
-    // ハイハットは余韻が非常に短いため、マスターのリリースも極短に
-    masterEnv = new ADSR(1.0f, 0.001f, 0.0f, 1.0f, 0.05f);
-    mixer.patch(masterEnv);
-    
-    float baseAmp = masterVol * pow(constrain(velocity, 0, 127) / 127.0f, 0.9f) * 5.0f;
-    
-    float[][]hihatLUT = utils.GetLUT("HiHat");
-    
-    // --- 1. 金属共鳴パート (LUTによる加算合成) ---
-    int numComponents = hihatLUT.length;
-    Oscil[] tones = new Oscil[numComponents];
-    harmonicEnvs = new ADSR[numComponents];
-
-    for (int i = 0; i < numComponents; i++) {
-      if (hihatLUT[i] == null || hihatLUT[i].length < 3) continue;
-      
-      float freq = hihatLUT[i][0];
-      float mag = hihatLUT[i][1];
-      float decayTime = hihatLUT[i][2];
-      float amp = (baseAmp * mag) / numComponents;
-      
-      tones[i] = new Oscil(freq, amp, Waves.SINE);
-      tones[i].setPhase(random(1.0f));
-      
-      harmonicEnvs[i] = new ADSR(1.0f, 0.001f, decayTime, 0.0f, 0.05f);
-      
-      tones[i].patch(harmonicEnvs[i]);
-      harmonicEnvs[i].patch(mixer);
-    }
-    
-    // --- 2. 打撃摩擦パート (ノイズによる減算合成) ---
-    float noiseVol = baseAmp * 0.042f;
-    Noise hatNoise = new Noise(noiseVol, Noise.Tint.WHITE);
-    HighPassSP hatFilter = new HighPassSP(10250, out.sampleRate()); // 10000Hz以上の超高音のみ
-    noiseEnv = new ADSR(1.0f, 0.001f, 0.06f, 0.0f, 0.05f); // 0.06秒でスパッと消える
-    
-    hatNoise.patch(hatFilter).patch(noiseEnv).patch(mixer);
-  }
-
-  void noteOn(float duration) {
-    masterEnv.noteOn();
-    for (int i = 0; i < harmonicEnvs.length; i++) {
-      if (harmonicEnvs[i] != null) harmonicEnvs[i].noteOn();
-    }
-    noiseEnv.noteOn();
-    masterEnv.patch(shortOut);
-  }
-
-  void noteOff() {
-    masterEnv.noteOff();
-    for (int i = 0; i < harmonicEnvs.length; i++) {
-      if (harmonicEnvs[i] != null) harmonicEnvs[i].noteOff();
-    }
-    noiseEnv.noteOff();
-    masterEnv.unpatchAfterRelease(shortOut);
-  }
-}
-
-
-
-
-
-
-
-
-
-// ==========================================
-// 2. 新・スネア（Snare）のクラス (シンセサイズ方式)
-// ==========================================
 class SnareInstrument implements Instrument {
+  
   ADSR masterEnv;
-  
-  // 1. 胴鳴り（Body）パート用
-  Oscil bodyOsc;
-  Line  bodyPitchEnv;
-  ADSR  bodyAmpEnv;
-  
-  // 2. 倍音（Overtone）パート用
-  Oscil overtoneOsc;
-  ADSR  overtoneAmpEnv;
-  
-  // 3. スナッピー（Noise）パート用
-  Noise      snappyNoise;
-  //HighPassSP snappyFilter;
-  ADSR       snappyAmpEnv;
+  ADSR bodyAmpEnv;
+  ADSR overtoneAmpEnv;
+  ADSR snappyAmpEnv;
 
   SnareInstrument(float masterVol, float velocity, float sinAmp) {
     Summer mixer = new Summer();
@@ -3505,39 +1913,38 @@ class SnareInstrument implements Instrument {
     float sinSet = constrain(sinAmp, 0, 127) / 127.0f;
     
     // ==========================================
-    // パラメータ設定（ここをいじって音色をチューニングします）
+    // パラメータ設定
     // ==========================================
     
     // --- 1. 胴鳴り（ベースとなる太さ） ---
-    float bodyFreq     = 172.3f * random(0.99f, 1.01f);  // ★データ最上部の「172.3 Hz (強さ: 0.63)」をそのまま指定！
-    float bodyPitchMod = 3.0f;    // アタック時は約516Hz付近から172.3Hzへ急降下させる
-    float bodySweepTime= 0.025f;  // 一瞬でピッチを落とす
-    float bodyDecay    = 0.07f;   
-    float bodyVolRatio = 0.63f * sinSet;    // 172.3Hzは強いエネルギーを持っているので、音量比率を高めに
+    float bodyFreq     = 172.3f * random(0.99f, 1.01f);
+    float bodyPitchMod = 3.0f;
+    float bodySweepTime= 0.025f;
+    float bodyDecay    = 0.07f;
+    float bodyVolRatio = 0.63f * sinSet;
     
     // --- 2. 倍音（カンカンしたヘッドの芯） ---
-    float overtoneFreq  = 323.0f * random(0.98f, 1.02f); // ★データ2番目の「323.0 Hz (強さ: 0.55)」をそのまま指定！
-    float overtoneDecay = 0.048f;  // 胴鳴り（172.3Hz）よりも早く減衰させて歯切れを良くする
+    float overtoneFreq  = 323.0f * random(0.98f, 1.02f);
+    float overtoneDecay = 0.048f;
     float overtoneVolRatio = 0.55f * sinSet;
     
     // --- 3. スナッピー（ホワイトノイズ） ---
-    // データを見ると 1184.3 Hz 付近から徐々に強さが上がり、2.5kHz〜8kHzがエネルギーの塊になっています。
-    //float noiseFilterCutoff = 2000.0f; // 2kHzあたりから上のノイズをまるごと通す
-    float noiseDecay        = 0.17f;   // スナッピーの余韻
+    float noiseDecay        = 0.22f;
     float noiseVolRatio     = 3.5f;
     float noiseHPCutoff     = 2500.0f * random(0.9f, 1.1f);
     float noiseLPCutoff1    = 2800.0f * random(0.9f, 1.1f);
     float noiseLPCutoff2    = 4000.0f * random(0.9f, 1.1f);
     float noiseLPCutoff3    = 7000.0f * random(0.9f, 1.1f);
 
+
     // ==========================================
     // 各モジュールの構築とパッチング
     // ==========================================
     
     // --- 1. 胴鳴りパートの構築 ---
-    bodyOsc = new Oscil(bodyFreq, baseAmp * bodyVolRatio, Waves.SINE);
+    Oscil bodyOsc = new Oscil(bodyFreq, baseAmp * bodyVolRatio, Waves.SINE);
     // 叩いた瞬間に音程を急激に下げる（アタック感の演出）
-    bodyPitchEnv = new Line(bodySweepTime, bodyFreq * bodyPitchMod, bodyFreq);
+    Line bodyPitchEnv = new Line(bodySweepTime, bodyFreq * bodyPitchMod, bodyFreq);
     bodyPitchEnv.patch(bodyOsc.frequency);
     // 音量エンベロープ (Attack, Decay, Sustain, Release)
     bodyAmpEnv = new ADSR(1.0f, 0.001f, bodyDecay, 0.0f, 0.05f);
@@ -3547,27 +1954,25 @@ class SnareInstrument implements Instrument {
     
 
     // --- 2. 倍音パートの構築 ---
-    overtoneOsc = new Oscil(overtoneFreq, baseAmp * overtoneVolRatio, Waves.SINE);
+    Oscil overtoneOsc = new Oscil(overtoneFreq, baseAmp * overtoneVolRatio, Waves.SINE);
     overtoneAmpEnv = new ADSR(1.0f, 0.002f, overtoneDecay, 0.0f, 0.05f);
     
     overtoneOsc.patch(overtoneAmpEnv).patch(mixer);
     
     
 
-  // --- 3. スナッピー（Noise）パートの構築 ---
-    snappyNoise = new Noise(baseAmp * noiseVolRatio, Noise.Tint.WHITE);
+    // --- 3. スナッピー（Noise）パートの構築 ---
+    Noise snappyNoise = new Noise(baseAmp * noiseVolRatio, Noise.Tint.WHITE);
     
-    // 4,500Hzに向かってなだらかに立ち上げるためのハイパス
+    // フィルター
     HighPassSP snappyHP = new HighPassSP(noiseHPCutoff, out.sampleRate());
-    
-    // 5,500Hzから20,000Hzに向けてなだらかに落とすためのローパス
     LowPassSP  snappyLP1 = new LowPassSP(noiseLPCutoff1, out.sampleRate());
     LowPassSP  snappyLP2 = new LowPassSP(noiseLPCutoff2, out.sampleRate());
     LowPassSP  snappyLP3 = new LowPassSP(noiseLPCutoff3, out.sampleRate());
     
     snappyAmpEnv = new ADSR(1.0f, 0.003f, noiseDecay, 0.0f, 0.05f);
     
-    // ノイズを2つのフィルターに順番に通して（挟み撃ちにして）エンベロープへ送る
+    // ホワイトノイズ -> フィルター -> エンベロープ -> ミキサー
     snappyNoise.patch(snappyHP).patch(snappyLP1).patch(snappyLP2).patch(snappyLP3).patch(snappyAmpEnv).patch(mixer);
     
     
@@ -3599,54 +2004,26 @@ class SnareInstrument implements Instrument {
 
 
 // ==========================================
-// 3. 新・ハイハット（Hi-Hat）のクラス (シンセサイズ方式)
+// 3. ハイハット（HiHat）のクラス
 // ==========================================
 class HiHatInstrument implements Instrument {
+  
   ADSR masterEnv;
-  
-  // 1. 金属共鳴（Metallic Core）パート用
-  // グラフから厳選した主要な4つのピークを個別に発振・制御します
-  //Oscil toneOsc1, toneOsc2, toneOsc3, toneOsc4;
-  //ADSR  toneEnv1, toneEnv2, toneEnv3, toneEnv4;
-  
-  Oscil[] toneOscList;
   ADSR[] toneEnvList;
-  
-  // 2. 打撃摩擦（Noise）パート用
-  Noise      hatNoise;
-  //HighPassSP hatHP;
   ADSR       noiseEnv;
 
   HiHatInstrument(float masterVol, float velocity) {
     Summer mixer = new Summer();
     
-    // 全体の音量調整（歪まないようにスネア等のバランスに合わせて調整してください）
+    // 全体の音量調整
     float baseAmp = masterVol * pow(constrain(velocity, 0, 127) / 127.0f, 0.9f) * 0.04f; 
     
+    
     // ==========================================
-    // パラメータ設定（ここをいじって音色をチューニングします！）
+    // パラメータ設定
     // ==========================================
     
     // --- 1. 金属共鳴（チキチキ・カンカンした芯の成分） ---
-    // FFT解析データの上位トップ4の強いピークをそのままスタンドアロンで指定
-    /*
-    float toneFreq1     = 7149.0f; // ★最強のセンターピーク（強さ: 1.00）
-    float toneVolRatio1 = 1.00f;
-    float toneDecay1    = 0.109f;  // 金属的なアタックのみを出すため、非常に短く
-    
-    float toneFreq2     = 7644.3f; // ★2番目に強い高域ピーク（強さ: 0.62）
-    float toneVolRatio2 = 0.62f;
-    float toneDecay2    = 0.040f;
-    
-    float toneFreq3     = 5964.7f; // ★3番目に強い中高域ピーク（強さ: 0.61）
-    float toneVolRatio3 = 0.61f;
-    float toneDecay3    = 0.060f;
-    
-    float toneFreq4     = 13006.1f;// ★超高域の金属的な鋭さを補うピーク（強さ: 0.52）
-    float toneVolRatio4 = 0.52f;
-    float toneDecay4    = 0.015f;  // 超高域は一瞬で消え去るように
-    */
-    
     float[][] toneList     = {
                                {21.53f, 0.0619f, 0.131f},
                                {7149.0f, 1.00f, 0.109f},
@@ -3658,295 +2035,110 @@ class HiHatInstrument implements Instrument {
                                {4931.1f, 0.1834f, 0.109f}
                              };
     
-    // --- 2. 打撃摩擦（シャリシャリ・シュワシュワした高域ノイズ） ---
-    float noiseVolRatio = 6.00f * random(0.99f, 1.01f);   // ノイズのブレンド比率。シャリシャリ感を強めるなら上げる
-    float noiseHPCutoff1 = 7000.0f * random(0.9f, 1.1f); // ★ハイパスのカットオフ（Hz）。
-                                   // 8k〜10kHz以上にすると、ゴソゴソした中音域が消え、綺麗な「チッ」になります
+    // --- 2. 打撃摩擦 ---
+    float noiseVolRatio = 6.00f * random(0.99f, 1.01f);
+    float noiseHPCutoff1 = 7000.0f * random(0.9f, 1.1f);
     float noiseHPCutoff2 = 4000.0f * random(0.9f, 1.1f);
     float noiseLPCutoff1 = 5000.0f * random(0.9f, 1.1f);
     float noiseLPCutoff2 = 30000.0f * random(0.9f, 1.1f);
-    //float noiseLPCutoff3 = 3000.0f;
-    float noiseDecay    = 0.080f;  // クローズドハイハットの「余韻の長さ（キレ）」を左右する最重要パラメータ
+    float noiseDecay    = 0.080f;
+    
     
     // ==========================================
     // 各モジュールの構築とパッチング
     // ==========================================
     
     // --- 1. 金属共鳴パートの構築 ---
-    // 各正弦波の位相（Phase）をランダムにすることで、発音ごとの微妙な「なじみ」を生み出します
-    /*
-    toneOsc1 = new Oscil(toneFreq1, baseAmp * toneVolRatio1, Waves.SINE);
-    toneOsc1.setPhase(random(1.0f));
-    toneEnv1 = new ADSR(1.0f, 0.001f, toneDecay1, 0.0f, 0.01f);
-    toneOsc1.patch(toneEnv1).patch(mixer);
-    
-    toneOsc2 = new Oscil(toneFreq2, baseAmp * toneVolRatio2, Waves.SINE);
-    toneOsc2.setPhase(random(1.0f));
-    toneEnv2 = new ADSR(1.0f, 0.001f, toneDecay2, 0.0f, 0.01f);
-    toneOsc2.patch(toneEnv2).patch(mixer);
-    
-    toneOsc3 = new Oscil(toneFreq3, baseAmp * toneVolRatio3, Waves.SINE);
-    toneOsc3.setPhase(random(1.0f));
-    toneEnv3 = new ADSR(1.0f, 0.001f, toneDecay3, 0.0f, 0.01f);
-    toneOsc3.patch(toneEnv3).patch(mixer);
-    
-    toneOsc4 = new Oscil(toneFreq4, baseAmp * toneVolRatio4, Waves.SINE);
-    toneOsc4.setPhase(random(1.0f));
-    toneEnv4 = new ADSR(1.0f, 0.001f, toneDecay4, 0.0f, 0.01f);
-    toneOsc4.patch(toneEnv4).patch(mixer);
-    */
-    
-    toneOscList = new Oscil[toneList.length];
+    //toneOscList = new Oscil[toneList.length];
     toneEnvList = new ADSR[toneList.length];
     
     for (int i = 0; i < toneList.length; i++){
-      toneOscList[i] = new Oscil(toneList[i][0] * random(0.98f, 1.02f), baseAmp * toneList[i][1], Waves.SINE);
-      toneOscList[i].setPhase(random(1.0f));
+      Oscil toneOsc = new Oscil(toneList[i][0] * random(0.98f, 1.02f), baseAmp * toneList[i][1], Waves.SINE);
+      toneOsc.setPhase(random(1.0f));
       toneEnvList[i] = new ADSR(1.0f, 0.001f, toneList[i][2]*0.5, 0.0f, 0.01f);
-      toneOscList[i].patch(toneEnvList[i]).patch(mixer);
+      toneOsc.patch(toneEnvList[i]).patch(mixer);
     }
     
     // --- 2. ノイズパートの構築 ---
-    hatNoise = new Noise(baseAmp * noiseVolRatio, Noise.Tint.WHITE);
+    Noise hatNoise = new Noise(baseAmp * noiseVolRatio, Noise.Tint.WHITE);
+    
+    // フィルター
     HighPassSP hatHP1    = new HighPassSP(noiseHPCutoff1, out.sampleRate());
     HighPassSP hatHP2    = new HighPassSP(noiseHPCutoff2, out.sampleRate());
     LowPassSP hatLP1    = new LowPassSP(noiseLPCutoff1, out.sampleRate());
     LowPassSP hatLP2    = new LowPassSP(noiseLPCutoff2, out.sampleRate());
-    //LowPassSP hatLP3    = new LowPassSP(noiseLPCutoff3, out.sampleRate());
+    
     noiseEnv = new ADSR(1.0f, 0.001f, noiseDecay, 0.0f, 0.02f);
     
-    // ホワイトノイズ -> ハイパスフィルター -> エンベロープ -> ミキサー
+    // ホワイトノイズ -> フィルター -> エンベロープ -> ミキサー
     hatNoise.patch(hatHP1).patch(hatHP2).patch(hatLP1).patch(hatLP2).patch(noiseEnv).patch(mixer);
     
     // --- 3. 全体の結合とマスターエンベロープ ---
-    masterEnv = new ADSR(1.0f, 0.0001f, 0.0f, 1.0f, 0.02f); // リリースも極短に
+    masterEnv = new ADSR(1.0f, 0.0001f, 0.0f, 1.0f, 0.02f);
     mixer.patch(masterEnv);
   }
 
   void noteOn(float duration) {
     masterEnv.noteOn();
-    //toneEnv1.noteOn();
-    //toneEnv2.noteOn();
-    //toneEnv3.noteOn();
-    //toneEnv4.noteOn();
-    
     for (int i = 0; i<toneEnvList.length; i++ ) toneEnvList[i].noteOn();
-    
     noiseEnv.noteOn();
-    
     masterEnv.patch(shortOut);
   }
 
   void noteOff() {
     masterEnv.noteOff();
-    //toneEnv1.noteOff();
-    //toneEnv2.noteOff();
-    //toneEnv3.noteOff();
-    //toneEnv4.noteOff();
-    
     for (int i = 0; i < toneEnvList.length; i++) {if (toneEnvList[i] != null) toneEnvList[i].noteOff();}
-    
-    
     noiseEnv.noteOff();
-    
     masterEnv.unpatchAfterRelease(shortOut);
   }
 }
-
-
-
-
-
-//class SnareRoll implements Thread {
-//  SnareRoll () {
-    
-//  }
-//  void run() {
-    
-//  }
-//}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-// ==========================================
-// シンバル（Cymbal）のクラス
-// ==========================================
-class CymbalInstrument implements Instrument {
-  ADSR masterEnv;
-  ADSR[] harmonicEnvs;
-  ADSR noiseEnv; // シャーンという余韻ノイズ用
-
-  CymbalInstrument(float masterVol, float velocity) {
-    Summer mixer = new Summer();
-    
-    // JSONデータの取得（ファイル名やキーは環境に合わせてください）
-    float[][] cymbalLUT = utils.GetLUT("Cymbal"); 
-    
-    // 全体のマスターエンベロープ（余韻を長く残すためリリースは3.5秒）
-    masterEnv = new ADSR(1.0f, 0.005f, 0.0f, 1.0f, 3.5f);
-    mixer.patch(masterEnv);
-    
-    int numComponents = cymbalLUT.length;
-    Oscil[] tones = new Oscil[numComponents];
-    harmonicEnvs = new ADSR[numComponents];
-    
-    // 倍音成分が多く音が割れやすいため、ベース音量を少し控えめに設定
-    float baseAmp = masterVol * pow(constrain(velocity, 0, 127) / 127.0f, 0.9f) * 1.0f;
-
-    // ------------------------------------------------
-    // 1. 金属のコア層（加算合成 ＋ FM/AM変調）
-    // ------------------------------------------------
-    for (int i = 0; i < numComponents; i++) {
-      if (cymbalLUT[i] == null || cymbalLUT[i].length < 3) continue;
-      
-      float freq = cymbalLUT[i][0];
-      float mag = cymbalLUT[i][1];
-      float decayTime = cymbalLUT[i][2]; 
-      
-      // 高音域ほど音量が大きくなりすぎないよう微調整
-      float amp = (baseAmp * mag) / numComponents/3;
-      
-      tones[i] = new Oscil(freq, amp, Waves.SINE);
-      
-      // アタック時の位相が揃って「バチッ」と鳴るのを防ぐ
-      tones[i].setPhase(random(1.0f)); 
-      
-      // --- ① 非整数倍音の干渉をシミュレートするFM変調（ピッチ揺れ） ---
-      // フルートよりも少し速く、ランダムな周期で揺らすことで金属の歪みを生む
-      float fmSpeed = random(3.0f, 15.0f); 
-      float vibDepthHz = freq * random(0.002f, 0.008f); 
-      Oscil freqController = new Oscil(fmSpeed, vibDepthHz, Waves.SINE);
-      freqController.offset.setLastValue(freq); 
-      freqController.patch(tones[i].frequency);
-      
-      // --- ② 複雑なビートを生み出すAM変調（音量揺らぎ） ---
-      // 倍音ごとに異なる周期で音量をウネウネさせる
-      float amSpeed = random(1.0f, 8.0f);
-      Oscil ampLFO = new Oscil(amSpeed, amp * random(0.3f, 0.7f), Waves.SINE);
-      ampLFO.offset.setLastValue(amp);
-      ampLFO.patch(tones[i].amplitude);
-      
-      // --- 個別エンベロープ（LUTのdecayTimeを適用） ---
-      // decayTimeをそのままReleaseにも適用し、自然に消えさせる
-      harmonicEnvs[i] = new ADSR(1.0f, 0.001f, decayTime/5, 0.0f, decayTime);
-      
-      tones[i].patch(harmonicEnvs[i]);
-      harmonicEnvs[i].patch(mixer);
-    }
-
-    // ------------------------------------------------
-    // 2. 超高域の余韻層（ノイズ ＋ ハイパスフィルター）
-    // ------------------------------------------------
-    // 「バーン」の後の「シャーン」という細かく散る粒子感をホワイトノイズで補完
-    Noise cymbalNoise = new Noise(baseAmp * 0.10f, Noise.Tint.PINK);
-    
-    // 5000Hz以下の重たい成分を削り、チリチリとした超高域だけを残す
-    HighPassSP hpf = new HighPassSP(5000f, out.sampleRate());
-    
-    // ノイズ層はゆっくり立ち上がり、コア層よりも長く残るように設定
-    noiseEnv = new ADSR(1.0f, 0.02f, 1.5f, 0.3f, 3.5f); 
-    
-    cymbalNoise.patch(hpf).patch(noiseEnv).patch(mixer);
-  }
-
-  void noteOn(float duration) {
-    masterEnv.noteOn();
-    noiseEnv.noteOn();
-    for (int i = 0; i < harmonicEnvs.length; i++) {
-      if (harmonicEnvs[i] != null) harmonicEnvs[i].noteOn();
-    }
-    // 出力先（shortOut等）は環境に合わせて変更してください
-    masterEnv.patch(out); 
-  }
-
-  void noteOff() {
-    masterEnv.noteOff();
-    noiseEnv.noteOff();
-    for (int i = 0; i < harmonicEnvs.length; i++) {
-      if (harmonicEnvs[i] != null) harmonicEnvs[i].noteOff();
-    }
-    masterEnv.unpatchAfterRelease(out);
-  }
-}*/
 \end{lstlisting}
 
 \subsection{Horn.pde}
 \begin{lstlisting}[caption={Horn.pde}, label={lst:proc_horn}]
+// ==========================================
+// ホルン（Horn）のクラス
+// ==========================================
 class HornInstrument implements Instrument {
-  byte numHarmonics/* = 15*/;
+  byte numHarmonics;
   
   ADSR masterEnv;
-  ADSR[] harmonicEnvs/* = new ADSR[numHarmonics]*/;
+  ADSR[] harmonicEnvs;
   
-  Line[] wobbleLines;    // 6/12【追加】倍音ウナリ（AM）用のフェードライン
-  float[] wobbleFactors; // 6/12【追加】倍音ごとの固有ウナリ比率の保持用
+  Line[] wobbleLines;
+  float[] wobbleFactors;
   
-  // ==========================================
-  // 7/5【追加1】ピッチエンベロープ用の変数
-  // ==========================================
-  Line[] pitchEnvLines;  // アタック時のピッチ急降下用
-  float[] targetFreqs;   // 各倍音の本来の周波数（noteOnで計算に使うため保持）
+  Line[] pitchEnvLines;
+  float[] targetFreqs;
   
-  Line[] ampLines/* = new Line[numHarmonics]*/;
-  float[] startAmps/* = new float[numHarmonics]*/;
-  float[] endAmps/* = new float[numHarmonics]*/;
+  Line[] ampLines;
+  float[] startAmps;
+  float[] endAmps;
   
   ADSR breathEnv;
   
-  
-  // ==========================================
-  // 【新規追加】 持続する空気の渦と管の共鳴（サブハーモニクス層）
-  // ==========================================
-  //ADSR sustainEnv;
-  
-  // 【追加】持続ノイズの音量変化（クレッシェンド/デクレッシェンド）用
-  //Line sustainAmpLine;
-  //Line sustainWobbleLine; // 6/12【追加】持続ノイズのウナリ用のフェードライン
-  //float startSustainVol;
-  //float endSustainVol;
   
   
   
   HornInstrument(float midiNote, float duration, float startVel, float endVel, float masterVol) {
     Summer mixer = new Summer();
     
-    //float masterAttackTime = 0.2f - constrain(startVel, 0, 127) / 127.0f * 0.19f;
     float masterAttackTime = 0.1f;
     masterAttackTime = min(masterAttackTime, duration - 0.1f);
     if (masterAttackTime < 0.035f) masterAttackTime = 0.035f;
     
-    // 【修正】masterEnv の一番最後の引数（リリース時間）を 0.3f から 0.4f に延ばす。
-    // 内部の音が 0.3秒 かけて完全に消え去るのを待ってから、安全にアンパッチさせるための余裕（バッファ）です。
-    // 【修正】masterEnv のリリース時間を、希望のフェードアウト時間（例：0.35秒）に設定
     masterEnv = new ADSR(1.0f, masterAttackTime, 0.0f, 1.0f, 0.13f);
-    
     mixer.patch(masterEnv);
     
     
-    // 変更6/12
-    // 1. 倍音レシピを安全に取り出すための基準ベロシティ（0除算・ロード不全の防止）
     float profileVel = (startVel > 0) ? startVel : endVel;
-    if (profileVel <= 0) profileVel = 64.0f; // どちらも0の場合のセーフティ
+    if (profileVel <= 0) profileVel = 64.0f;
     
-    // 2. 開始・終了のゲインファクターをフルートの特性（0.7乗カーブ）に基づいて独立計算
     float startGainFactor = pow(startVel / profileVel, 0.9f);
     float endGainFactor   = pow(endVel / profileVel, 0.9f);
     
-    // 安全にロードされた基準プロファイルを取得
     float[][] startProfile = utils.GetDynamicProfile(midiNote, profileVel, "Horn", 34, 1.0f);
+    
     
     float volFactor = masterVol * 0.017f;
     
@@ -3954,294 +2146,97 @@ class HornInstrument implements Instrument {
     
     harmonicEnvs  = new ADSR[numHarmonics];
     ampLines      = new Line[numHarmonics];
-    wobbleLines   = new Line[numHarmonics];    // 初期化を追加
-    wobbleFactors = new float[numHarmonics];   // 初期化を追加
+    wobbleLines   = new Line[numHarmonics];
+    wobbleFactors = new float[numHarmonics];
     startAmps     = new float[numHarmonics];
     endAmps       = new float[numHarmonics];
-    
-    // ==========================================
-    // 7/5【追加2】配列の初期化
-    // ==========================================
     pitchEnvLines = new Line[numHarmonics];
     targetFreqs   = new float[numHarmonics];
     
     
-    
-    //float fundamentalFreq = 440.0 * pow(2.0, (actualMidiNote - 69) / 12.0);
     byte baseWaveNum = 0;
     for (byte i = 1; i < numHarmonics; i++) {
       if (startProfile[i-1][0] < startProfile[i][0]) baseWaveNum = i;
     }
     
-    
-    // ==========================================
-    // 【新規】倍音ごとの自然な振幅揺らぎ（変動率ベース）
-    // ==========================================
-    // Pythonで解析した変動率(%)を参考に、基音の振幅に対して何倍の揺れ(±)を許容するかを設定。
-    // 実測データの変動率(%)から数式 [ Variation / 500 ] によって導出された、
-    // 倍音ごとの自然な振幅揺らぎ（AM変調）の深度設定。
-    //float[] wobbleDepths = {0.1250f, 0.1616f, 0.2078f, 0.2340f, 0.2114f, 0.2742f, 0.3716f, 0.2946f, 0.7420f, 0.8796f, 
-    //                        0.7850f, 0.5070f, 0.6242f, 0.7654f, 0.6702f, 0.3898f, 0.8850f, 0.5942f, 0.3152f, 0.5030f};
-    
-    // ==========================================
-    // 【新規】この音符全体の「呼吸のスピード」を決定
-    // forループの外で1つだけ定義し、全倍音で共有することで相殺を防ぐ
-    // ==========================================
-    float globalBreathSpeed = random(2.5f, 3.5f); // 生楽器の自然なビブラート周期
+    float globalBreathSpeed = random(2.5f, 3.5f);
     
     
-    
-
-
-    // 1. 加算合成パート（7つのサイン波）
+    // --- 1. 加算合成パート ---
     for (int i = 0; i < numHarmonics; i++) {
-      /*
-      int h = i + 1;
-      // あなたがPythonで導き出した厳密なインハーモニシティ公式を適用
-      float B = 0.0005f; // インハーモニシティ係数
-      float inharmonicity = sqrt(1.0f + B * h * h);
-      float targetFreq = f0 * h * inharmonicity;
-      */
+      
       float targetFreq = startProfile[i][0];
       
       Oscil osc = new Oscil(targetFreq, 0.0f, Waves.SINE);
-      
-      // 【追加】初期位相を 0.0 〜 1.0 (0度〜360度) の間で完全にランダムに散らす
-      // これにより「カチッ」とした機械的なアタック音が消え、音割れ（ピーク）も防げる
       osc.setPhase(random(1.0f));
       
-      
-      //startAmps[i] = startProfile[i][1] * volFactor;
-      //endAmps[i] = endProfile[i] * volFactor;
-        // 聴覚特性（0.7乗）に完全同期させた、開始時から終了時への音量変化比率を算出
-        //float velRatio = pow(endVel / (startVel + 0.0001f), 0.7f);
-      // 【確定修正】すでにvolFactorが掛けられたstartAmpsに対して、正しいべき乗比率を乗算する
-      //endAmps[i]   = startAmps[i] * pow(endVel / (startVel + 0.0001f), 0.7f);
-      
-      // 6/12追加
-      // 独立した開始・終了音量を厳密に算出
       float baseAmp = startProfile[i][1] * volFactor;
       startAmps[i] = baseAmp * startGainFactor;
       endAmps[i]   = baseAmp * endGainFactor;
       
+      float vibDepthHz = targetFreq * 0.001f; 
+      Oscil freqController = new Oscil(globalBreathSpeed, vibDepthHz, Waves.SINE);
+      targetFreqs[i] = targetFreq;
       
+      pitchEnvLines[i] = new Line();
+      pitchEnvLines[i].patch(freqController.offset).patch(osc.frequency);  
       
-        // 通常のビブラート（サイン波）
-        
-        // ==========================================
-        // ① 極小のピッチ揺れ (FM変調) の復活
-        // 以前の0.0132fを「0.003f」に激減させ、音痴にならない程度の「空気の揺らぎ」を作る
-        // ==========================================
-        float vibDepthHz = targetFreq * 0.001f; 
-        Oscil freqController = new Oscil(globalBreathSpeed, vibDepthHz, Waves.SINE);
-        freqController.offset.setLastValue(targetFreq); 
-        
-        
-        //freqController.patch(osc.frequency);
-        
-        // ==========================================
-        // 7/5【追加3】本来の周波数を保存し、Pitch用のLineを接続
-        // ==========================================
-        targetFreqs[i] = targetFreq; // noteOnで使うために記憶しておく
-        
-        //pitchEnvLines[i] = new Line();
-        //pitchEnvLines[i].patch(osc.frequency); // オシレーターの周波数に加算接続
-        // 【変更点】7/5
-        // 以前あった freqController.offset.setLastValue(targetFreq); を削除します。
-        // 代わりに、Pitch用のLineをLFOの「offset（基準周波数）」に直接パッチします！
-        pitchEnvLines[i] = new Line();
-        pitchEnvLines[i].patch(freqController.offset); 
-        
-        // LFO(基準値がLineで動く)を、メインオシレーターの周波数にパッチ
-        freqController.patch(osc.frequency);
-        
-        // ==========================================
-        // ② 呼吸に同期した音量揺らぎ (AM変調)
-        // ==========================================
-        // この倍音の基準音量に対して、配列で設定した割合だけ揺らす
-        //float wobbleAmp = startAmps[i] * wobbleDepths[i]; 
-        //float wobbleAmp = startAmps[i] * random(0.1f, 0.3f);
-        
-        // 1.5Hz 〜 3.5Hz の間で、倍音ごとにランダムなスピードで揺らす
-        // 【修正】ランダムではなく、統一された globalBreathSpeed を使う！
-        //Oscil ampLFO = new Oscil(globalBreathSpeed, wobbleAmp, Waves.SINE);
-        
-        // 位相（スタート位置）は少しだけバラけさせると、音が立体的になります
-        //ampLFO.setPhase(random(1.0f)); 
-        
-        // ampLFOを osc.amplitude にパッチ(追加)する。
-        // Minimでは複数のUGenを同じ入力にパッチすると「加算(Sum)」されるため、
-        // ampLines の基準値に対して、ampLFO が ±wobbleAmp の揺れを足し引きしてくれます。
-        //ampLFO.patch(osc.amplitude);
-        
-        // --- 音量揺らぎ（AM変調）のフェード構造化 ---
-        wobbleFactors[i] = random(0.12f, 0.17f); 
-        //wobbleFactors[i] = wobbleDepths[i]; 
-        wobbleLines[i] = new Line();
-        Oscil ampLFO = new Oscil(globalBreathSpeed, 0.0f, Waves.SINE); // 初期振幅は0
-        ampLFO.setPhase(random(1.0f)); 
-        
-        wobbleLines[i].patch(ampLFO.amplitude); // 新設LineをLFOの振幅へ接続
-        ampLFO.patch(osc.amplitude);
+      wobbleFactors[i] = random(0.12f, 0.17f);
+      wobbleLines[i] = new Line();
+      Oscil ampLFO = new Oscil(globalBreathSpeed, 0.0f, Waves.SINE);
+      ampLFO.setPhase(random(1.0f));
+      
+      wobbleLines[i].patch(ampLFO.amplitude).patch(osc.amplitude);
       
       
       ampLines[i] = new Line();
       ampLines[i].patch(osc.amplitude); 
       
-      float attackTime = (i == baseWaveNum) ? 0.058f : 0.395f; 
-      
-      // 【修正】内部のサイン波のリリースを 0.3f から 10.0f（10秒）にして、急激な角を作らせない
+      float attackTime = (i == baseWaveNum) ? 0.058f : 0.395f;
       harmonicEnvs[i] = new ADSR(1.0f, attackTime/3, 1.0f, 0.7f, 10.0f);
-      osc.patch(harmonicEnvs[i]);
-      harmonicEnvs[i].patch(mixer);
+      osc.patch(harmonicEnvs[i]).patch(mixer);
     }
     
     
-    // ==========================================
-    // 2. 息のノイズ（Chiff）パートの実測値アップデート
-    // =========================================
-    // 0.0〜1.0 のベロシティ割合を計算（ノイズの音量調整用）
-    float startNorm = constrain(startVel, 0, 127) / 127.0f;
     
-    // 中低音の破裂音（ドスッという音）になるため、少しだけ音量を上げます（0.01f -> 0.02f）
+      // --- 2. 息のノイズパート ---
+    float startNorm = constrain(startVel, 0, 127) / 127.0f;
     float attackNoiseVol = masterVol * 0.003f * pow(startNorm, 0.9f); 
     Noise breathNoise = new Noise(attackNoiseVol, Noise.Tint.WHITE);
     
-    // 【修正】ハイパス(HP)からバンドパス(BP)に変更。
-    // 3500Hz付近の「シュッ」という音だけを残し、耳障りな高音を削る。
-    // 【修正】実測データに基づき、3500Hzから 581.4Hz に変更！
-    // 473Hzの山も一緒に拾うため、レゾナンスを 0.3 から 0.15 に下げて帯域を広げる
     MoogFilter breathFilter = new MoogFilter(381.4f, 0.15f);
     breathFilter.type = MoogFilter.Type.BP;
-    
     breathEnv = new ADSR(1.0f, 0.01f, 0.08f, 0.0f, 0.0f);
     
-    breathNoise.patch(breathFilter);
-    breathFilter.patch(breathEnv);
-    breathEnv.patch(mixer);
-    
-    
-    /*
-    // ==========================================
-    // 3. 【新規追加】持続する空気の渦と管の共鳴（サブハーモニクス層）
-    // ==========================================
-    float endNorm = constrain(endVel, 0, 127) / 127.0f; // 【追加】終了時のベロシティ割合
-    
-    // 【修正】開始時と終了時のノイズ音量を計算して保持する
-    startSustainVol = masterVol * 0.005f * pow(startNorm, 0.9f);
-    endSustainVol   = masterVol * 0.005f * pow(endNorm, 0.9f);
-    
-    // ピンクノイズで低音の「フオォォ」という空気感を出す
-    // 【修正】Noiseの初期音量は0.0fにし、音量制御はLineに任せる
-    Noise sustainNoise = new Noise(0.0f, Noise.Tint.PINK);
-    
-    // 【追加】持続ノイズのボリュームつまみにLineを接続
-    sustainAmpLine = new Line();
-    sustainAmpLine.patch(sustainNoise.amplitude);
-    
-    // ==========================================
-    // 【新規】持続ノイズ自体にも「息の乱れ」を適用する
-    // サイン波の第1倍音と同等のスピードと深さでノイズを揺らす
-    // ==========================================
-    //float noiseWobbleAmp = startSustainVol * 0.20f; // 20%揺らす
-    //Oscil sustainWobble = new Oscil(random(1.5f, 3.0f), noiseWobbleAmp, Waves.SINE);
-    //sustainWobble.setPhase(random(1.0f));
-    //sustainWobble.patch(sustainNoise.amplitude); // Lineの音量にLFOの揺れを加算
-    // ==========================================
-    
-    // 6/12変更
-    // --- 持続ノイズの息の乱れも完全にフェードさせる ---
-    sustainWobbleLine = new Line();
-    Oscil sustainWobble = new Oscil(random(1.5f, 3.0f), 0.0f, Waves.SINE); // 初期振幅は0
-    sustainWobble.setPhase(random(1.0f));
-    
-    sustainWobbleLine.patch(sustainWobble.amplitude); // 新設LineをノイズLFOの振幅へ接続
-    sustainWobble.patch(sustainNoise.amplitude);      // LFO出力をノイズ振幅へ（加算）
-    
-    // ローパスフィルターで高音を削りつつ、2500Hz付近に共鳴(レゾナンス0.5)の山を作る
-    MoogFilter sustainFilter = new MoogFilter(2500f, 0.5f);
-    sustainFilter.type = MoogFilter.Type.LP;
-    
-    // 音が鳴っている間ずっと持続するエンベロープ（サイン波のアタックに合わせる）
-    // 【修正】持続ノイズのリリースも 0.3f から 10.0f（10秒）にする
-    sustainEnv = new ADSR(1.0f, 0.058f, 0.0f, 1.0f, 10.0f);
-    
-    sustainNoise.patch(sustainFilter);
-    sustainFilter.patch(sustainEnv);
-    sustainEnv.patch(mixer);
-    */
+    breathNoise.patch(breathFilter).patch(breathEnv).patch(mixer);
   }
   
   
-  /*
-  void noteOn(float dur) {
-    masterEnv.noteOn();
-    
-    // ====================================================
-    // 【修正】Lineの寿命に、リリース時間（0.4秒）分の猶予を足す！
-    // これにより、減衰中もLineが生き残り、オシレーターの音量が突然0.0fにリセットされるのを防ぐ
-    // ====================================================
-    // 【微調整】masterEnvのリリース時間(0.35f)より少し長ければOK
-    float safeDur = dur + 0.5f;
-    
-    for(int i=0; i<numHarmonics; i++) {
-      harmonicEnvs[i].noteOn();
-      ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
-    }
-    
-    breathEnv.noteOn();
-    sustainEnv.noteOn(); // 【追加】持続ノイズをオン
-    sustainAmpLine.activate(safeDur, startSustainVol, endSustainVol); // 【追加】発音と同時に、持続ノイズの音量変化をスタートさせる
-    
-    masterEnv.patch(out); 
-  }*/
-  // 6/12変更
+  
   void noteOn(float dur) {
     masterEnv.noteOn();
     float safeDur = dur + 0.5f;
     
-    // 7/5【追加4】トランペット/ホルン特有の「アタック時のピッチ降下」パラメータ
-    float sweepTime = 0.12f; // 変化にかかる時間（0.04秒）
-    float pitchMod  = 0.05f; // 高くなる割合（0.03 = 本来の周波数の3%増しからスタート）
+    float sweepTime = 0.12f;
+    float pitchMod  = 0.05f;
     
     for(int i = 0; i < numHarmonics; i++) {
       harmonicEnvs[i].noteOn();
-      
-      // 1. 各倍音のベース音量をフェード
       ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
       
-      // 2. 通常ビブラート時のみ、ウナリ（AM）の深さも比例フェードさせる
       if (wobbleLines[i] != null) {
         float factor = wobbleFactors[i];
         wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
       }
       
-      // 3. 7/5【新規追加】アタック時のピッチエンベロープ（周波数の急降下）
-      // 「本来の周波数の3%分上乗せした値」から「0（上乗せなし）」へと一直線に下げる
-      //if (pitchEnvLines[i] != null) {
-      //  float baseFreq = targetFreqs[i];
-      //  pitchEnvLines[i].activate(sweepTime, baseFreq * pitchMod, 0.0f);
-      //}
-      // 3. 7/5【新規追加】アタック時のピッチエンベロープ（周波数の急降下）
       if (pitchEnvLines[i] != null) {
         float baseFreq = targetFreqs[i];
-        
-        // スタート地点の周波数: 本来の周波数に pitchMod(%) を上乗せした値
-        // 例: pitchMod が 0.03 なら 3%増し、2.0 なら 200%増し（3倍）
         float startFreq = baseFreq * (1.0f + pitchMod);
-        
-        // startFreq から baseFreq(本来の周波数) へ、一直線に下げる
         pitchEnvLines[i].activate(sweepTime, startFreq, baseFreq);
       }
     }
     
     breathEnv.noteOn();
-    //sustainEnv.noteOn(); 
-    
-    // 3. 持続ノイズの全体音量と、そのウナリの深さを同時に追従フェード
-    //sustainAmpLine.activate(safeDur, startSustainVol, endSustainVol); 
-    //sustainWobbleLine.activate(safeDur, startSustainVol * 0.20f, endSustainVol * 0.20f); 
-    
     masterEnv.patch(longOut); 
   }
   
@@ -4250,11 +2245,6 @@ class HornInstrument implements Instrument {
   void noteOff() {
     masterEnv.noteOff();
     for(int i=0; i<numHarmonics; i++) harmonicEnvs[i].noteOff();
-    
-    // 【削除】breathEnv は既に無音なので noteOff を呼ばない（空撃ちグリッチ防止）
-    // breathEnv.noteOff();
-    
-    //sustainEnv.noteOff(); // 【追加】持続ノイズをオフ
     masterEnv.unpatchAfterRelease(longOut); 
   }
 }
@@ -4262,38 +2252,27 @@ class HornInstrument implements Instrument {
 
 \subsection{Trumpet.pde}
 \begin{lstlisting}[caption={Trumpet.pde}, label={lst:proc_trumpet}]
+// ==========================================
+// トランペット（Trumpet）のクラス
+// ==========================================
 class TrumpetInstrument implements Instrument {
-  byte numHarmonics/* = 15*/;
+  byte numHarmonics;
   
   ADSR masterEnv;
-  ADSR[] harmonicEnvs/* = new ADSR[numHarmonics]*/;
+  ADSR[] harmonicEnvs;
   
-  Line[] wobbleLines;    // 6/12【追加】倍音ウナリ（AM）用のフェードライン
-  float[] wobbleFactors; // 6/12【追加】倍音ごとの固有ウナリ比率の保持用
+  Line[] wobbleLines;
+  float[] wobbleFactors;
   
-  // ==========================================
-  // 7/5【追加1】ピッチエンベロープ用の変数
-  // ==========================================
-  Line[] pitchEnvLines;  // アタック時のピッチ急降下用
-  float[] targetFreqs;   // 各倍音の本来の周波数（noteOnで計算に使うため保持）
+  Line[] pitchEnvLines;
+  float[] targetFreqs;
   
-  Line[] ampLines/* = new Line[numHarmonics]*/;
-  float[] startAmps/* = new float[numHarmonics]*/;
-  float[] endAmps/* = new float[numHarmonics]*/;
+  Line[] ampLines;
+  float[] startAmps;
+  float[] endAmps;
   
   ADSR breathEnv;
   
-  
-  // ==========================================
-  // 【新規追加】 持続する空気の渦と管の共鳴（サブハーモニクス層）
-  // ==========================================
-  //ADSR sustainEnv;
-  
-  // 【追加】持続ノイズの音量変化（クレッシェンド/デクレッシェンド）用
-  //Line sustainAmpLine;
-  //Line sustainWobbleLine; // 6/12【追加】持続ノイズのウナリ用のフェードライン
-  //float startSustainVol;
-  //float endSustainVol;
   
   
   
@@ -4304,25 +2283,18 @@ class TrumpetInstrument implements Instrument {
     masterAttackTime = min(masterAttackTime, duration - 0.05f);
     if (masterAttackTime < 0.035f) masterAttackTime = 0.035f;
     
-    // 【修正】masterEnv の一番最後の引数（リリース時間）を 0.3f から 0.4f に延ばす。
-    // 内部の音が 0.3秒 かけて完全に消え去るのを待ってから、安全にアンパッチさせるための余裕（バッファ）です。
-    // 【修正】masterEnv のリリース時間を、希望のフェードアウト時間（例：0.35秒）に設定
     masterEnv = new ADSR(1.0f, masterAttackTime, 0.0f, 1.0f, 0.17f);
-    
     mixer.patch(masterEnv);
     
     
-    // 変更6/12
-    // 1. 倍音レシピを安全に取り出すための基準ベロシティ（0除算・ロード不全の防止）
     float profileVel = (startVel > 0) ? startVel : endVel;
-    if (profileVel <= 0) profileVel = 64.0f; // どちらも0の場合のセーフティ
+    if (profileVel <= 0) profileVel = 64.0f;
     
-    // 2. 開始・終了のゲインファクターをフルートの特性（0.7乗カーブ）に基づいて独立計算
     float startGainFactor = pow(startVel / profileVel, 0.9f);
     float endGainFactor   = pow(endVel / profileVel, 0.9f);
     
-    // 安全にロードされた基準プロファイルを取得
     float[][] startProfile = utils.GetDynamicProfile(midiNote, profileVel, "Trumpet", 52, 1.0f);
+    
     
     float volFactor = masterVol * 0.018f;
     
@@ -4330,285 +2302,94 @@ class TrumpetInstrument implements Instrument {
     
     harmonicEnvs  = new ADSR[numHarmonics];
     ampLines      = new Line[numHarmonics];
-    wobbleLines   = new Line[numHarmonics];    // 初期化を追加
-    wobbleFactors = new float[numHarmonics];   // 初期化を追加
+    wobbleLines   = new Line[numHarmonics];
+    wobbleFactors = new float[numHarmonics];
     startAmps     = new float[numHarmonics];
     endAmps       = new float[numHarmonics];
-    
-    // ==========================================
-    // 7/5【追加2】配列の初期化
-    // ==========================================
     pitchEnvLines = new Line[numHarmonics];
     targetFreqs   = new float[numHarmonics];
     
     
-    
-    
-    //float fundamentalFreq = 440.0 * pow(2.0, (actualMidiNote - 69) / 12.0);
     byte baseWaveNum = 0;
     for (byte i = 1; i < numHarmonics; i++) {
       if (startProfile[i-1][0] < startProfile[i][0]) baseWaveNum = i;
     }
     
-    
-    // ==========================================
-    // 【新規】倍音ごとの自然な振幅揺らぎ（変動率ベース）
-    // ==========================================
-    // Pythonで解析した変動率(%)を参考に、基音の振幅に対して何倍の揺れ(±)を許容するかを設定。
-    // 実測データの変動率(%)から数式 [ Variation / 500 ] によって導出された、
-    // 倍音ごとの自然な振幅揺らぎ（AM変調）の深度設定。
-    //float[] wobbleDepths = {0.1250f, 0.1616f, 0.2078f, 0.2340f, 0.2114f, 0.2742f, 0.3716f, 0.2946f, 0.7420f, 0.8796f, 
-    //                        0.7850f, 0.5070f, 0.6242f, 0.7654f, 0.6702f, 0.3898f, 0.8850f, 0.5942f, 0.3152f, 0.5030f};
-    
-    // ==========================================
-    // 【新規】この音符全体の「呼吸のスピード」を決定
-    // forループの外で1つだけ定義し、全倍音で共有することで相殺を防ぐ
-    // ==========================================
-    float globalBreathSpeed = random(4.0f, 5.0f); // 生楽器の自然なビブラート周期
+    float globalBreathSpeed = random(4.0f, 5.0f);
     
     
-    
-
-
     // 1. 加算合成パート（7つのサイン波）
     for (int i = 0; i < numHarmonics; i++) {
-      /*
-      int h = i + 1;
-      // あなたがPythonで導き出した厳密なインハーモニシティ公式を適用
-      float B = 0.0005f; // インハーモニシティ係数
-      float inharmonicity = sqrt(1.0f + B * h * h);
-      float targetFreq = f0 * h * inharmonicity;
-      */
+      
       float targetFreq = startProfile[i][0];
       
       Oscil osc = new Oscil(targetFreq, 0.0f, Waves.SINE);
-      
-      // 【追加】初期位相を 0.0 〜 1.0 (0度〜360度) の間で完全にランダムに散らす
-      // これにより「カチッ」とした機械的なアタック音が消え、音割れ（ピーク）も防げる
       osc.setPhase(random(1.0f));
       
-      
-      
-      
-      //startAmps[i] = startProfile[i][1] * volFactor;
-      //endAmps[i] = endProfile[i] * volFactor;
-        // 聴覚特性（0.7乗）に完全同期させた、開始時から終了時への音量変化比率を算出
-        //float velRatio = pow(endVel / (startVel + 0.0001f), 0.7f);
-      // 【確定修正】すでにvolFactorが掛けられたstartAmpsに対して、正しいべき乗比率を乗算する
-      //endAmps[i]   = startAmps[i] * pow(endVel / (startVel + 0.0001f), 0.7f);
-      
-      // 6/12追加
-      // 独立した開始・終了音量を厳密に算出
       float baseAmp = startProfile[i][1] * volFactor;
       startAmps[i] = baseAmp * startGainFactor;
       endAmps[i]   = baseAmp * endGainFactor;
       
+      // アタック時にピッチが急降下する特有のエンベロープ準備
+      float vibDepthHz = targetFreq * 0.0007f; 
+      Oscil freqController = new Oscil(globalBreathSpeed, vibDepthHz, Waves.SINE);
+      targetFreqs[i] = targetFreq;
       
+      pitchEnvLines[i] = new Line();
+      pitchEnvLines[i].patch(freqController.offset).patch(osc.frequency);
       
-        // 通常のビブラート（サイン波）
-        
-        // ==========================================
-        // ① 極小のピッチ揺れ (FM変調) の復活
-        // 以前の0.0132fを「0.003f」に激減させ、音痴にならない程度の「空気の揺らぎ」を作る
-        // ==========================================
-        float vibDepthHz = targetFreq * 0.0007f; 
-        Oscil freqController = new Oscil(globalBreathSpeed, vibDepthHz, Waves.SINE);
-        
-        
-        
-        //freqController.offset.setLastValue(targetFreq); 
-        
-        // ==========================================
-        // 7/5【追加3】本来の周波数を保存し、Pitch用のLineを接続
-        // ==========================================
-        targetFreqs[i] = targetFreq; // noteOnで使うために記憶しておく
-        
-        //pitchEnvLines[i] = new Line();
-        //pitchEnvLines[i].patch(osc.frequency); // オシレーターの周波数に加算接続
-        // 【変更点】7/5
-        // 以前あった freqController.offset.setLastValue(targetFreq); を削除します。
-        // 代わりに、Pitch用のLineをLFOの「offset（基準周波数）」に直接パッチします！
-        pitchEnvLines[i] = new Line();
-        pitchEnvLines[i].patch(freqController.offset); 
-        
-        // LFO(基準値がLineで動く)を、メインオシレーターの周波数にパッチ
-        freqController.patch(osc.frequency);
-        
-        
-        
-        // ==========================================
-        // ② 呼吸に同期した音量揺らぎ (AM変調)
-        // ==========================================
-        // この倍音の基準音量に対して、配列で設定した割合だけ揺らす
-        //float wobbleAmp = startAmps[i] * wobbleDepths[i]; 
-        //float wobbleAmp = startAmps[i] * random(0.1f, 0.3f);
-        
-        // 1.5Hz 〜 3.5Hz の間で、倍音ごとにランダムなスピードで揺らす
-        // 【修正】ランダムではなく、統一された globalBreathSpeed を使う！
-        //Oscil ampLFO = new Oscil(globalBreathSpeed, wobbleAmp, Waves.SINE);
-        
-        // 位相（スタート位置）は少しだけバラけさせると、音が立体的になります
-        //ampLFO.setPhase(random(1.0f)); 
-        
-        // ampLFOを osc.amplitude にパッチ(追加)する。
-        // Minimでは複数のUGenを同じ入力にパッチすると「加算(Sum)」されるため、
-        // ampLines の基準値に対して、ampLFO が ±wobbleAmp の揺れを足し引きしてくれます。
-        //ampLFO.patch(osc.amplitude);
-        
-        // --- 音量揺らぎ（AM変調）のフェード構造化 ---
-        wobbleFactors[i] = random(0.10f, 0.20f); 
-        //wobbleFactors[i] = wobbleDepths[i]; 
-        wobbleLines[i] = new Line();
-        Oscil ampLFO = new Oscil(globalBreathSpeed, 0.0f, Waves.SINE); // 初期振幅は0
-        ampLFO.setPhase(random(1.0f)); 
-        
-        wobbleLines[i].patch(ampLFO.amplitude); // 新設LineをLFOの振幅へ接続
-        ampLFO.patch(osc.amplitude);
+      wobbleFactors[i] = random(0.10f, 0.20f); 
+      wobbleLines[i] = new Line();
+      Oscil ampLFO = new Oscil(globalBreathSpeed, 0.0f, Waves.SINE);
+      ampLFO.setPhase(random(1.0f)); 
+      
+      wobbleLines[i].patch(ampLFO.amplitude).patch(osc.amplitude);
       
       
       ampLines[i] = new Line();
       ampLines[i].patch(osc.amplitude); 
       
-      float attackTime = (i == baseWaveNum) ? 0.058f : 0.395f; 
-      
-      // 【修正】内部のサイン波のリリースを 0.3f から 10.0f（10秒）にして、急激な角を作らせない
+      float attackTime = (i == baseWaveNum) ? 0.058f : 0.395f;
       harmonicEnvs[i] = new ADSR(1.0f, attackTime/3, 1.0f, 0.7f, 10.0f);
-      osc.patch(harmonicEnvs[i]);
-      harmonicEnvs[i].patch(mixer);
+      osc.patch(harmonicEnvs[i]).patch(mixer);
     }
     
     
-    // ==========================================
-    // 2. 息のノイズ（Chiff）パートの実測値アップデート
-    // =========================================
-    // 0.0〜1.0 のベロシティ割合を計算（ノイズの音量調整用）
+    // --- 2. 息のノイズパート ---
     float startNorm = constrain(startVel, 0, 127) / 127.0f;
-    
-    // 中低音の破裂音（ドスッという音）になるため、少しだけ音量を上げます（0.01f -> 0.02f）
     float attackNoiseVol = masterVol * 0.01f * pow(startNorm, 0.9f); 
     Noise breathNoise = new Noise(attackNoiseVol, Noise.Tint.WHITE);
     
-    // 【修正】ハイパス(HP)からバンドパス(BP)に変更。
-    // 3500Hz付近の「シュッ」という音だけを残し、耳障りな高音を削る。
-    // 【修正】実測データに基づき、3500Hzから 581.4Hz に変更！
-    // 473Hzの山も一緒に拾うため、レゾナンスを 0.3 から 0.15 に下げて帯域を広げる
     MoogFilter breathFilter = new MoogFilter(581.4f, 0.15f);
     breathFilter.type = MoogFilter.Type.BP;
-    
     breathEnv = new ADSR(1.0f, 0.01f, 0.08f, 0.0f, 0.0f);
     
-    breathNoise.patch(breathFilter);
-    breathFilter.patch(breathEnv);
-    breathEnv.patch(mixer);
-    
-    
-    /*
-    // ==========================================
-    // 3. 【新規追加】持続する空気の渦と管の共鳴（サブハーモニクス層）
-    // ==========================================
-    float endNorm = constrain(endVel, 0, 127) / 127.0f; // 【追加】終了時のベロシティ割合
-    
-    // 【修正】開始時と終了時のノイズ音量を計算して保持する
-    startSustainVol = masterVol * 0.005f * pow(startNorm, 0.9f);
-    endSustainVol   = masterVol * 0.005f * pow(endNorm, 0.9f);
-    
-    // ピンクノイズで低音の「フオォォ」という空気感を出す
-    // 【修正】Noiseの初期音量は0.0fにし、音量制御はLineに任せる
-    Noise sustainNoise = new Noise(0.0f, Noise.Tint.PINK);
-    
-    // 【追加】持続ノイズのボリュームつまみにLineを接続
-    sustainAmpLine = new Line();
-    sustainAmpLine.patch(sustainNoise.amplitude);
-    
-    // ==========================================
-    // 【新規】持続ノイズ自体にも「息の乱れ」を適用する
-    // サイン波の第1倍音と同等のスピードと深さでノイズを揺らす
-    // ==========================================
-    //float noiseWobbleAmp = startSustainVol * 0.20f; // 20%揺らす
-    //Oscil sustainWobble = new Oscil(random(1.5f, 3.0f), noiseWobbleAmp, Waves.SINE);
-    //sustainWobble.setPhase(random(1.0f));
-    //sustainWobble.patch(sustainNoise.amplitude); // Lineの音量にLFOの揺れを加算
-    // ==========================================
-    
-    // 6/12変更
-    // --- 持続ノイズの息の乱れも完全にフェードさせる ---
-    sustainWobbleLine = new Line();
-    Oscil sustainWobble = new Oscil(random(1.5f, 3.0f), 0.0f, Waves.SINE); // 初期振幅は0
-    sustainWobble.setPhase(random(1.0f));
-    
-    sustainWobbleLine.patch(sustainWobble.amplitude); // 新設LineをノイズLFOの振幅へ接続
-    sustainWobble.patch(sustainNoise.amplitude);      // LFO出力をノイズ振幅へ（加算）
-    
-    // ローパスフィルターで高音を削りつつ、2500Hz付近に共鳴(レゾナンス0.5)の山を作る
-    MoogFilter sustainFilter = new MoogFilter(2500f, 0.5f);
-    sustainFilter.type = MoogFilter.Type.LP;
-    
-    // 音が鳴っている間ずっと持続するエンベロープ（サイン波のアタックに合わせる）
-    // 【修正】持続ノイズのリリースも 0.3f から 10.0f（10秒）にする
-    sustainEnv = new ADSR(1.0f, 0.058f, 0.0f, 1.0f, 10.0f);
-    
-    sustainNoise.patch(sustainFilter);
-    sustainFilter.patch(sustainEnv);
-    sustainEnv.patch(mixer);
-    */
+    breathNoise.patch(breathFilter).patch(breathEnv).patch(mixer);
   }
   
   
-  /*
-  void noteOn(float dur) {
-    masterEnv.noteOn();
-    
-    // ====================================================
-    // 【修正】Lineの寿命に、リリース時間（0.4秒）分の猶予を足す！
-    // これにより、減衰中もLineが生き残り、オシレーターの音量が突然0.0fにリセットされるのを防ぐ
-    // ====================================================
-    // 【微調整】masterEnvのリリース時間(0.35f)より少し長ければOK
-    float safeDur = dur + 0.5f;
-    
-    for(int i=0; i<numHarmonics; i++) {
-      harmonicEnvs[i].noteOn();
-      ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
-    }
-    
-    breathEnv.noteOn();
-    sustainEnv.noteOn(); // 【追加】持続ノイズをオン
-    sustainAmpLine.activate(safeDur, startSustainVol, endSustainVol); // 【追加】発音と同時に、持続ノイズの音量変化をスタートさせる
-    
-    masterEnv.patch(out); 
-  }*/
-  // 6/12変更
   void noteOn(float dur) {
     masterEnv.noteOn();
     float safeDur = dur + 0.5f;
     
-    // 7/5【追加4】トランペット/ホルン特有の「アタック時のピッチ降下」パラメータ
-    float sweepTime = 0.07f; // 変化にかかる時間（0.04秒）
-    float pitchMod  = 0.03f; // 高くなる割合（0.03 = 本来の周波数の3%増しからスタート）
+    float sweepTime = 0.07f; // ピッチ変化にかかる時間
+    float pitchMod  = 0.03f; // アタック時に高くなる割合
     
     for(int i = 0; i < numHarmonics; i++) {
       harmonicEnvs[i].noteOn();
       
-      // 1. 各倍音のベース音量をフェード
       ampLines[i].activate(safeDur, startAmps[i], endAmps[i]);
       
-      // 2. 通常ビブラート時のみ、ウナリ（AM）の深さも比例フェードさせる
       if (wobbleLines[i] != null) {
         float factor = wobbleFactors[i];
         wobbleLines[i].activate(safeDur, startAmps[i] * factor, endAmps[i] * factor);
       }
       
-      // 3. 7/5【新規追加】アタック時のピッチエンベロープ（周波数の急降下）
-      // 「本来の周波数の3%分上乗せした値」から「0（上乗せなし）」へと一直線に下げる
-      //if (pitchEnvLines[i] != null) {
-      //  float baseFreq = targetFreqs[i];
-      //  pitchEnvLines[i].activate(sweepTime, baseFreq * pitchMod, 0.0f);
-      //}
-      // 3. 7/5【新規追加】アタック時のピッチエンベロープ（周波数の急降下）
+      // 金管楽器特有のピッチアタック（高いピッチから本来のピッチへ下げる）
       if (pitchEnvLines[i] != null) {
         float baseFreq = targetFreqs[i];
         
         // スタート地点の周波数: 本来の周波数に pitchMod(%) を上乗せした値
-        // 例: pitchMod が 0.03 なら 3%増し、2.0 なら 200%増し（3倍）
         float startFreq = baseFreq * (1.0f + pitchMod);
         
         // startFreq から baseFreq(本来の周波数) へ、一直線に下げる
@@ -4617,12 +2398,6 @@ class TrumpetInstrument implements Instrument {
     }
     
     breathEnv.noteOn();
-    //sustainEnv.noteOn(); 
-    
-    // 3. 持続ノイズの全体音量と、そのウナリの深さを同時に追従フェード
-    //sustainAmpLine.activate(safeDur, startSustainVol, endSustainVol); 
-    //sustainWobbleLine.activate(safeDur, startSustainVol * 0.20f, endSustainVol * 0.20f); 
-    
     masterEnv.patch(longOut); 
   }
   
@@ -4631,11 +2406,6 @@ class TrumpetInstrument implements Instrument {
   void noteOff() {
     masterEnv.noteOff();
     for(int i=0; i<numHarmonics; i++) harmonicEnvs[i].noteOff();
-    
-    // 【削除】breathEnv は既に無音なので noteOff を呼ばない（空撃ちグリッチ防止）
-    // breathEnv.noteOff();
-    
-    //sustainEnv.noteOff(); // 【追加】持続ノイズをオフ
     masterEnv.unpatchAfterRelease(longOut); 
   }
 }

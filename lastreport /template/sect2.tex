@@ -8,7 +8,7 @@
 最後に，演奏開始後にて楽曲の音量を変更したい場合，ユーザがスライド式可変抵抗器を操作したうえで指揮デバイスを振ると，加速度センサが振り動作を検知し，直接楽器デバイスへUDP通信を行い楽曲の音量を変更する．
 ここからは各デバイスの概要について説明する．
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{./figs/zentaigod.png}
     \caption{全体の構成図}
@@ -35,14 +35,14 @@
 \end{figure}
 \FloatBarrier
 
-\begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
     \centering % 中央揃え
     \includegraphics[width=0.8\columnwidth]{figs/siki_sys4.png} % 横幅を列幅の80%に指定
     \caption{指揮デバイスのシステム構成図} % 図の説明
     \label{fig:sys_siki} % 本文中で参照するためのラベル
 \end{figure}
 
-\begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
     \centering % 中央揃え
     \includegraphics[width=0.8\columnwidth]{figs/kaisi_inta2_cropped.pdf} % 余白をpdfcropでトリミング済み
     \caption{演奏開始トリガー送信機能設計} % 図の説明
@@ -130,12 +130,12 @@
 
 次に，指揮デバイスの制御プログラムのファイル構成を示す．表\ref{table:siki_files}の通り，各ファイルは機能ごとにクラス化されている．
 
-\begin{table}[h]
+\begin{table}[htbp]
     \vspace{-1em}
     \caption{指揮デバイスのファイル構成}
     \label{table:siki_files}
     \centering
-    \begin{tabular}{|l|p{10cm}|}
+    \begin{tabular}{|l|p{9.4cm}|}
         \hline
         ファイル名 & 概要 \\ \hline \hline
         Controller\_simultaneous.ino & setup/loopによる全体制御，ボタン入力の判定 \\ \hline
@@ -830,7 +830,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
 %指揮デバイスから信号を受け取った際に，観覧車型の中継機デバイスが作動する．
 %指揮デバイスから送信されたBPMを元にして観覧車は回転し，LEDMatrixにはそのBPMが表示される仕組みである．
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \centering
     \includegraphics[width=10cm]{./figs/kan.png}
@@ -845,7 +845,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
 また，スライドスイッチは，観覧車のレーザー基板ごとに実装され，ボタン電池からレーザーモジュールへの給電をON/OFFする役割を持つ．レーザーは演奏中常時点灯させる必要があるが，非使用時にはこのスイッチによって電源を遮断できるようにすることで，ボタン電池の消耗を抑えている．
 
 
-\begin{table}[h]
+\begin{table}[htbp]
     \caption{中継機デバイスを構成する部品}
     \centering
     \label{kizai}
@@ -884,7 +884,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
 
 
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \centering
     \includegraphics[width=\textwidth]{./figs/kairo.png}
@@ -934,7 +934,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
 
 
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \centering
     \includegraphics[width=5cm]{./figs/model_base.png}
@@ -942,7 +942,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
     \label{kanran1}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \centering
     \includegraphics[width=5cm]{./figs/model_pillar.png}
@@ -950,7 +950,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
     \label{kanran2}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \centering
     \includegraphics[width=5cm]{./figs/model_shaft.png}
@@ -958,7 +958,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
     \label{kanran3}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \centering
     \includegraphics[width=5cm]{./figs/model_circle1.png}
@@ -966,7 +966,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
     \label{kanran4}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \centering
     \includegraphics[width=5cm]{./figs/model_circle2.png}
@@ -974,7 +974,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
     \label{kanran5}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \centering
     \includegraphics[width=5cm]{./figs/model_pointer.png}
@@ -999,7 +999,7 @@ isButtonPlayingがtrue（演奏中）であればsync.sendEnd()を呼び出し�
 本節では中継機デバイスの内部設計について説明する．本デバイスでは，モータ制御と現在のBPMを表示するLEDMatrixのプログラムによって構成される．
 また，中継機デバイスの制御プログラムのファイル構成を示す．表\ref{tab:file1}の通り，各ファイルは機能ごとに分割されている．
 
-\begin{table}[h]
+\begin{table}[htbp]
     \vspace{-1em}
     \caption{中継機デバイスのファイル構成}
     \label{tab:file1}
@@ -1386,7 +1386,7 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
 
 続いて，LEDMatrix表示で使用する関数の仕様を表\ref{tab:func1}に示す．
 
-\begin{table}[h]
+\begin{table}[htbp]
     \vspace{-1em}
     \caption{LEDMatrix表示で使用する関数の仕様一覧}
     \centering
@@ -1409,7 +1409,7 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
 LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りである．WiFi接続・UDP受信および各処理の呼び出しを行うFerrisWheel.ino，LEDマトリクスへの描画処理を行うDisplay.cpp，および関数宣言やフォント定義を行うDisplay.hで構成される．
 各モジュール間の関係について，FerrisWheel.inoからDisplay.cppへの関係は，表示処理を利用する依存関係である．また，Display.cppからDisplay.hへの関係は，関数宣言およびフォント定義を参照する依存関係である．
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
      \centering
     \includegraphics[width=7cm]{figs/class_mat.png}
@@ -1735,14 +1735,14 @@ bool detectLight(int v, unsigned long nowMs) {
 
 ここからは，外部設計と内部設計について説明する．
 
-\begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
         \centering % 中央揃え
         \includegraphics[width=0.8\columnwidth]{figs/jusin_sys3.png} % 横幅を列幅の80%に指定
         \caption{楽器デバイスのシステム構成図} % 図の説明
         \label{fig:jusin_sys} % 本文中で参照するためのラベル
 \end{figure}
 
-\begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
+\begin{figure}[htbp] % h:ここ, t:上, b:下, p:独立ページ
         \centering % 中央揃え
         \includegraphics[width=0.9\columnwidth]{figs/jusin_jou5_cropped.pdf}
         \caption{レーザー光受光によるBPM検出のシーケンス図} % 図の説明
@@ -1756,7 +1756,7 @@ bool detectLight(int v, unsigned long nowMs) {
 また，今回はドラム，ピアノ，ストリングス，フルートの4種類の楽器の音色を再現するため，それぞれにArduinoを使用し，CdSセルおよびブレッドボードも4台用意する．
 
 
-\begin{table}[h]
+\begin{table}[htbp]
     \caption{楽器デバイスに必要な機器}
     \centering
     \label{table:ota}

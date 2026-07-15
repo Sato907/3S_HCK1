@@ -1,4 +1,5 @@
-\section{中継機デバイス（Display）のプログラムソース}
+\section{中継機デバイス（FerrisWheel）のプログラムソース}
+\label{sec:apndx_display}
 本節では，中継機デバイスのモータ回転制御およびLEDマトリクス表示を行う制御プログラムの全文を示す．
 
 \subsection{FerrisWheel.ino}
@@ -8,21 +9,23 @@
 #include <WiFiS3.h>
 #include <WiFiUdp.h>
 
-const char SSID[] = "hackathon001-WPA2";
-const char PASS[] = "hackathon001";
+const char SSID[] = "hackathon001-WPA2";// Wi-Fi のネットワーク名(hackathon001-WPA2)
+const char PASS[] = "hackathon001";// その Wi-Fi のパスワード(hackathon001)
 
-IPAddress localIP(192, 168, 11, 10);
-IPAddress gateway(192, 168, 11, 1);
-IPAddress subnet(255, 255, 255, 0);
 
-const uint16_t LOCAL_PORT = 5005;
+IPAddress localIP(192, 168, 11, 10);// 観覧車の静的IPアドレスを設定
+IPAddress gateway(192, 168, 11, 1);// 静的IP設定のために使用するデフォルトゲートウェイのアドレスを設定
+IPAddress subnet(255, 255, 255, 0);// 静的IP設定のために使用するサブネットマスク
+
+const uint16_t LOCAL_PORT = 5005;// 自身のポート番号
 
 MotorControl motor;
 
 WiFiUDP Udp;
-uint8_t packetBuffer[10];
 
-// 演奏中フラグ。'S'でtrue / 'E'でfalse。
+uint8_t packetBuffer[10];// UDP通信で受信したパケットのデータを一時的に格納するバッファ
+
+// 演奏中かどうかを判定('S'受信でtrue，'E'でfalse)
 // 'B'(BPM変更)は演奏中のみ受け付け、開始前の不意の'B'でモーターが回り出すのを防ぐ。
 bool running = false;
 
@@ -121,9 +124,13 @@ void loop() {
 #define MATRIX_ROWS  8
 #define MATRIX_COLS  12
 
+// LEDマトリクスの初期化を行う．
 void displaySetup();
+// 指定された段階番号（1〜5）に対応するBPM値を算出し，BPM値をLEDマトリクスに表示する関数．
 void displayBPM(uint8_t stepNumber);
+// LEDマトリクスを全消灯する．
 void clearDisplay();
+// 指定された1桁の数字をフレームバッファから描画する．
 void drawDigit(int digit, int x_offset);
 
 extern const uint8_t font3x5[10][15];
@@ -167,6 +174,7 @@ static const int bpmTable[5] = {
 
 ArduinoLEDMatrix matrix;
 
+// LEDマトリクスの初期化を行う．
 void displaySetup() {
     matrix.begin();
     uint32_t warmUp[3] = {0, 0, 0};
@@ -177,6 +185,7 @@ void displaySetup() {
 static uint8_t frameBuffer[MATRIX_ROWS][MATRIX_COLS];
 static int currentBPM = -1;
 
+// 指定された段階番号（1〜5）に対応するBPM値を算出し，BPM値をLEDマトリクスに表示する関数．
 void displayBPM(uint8_t stepNumber) {
     if (stepNumber < 1 || stepNumber > 5) return;
     uint8_t bpm = bpmTable[stepNumber - 1];
@@ -218,6 +227,7 @@ void displayBPM(uint8_t stepNumber) {
     matrix.loadFrame(bitmap);
 }
 
+// 指定された1桁の数字をフレームバッファから描画する．
 void drawDigit(int digit, int x_offset) {
     if (digit < 0 || digit > 9) return;
     const int y_offset = (MATRIX_ROWS - FONT_HEIGHT) / 2;
@@ -232,6 +242,7 @@ void drawDigit(int digit, int x_offset) {
     }
 }
 
+// LEDマトリクスを全消灯する．
 void clearDisplay() {
     currentBPM = -1;
     uint32_t blank[3] = {0, 0, 0};
@@ -249,27 +260,35 @@ void clearDisplay() {
 class MotorControl {
 public:
     MotorControl();
+    
+    // setup内で一度だけ呼び出される関数であり，モーターピンの初期化を行う．
     void begin();
+    // rpmTableを作成する関数．
     void createRpmTable();
+    // 演奏開始時の加速を制御する．初期のBPMに基づき一定時間をかけて徐々に目標速度（RPM）へ到達させる．
     void startRamp(uint8_t stepNumber);
+    // 演奏中の BPM 変更を行う．
     void changeBPM(uint8_t stepNumber);
+    // 演奏終了時の減速を制御する．現在のBPMに基づき，時間をかけて徐々に速度を0に近づけていく．
     void stopRamp();
 
 private:
+    // 段階番号をBPMに変換する関数．
     void stepToNumber(uint8_t stepNumber);
+    // omegaとV_averageを作成する関数．
     void updateStatus();
 
-    const uint8_t PIN_MOTOR_PWM = 5;
-    const uint8_t bpmTable[5]  = {60, 90, 120, 150, 180};
-    const float   VCC           = 5.0;
-    const uint8_t pwmTable[5]  = {26, 28, 30, 32, 37}; // 仮の数値
+    const uint8_t PIN_MOTOR_PWM = 5;// モーター制御用の出力ピン
+    const uint8_t bpmTable[5]  = {60, 90, 120, 150, 180};// 5つの離散値 BPM 格納
+    const float VCC = 5.0;// Arduino への供給電圧 Vcc
+    const uint8_t pwmTable[5] = {26, 28, 30, 32, 37}; // 5つの離散値 PWM 格納
 
-    uint8_t currentBPM = 0;
-    float   RPM        = 0;
-    float   omega      = 0;
-    uint8_t pwmValue   = 0;
-    float   V_average  = 0;
-    float   rpmTable[5] = {};
+    uint8_t currentBPM = 0;// 現在演奏中の BPM データ
+    float RPM = 0; // BPM から計算された目標回転数
+    float omega = 0;// 目標角速度 omega
+    uint8_t pwmValue = 0;  // analogWrite 用の出力値
+    float V_average = 0;// 平均電圧 V_average
+    float rpmTable[5] = {};// rpmを格納する（計算するため空にしている）
 };
 
 #endif
@@ -281,11 +300,13 @@ private:
 
 MotorControl::MotorControl() {}
 
+// setup内で一度だけ呼び出される関数であり，モーターピンの初期化を行う．
 void MotorControl::begin() {
     pinMode(PIN_MOTOR_PWM, OUTPUT);
     analogWrite(PIN_MOTOR_PWM, 0);
 }
 
+// rpmTableを作成する関数．
 void MotorControl::createRpmTable() {
     for (uint8_t i = 0; i < 5; i++) {
         rpmTable[i] = bpmTable[i] / 16.0f;
@@ -293,6 +314,7 @@ void MotorControl::createRpmTable() {
     Serial.println("[Motor] rpmTable 初期化完了");
 }
 
+// 演奏開始時の加速を制御する．初期のBPMに基づき一定時間をかけて徐々に目標速度（RPM）へ到達させる．
 void MotorControl::startRamp(uint8_t stepNumber) {
     stepToNumber(stepNumber);
     Serial.println("[Motor] Start Ramp Up...");
@@ -304,6 +326,7 @@ void MotorControl::startRamp(uint8_t stepNumber) {
     Serial.println("[Motor] Target speed reached.");
 }
 
+// 演奏終了時の減速を制御する．現在のBPMに基づき，時間をかけて徐々に速度を0に近づけていく．
 void MotorControl::stopRamp() {
     Serial.println("[Motor] Start Ramp Down...");
     for (int i = pwmValue; i >= 0; i -= 5) {
@@ -314,6 +337,7 @@ void MotorControl::stopRamp() {
     Serial.println("[Motor] Stopped.");
 }
 
+// 演奏中の BPM 変更を行う．
 void MotorControl::changeBPM(uint8_t stepNumber) {
     stepToNumber(stepNumber);
     updateStatus();
@@ -321,6 +345,7 @@ void MotorControl::changeBPM(uint8_t stepNumber) {
     Serial.print("[Motor] Speed Changed. PWM: "); Serial.println(pwmValue);
 }
 
+// 段階番号をBPMに変換する関数．
 void MotorControl::stepToNumber(uint8_t stepNumber) {
     if (stepNumber < 1 || stepNumber > 5) return;
     currentBPM = bpmTable[stepNumber - 1];
@@ -328,6 +353,7 @@ void MotorControl::stepToNumber(uint8_t stepNumber) {
     RPM        = rpmTable[stepNumber - 1];
 }
 
+// omegaとV_averageを作成する関数．
 void MotorControl::updateStatus() {
     omega     = 2.0 * PI * RPM / 60.0f;
     V_average = VCC * (pwmValue / 256.0f);

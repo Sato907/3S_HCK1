@@ -1,8 +1,9 @@
-\section{楽器デバイスの同期プログラム（douki\_saigo）のプログラムソース}
-本節では，楽器デバイスの同期方式を担うArduinoプログラム（douki\_saigo）の全文を示す．なお，埋め込みの楽譜データ（Note[]配列）は，各小節ごとに同一形式のデータが多数繰り返されるのみであるため，冒頭2小節分のみを掲載し，以降は省略している．
+\section{楽器デバイスの同期プログラムのプログラムソース}
+\label{sec:apndx_douki}
+本節では，楽器デバイスの同期方式を担うArduinoプログラムの全文を示す．掲載にあたり，次の2点の省略を行っている．第一に，埋め込みの楽譜データ（Note[]配列）は，各小節ごとに同一形式のデータが多数繰り返されるのみであるため，冒頭2小節分のみを掲載し，以降は省略している．第二に，スレーブ機であるピアノ・ストリングス・フルートの3つのスケッチは，自機のIPアドレスと楽器ID（MY\_INST\_ID）の2定数および楽譜データを除いて完全に同一であるため，ピアノ（piano\_0706.ino）のみ全文を掲載し，ストリングス・フルートについては相違箇所のみを示す．
 
-\subsection{drum\_0706.ino}
-\begin{lstlisting}[caption={drum\_0706.ino（楽譜データ省略）}, label={lst:douki_drum_full}]
+\subsection{drum\_0706.ino（マスター機）}
+\begin{lstlisting}[caption={drum\_0706.ino（楽譜データは冒頭2小節のみ掲載）}, label={lst:douki_drum_full}]
 #include <WiFiS3.h>
 #include <WiFiUdp.h>
 #include <Arduino.h>
@@ -11,12 +12,13 @@ const char SSID[] = "hackathon001-WPA2";
 const char PASS[] = "hackathon001";
 
 IPAddress localIP(192, 168, 11, 11); // ドラム（マスター）のIPアドレス
-const uint16_t LOCAL_PORT = 5005;
+const uint16_t LOCAL_PORT = 5005; // 自身のポート番号
 
 WiFiUDP Udp;
+// UDP通信で受信したパケットのデータを一時的に格納する
 uint8_t packetBuffer[32];
 
-const int CDS_PIN = A0;
+const int CDS_PIN = A0; // CdSセルを接続するアナログ入力ピン番号を定義
 const int CDS_ON_THRESHOLD  = 800; // 起動直後だけ使う仮しきい値
 const int CDS_OFF_THRESHOLD = 780; // 起動直後だけ使う仮しきい値
 const int CDS_MIN_DELTA = 25;      // 暗い状態との差がこれ未満ならレーザー扱いしない
@@ -25,20 +27,18 @@ const uint8_t CDS_ON_RATIO = 65;    // baselineからピークまでの65%をON�
 const uint8_t CDS_OFF_RATIO = 35;   // baselineからピークまでの35%をOFFしきい値にする
 const int CDS_THRESHOLD_STEP_LIMIT = 25; // 1回の検出でしきい値が動きすぎない上限
 const unsigned long CDS_STARTUP_CALIBRATION_MS = 1000; // 起動直後の誤検出防止時間
-const unsigned long DEBOUNCE_MS = 20;
-const int BPM_LIST[] = { 60, 90, 120, 150, 180 };
-// 段階1~5(BPM_LISTと対応)の実測の1周あたり時間[ms]。理論値(30000/BPM)では観覧車の
-// 実際の回転速度と合わないことが判明したため、実測値でBPMを判定する。
-const float ROTATION_PERIOD_LIST[] = { 330, 240, 190, 150, 100 };
-const int MIN_STABLE_COUNT = 3;
+const unsigned long DEBOUNCE_MS = 20;// 直前の検知からこの時間未満の再検知を無視するデバウンス時間を定義
+const int BPM_LIST[] = { 60, 90, 120, 150, 180 }; // 5段階の目標BPM設定値（60〜180）を定義
+const float ROTATION_PERIOD_LIST[] = { 330, 240, 190, 150, 100 }; // 各BPMに対応する観覧車の実測回転周期を定義
+const int MIN_STABLE_COUNT = 3; // BPM確定（安定）とみなす連続一致回数（3回）を定義
 
 struct NoteData {
-  uint16_t timing;
-  uint16_t duration;
-  uint8_t  pitch;
-  uint8_t  startVelocity;
-  uint8_t  endVelocity;
-  uint8_t  type;
+  uint16_t timing; // 発音タイミング（楽曲開始からの累積Tick数）
+  uint16_t duration; // 発音の長さ（Tick単位）
+  uint8_t  pitch; // 音高を示すMIDIノート番号（0〜127）
+  uint8_t  startVelocity; // 発音開始時の強さ（0〜127）
+  uint8_t  endVelocity; // 発音終了時の強さ（0〜127）
+  uint8_t  type; // 発音の種類を指定するフラグ
 };
 
 // 楽譜データ
@@ -69,9 +69,12 @@ const NoteData Note[] = {
   {180, 1, 64, 96, 80, 0}, // [19] E4
   {186, 1, 64, 48, 80, 0}, // [20] E4
 
-  // ...（以下、同様の形式の楽譜データが続くため省略）...
+
+  // …（以降，末尾まで同一形式の楽譜データが続くため省略）…
+
 };
 
+// NoteDataに含まれる音符の数
 const uint16_t note_count = sizeof(Note) / sizeof(Note[0]);
 
 // ==========================================
@@ -83,8 +86,8 @@ uint32_t lastTick       = 0;  // updateTick用タイムスタンプ[µs]
 uint32_t tickIval       = 0;  // 1Tickあたりのµs
 uint16_t scoreIdx       = 0; // 次に発音する予定のデータのインデックス
 
-uint8_t curBpm = 0;
-uint8_t curVol = 50;
+uint8_t curBpm = 0; //現在のBPM
+uint8_t curVol = 50; // 現在の音量
 
 // ==========================================
 // 楽譜シーケンス定義
@@ -94,12 +97,12 @@ uint8_t curVol = 50;
 //   ★ O通信送信タイミング = 演奏開始elapsedPlayTick - O_ADVANCE_TICKS
 //   ★ state2移行後の最初のイベントがelapsedPlayTick=0（ドラム以外）の場合、
 //     そのイベントのO通信は elapsedPlayTick=0 では間に合わないため、
-//     実際の演奏開始は O_ADVANCE_TICKS 分だけ後ろにずれる（後述）
+//     実際の演奏開始は O_ADVANCE_TICKS 分だけ後ろにずれる
 // ==========================================
 const int32_t O_ADVANCE_TICKS = 96;  // O通信を演奏開始の何Tick前に送るか
-const int     MAX_SONGS       = 5;
-const int     MAX_EVENTS      = 10;
-const int     drumInstId      = 0;
+const int     MAX_SONGS       = 5; // 最大の曲数
+const int     MAX_EVENTS      = 10; // 最大の発音開始指示の上限
+const int     drumInstId      = 0; // ドラムのID
 
 // ★実際の曲構成に合わせて書き換える★
 // elapsedPlayTick=0 からドラム以外の楽器が始まる場合、
@@ -143,35 +146,21 @@ int startSequence[MAX_SONGS][MAX_EVENTS][2] = {
   }
 };
 
-int     currentSongId       = 0;
-// int     currentEventIndex   = 0;
+int     currentSongId       = 0; // 現在の曲のID
 int32_t elapsedPlayTick     = 0;  // state3移行後（演奏開始後）の経過Tick
 
-bool isDrumPlaying = false;
+bool isDrumPlaying = false; //ドラムが演奏中でないかどうか
 
-const uint8_t MAX_INSTRUMENTS = 4;
-// O通信は T受信に頼らず非同期で送るため、送信済みフラグを管理する
-// bool oSentFlags[MAX_EVENTS]               = {false}; // 各イベントのO通信送信済みか
-// 変更後：送信回数を記録する配列に変更
-uint8_t oSentCount[MAX_EVENTS] = {0}; 
+const uint8_t MAX_INSTRUMENTS = 4; // 最大楽器数
+uint8_t oSentCount[MAX_EVENTS] = {0}; // 各イベントのO通信の送信回数を保存
 bool isInstConnected[MAX_INSTRUMENTS]     = {false}; // 同期に参加してるかどうかv
 bool isInstJoin[MAX_INSTRUMENTS]          = {false}; // 演奏同期に参加する予告が来たか
 int32_t lastReceivedDiff[MAX_INSTRUMENTS] = {0}; // 他の楽器からT通信で送られるdiffを格納
 
-
-// 値は1〜5などを想定。0はデータ未取得扱いなどにする。
 uint8_t receivedBpmLevels[MAX_INSTRUMENTS] = {0}; // 参加している楽器のBPM段階を集約する配列（ドラム自身も含む）
 uint8_t currentBpmLevel = 1; // 現在確定しているBPM段階（前回値）
 
-// ==========================================
-// state 1→2 sync閾値（diff 6tick以内）
-// ==========================================
-//int32_t SYNC_READY_THRESHOLD  = 6;   // tick
-// const int32_t SYNC_STABLE_THRESHOLD = 10;  // state1での「まあ良い」閾値（ログ用）
-
-// ==========================================
 // SyncManager（レーザー検知・BPM安定判定）
-// ==========================================
 class SyncManager {
 public:
   SyncManager()
@@ -185,6 +174,7 @@ public:
     clearPeakHistory();
   }
 
+  // 全ての内部状態を初期値に戻す
   void reset() {
     lastDetectTime = 0;
     correctedBPM = 0;
@@ -207,6 +197,7 @@ public:
     clearPeakHistory();
   }
 
+  // CdSの読み取り値と現在時刻から，しきい値較正・エッジ検出・デバウンスを行い，レーザー検知時にtrueを返す．
   bool update(int cdsValue, unsigned long nowMs) {
     if (calibrationStartMs == 0) calibrationStartMs = nowMs;
     if (!detectLight(cdsValue, nowMs)) return false;
@@ -223,30 +214,32 @@ public:
     return true;
   }
 
-  int   getCorrectedBPM() const { return correctedBPM; }
-  int   getStableCount()  const { return stableCount; }
+  // 補正後の値を取得する窓口関数．
+  int getCorrectedBPM() const { return correctedBPM; }
+  int getStableCount()  const { return stableCount; }
 
 private:
-  unsigned long lastDetectTime;
-  int           correctedBPM;
-  int           stableCount;
-  int           prevCorrectedBPM;
-  bool          laserOn;
-  int           baseline;
-  bool          baselineReady;
-  int           onThreshold;
-  int           offThreshold;
-  int           pulsePeak;
-  int           peakHistory[CDS_PEAK_HISTORY];
-  uint8_t       peakIndex;
-  uint8_t       peakCount;
-  bool          calibrated;
-  bool          startupCalibrated;
-  bool          waitingForRelease;
-  unsigned long calibrationStartMs;
-  int           startupMin;
-  int           releaseThreshold;
+  unsigned long lastDetectTime; // 直前にレーザー検知が確定した時刻を格納
+  int correctedBPM; // 今回レーザーが通過したときの間隔（BPM）
+  int stableCount; // 同じBPMが何回連続で出たか
+  int prevCorrectedBPM; // 前回レーザーが通過したときの間隔(BPM)
+  bool laserOn; // 現在レーザーがCdSセルに当たっているかを格納
+  int baseline; // 暗状態（レーザー非通過時）の読み取り値の追従値を格納
+  bool baselineReady; // baselineの初期値取得が完了したかを格納
+  int onThreshold; // 現在有効なON判定しきい値を格納
+  int offThreshold; // 現在有効なOFF判定しきい値を格納
+  int pulsePeak; // 検知中のパルスにおける読み取り値の最大値を一時的に格納
+  int peakHistory[CDS_PEAK_HISTORY]; // しきい値較正に用いる直近ピーク値を保持する配列
+  uint8_t peakIndex; // peakHistory内の現在の書き込み位置を管理するインデックス
+  uint8_t peakCount; // peakHistoryに記録済みのピーク数を格納
+  bool calibrated; // しきい値の較正が一度でも行われたかを格納
+  bool startupCalibrated; // 起動直後のキャリブレーション期間が終了したかを格納
+  bool waitingForRelease; // 起動時に暗転待ち状態かを格納
+  unsigned long calibrationStartMs; // 起動キャリブレーションを開始した時刻を格納
+  int startupMin; // 起動キャリブレーション中に観測された最小値を格納
+  int releaseThreshold; // waitingForRelease状態を解除する判定値を格納
 
+  // レーザーのON/OFF判定，起動時キャリブレーション，ベースライン更新を行う．
   bool detectLight(int v, unsigned long nowMs) {
     if (!baselineReady) {
       baseline = v;
@@ -298,6 +291,7 @@ private:
     return false;
   }
 
+  // 検知したピーク値を記録し，ON/OFF判定しきい値を再較正する．
   void registerPeak(int peak) {
     if (peak - baseline < CDS_MIN_DELTA) return;
 
@@ -326,17 +320,20 @@ private:
     if (offThreshold >= onThreshold) offThreshold = max(0, onThreshold - 5);
   }
 
+  // 較正前に使用する仮のしきい値を更新する．
   void updateFallbackThresholds() {
     onThreshold = constrain(baseline + CDS_MIN_DELTA, 0, 1023);
     offThreshold = constrain(baseline + CDS_MIN_DELTA / 2, 0, max(0, onThreshold - 5));
   }
 
+  // しきい値が一度に変化する最大量を制限する．
   int limitStep(int current, int target, int limit) {
     if (target > current + limit) return current + limit;
     if (target < current - limit) return current - limit;
     return target;
   }
 
+  // ピーク履歴を初期化する．
   void clearPeakHistory() {
     for (uint8_t i = 0; i < CDS_PEAK_HISTORY; i++) peakHistory[i] = 0;
   }
@@ -364,13 +361,8 @@ SyncManager syncManager;
 // ==========================================
 int state = 4;
 
-
-
-// ==========================================
 // 楽譜遷移（ジャンプ）定義
 // jumpTable[曲ID][ジャンプ番号][0=トリガーtick, 1=ジャンプ先tick, 2=ジャンプ先scoreIdx]
-// 終端は {-1, -1, -1}
-// ==========================================
 const int MAX_JUMPS = 20;
 const int32_t jumpTable[MAX_SONGS][MAX_JUMPS][3] = {
   { // 曲ID: 0 かえるのうた
@@ -397,16 +389,13 @@ const int32_t jumpTable[MAX_SONGS][MAX_JUMPS][3] = {
 
 uint8_t currentJumpIdx = 0; // 現在のジャンプインデックス
 
-// ==========================================
 // 曲ごとの初期設定データ
-// ==========================================
 struct SongStartData {
   uint32_t startTick;
   uint16_t startNoteIdx;
 };
 
 // Processingの設定に合わせた初期値の定義
-// インデックスがそのまま currentSongId に対応します
 const SongStartData songStartParams[MAX_SONGS] = {
   {0, 0},   // 曲ID: 0 (かえるのうた)
   {0, 0},   // 曲ID: 1 (酒場でブギウギ風)
@@ -418,9 +407,8 @@ const SongStartData songStartParams[MAX_SONGS] = {
 
 
 
-// ==========================================
+
 // 関数宣言
-// ==========================================
 void updateTick();
 void setBpm(uint8_t bpm);
 void sendVolumeValue(uint8_t vol);
@@ -431,17 +419,13 @@ bool checkSyncReady();
 void sendNPacket(uint8_t bpm);
 void sendRPacket(uint8_t instId, int32_t diff);
 
-// ==========================================
 // IPアドレス（楽器IDからIPを引く）
-// ==========================================
 IPAddress instIP(uint8_t instId) {
   // ID=1→192.168.11.12, ID=2→.13, ID=3→.14
   return IPAddress(192, 168, 11, 11 + instId);
 }
 
-// ==========================================
 // セットアップ
-// ==========================================
 void setup() {
   Serial.begin(115200);
   WiFi.config(localIP);
@@ -453,9 +437,7 @@ void setup() {
   Serial.println("state=0 BPM安定待ち");
 }
 
-// ==========================================
 // メインループ
-// ==========================================
 void loop() {
   unsigned long now      = millis();
   int           cdsValue = analogRead(CDS_PIN);
@@ -468,14 +450,7 @@ void loop() {
     char header = (char)packetBuffer[0];
 
     switch (header) {
-
-      // -------------------------------------------------------
-      // 'T': 楽器からの同期パケット
-      //   [0]='T' [1..4]=slaveTick(uint32 big-endian) [5]=instId
-      //
-      //   → R通信（diff返信）は T受信時に即送信
-      //   → O通信は R通信とは独立。processOCommands() が管理。
-      // -------------------------------------------------------
+      //楽器からの同期パケット
       case 'T':
         if (pktSize >= 6) {
           uint32_t slaveTick =
@@ -491,7 +466,6 @@ void loop() {
             int32_t diff = (int32_t)(globalTick - slaveTick);
             lastReceivedDiff[id] = diff;
 
-            //作った
             sendRPacket(id, diff);
 
             Serial.print(F("[T] id=")); Serial.print(id);
@@ -506,11 +480,7 @@ void loop() {
         sendVolumeValue(vol);
         break;
       }
-
-      // -------------------------------------------------------
-      // 'E': 指揮機からのブロードキャスト終了指示
-      //   演奏を停止し、state4にして初期化する
-      // -------------------------------------------------------
+      //指揮機からのブロードキャスト終了指示．演奏を停止し、state4にして初期化する
       case 'E':
         isDrumPlaying       = false;
         curTick             = 0;
@@ -521,21 +491,17 @@ void loop() {
         memset(oSentCount,         0, sizeof(oSentCount));
         memset(isInstConnected,    0, sizeof(isInstConnected));
         memset(isInstJoin,         0, sizeof(isInstJoin));
-        // memset(pendingStartCommand,0, sizeof(pendingStartCommand));
         curBpm = 0;
         tickIval = 0;
 
-        // 追加: BPM関連の初期化
+        // BPM関連の初期化
         memset(receivedBpmLevels, 0, sizeof(receivedBpmLevels));
         currentBpmLevel = 0;
 
         Serial.println(F("[E] 演奏終了。state=4 に初期化"));
         break;
 
-      // -------------------------------------------------------
-      // 'S': 指揮機からのブロードキャスト開始指示
-      //   state0に戻して初期化する
-      // -------------------------------------------------------
+      // 指揮機からのブロードキャスト開始指示．state0に戻して初期化する
       case 'S': 
       {
         static unsigned long lastSReceivedTime = 0;
@@ -562,11 +528,9 @@ void loop() {
         memset(oSentCount,         0, sizeof(oSentCount));
         memset(isInstConnected,    0, sizeof(isInstConnected));
         memset(isInstJoin,         0, sizeof(isInstJoin));
-        // memset(pendingStartCommand,0, sizeof(pendingStartCommand));
         curBpm = 0;
         tickIval = 0;
 
-        // 追加: BPM関連の初期化
         memset(receivedBpmLevels, 0, sizeof(receivedBpmLevels));
         currentBpmLevel = 0;
 
@@ -574,22 +538,10 @@ void loop() {
 
         Serial.print(F("[S] 演奏開始。state=0 に初期化。曲変更。SongID:"));
         Serial.println(currentSongId);
-
-        // 🚨以下の数行を全て削除する！🚨
-        // // delayがあるため，加速が終わった時点で、バッファに溜まっている2回め・3回めのパケットを捨てる（ボタンが動くようにする）
-        // Serial.println("連射された残りのパケットをクリアします。");
-        // while(Udp.parsePacket() > 0) {
-        //   while(Udp.available()) {
-        //     Udp.read(); 
-        //   }
-        // }
         break;
       }
 
-      // -------------------------------------------------------
-      // 'J': 楽器からの演奏参加予告
-      //   同期に参加する楽器を読み取る
-      // -------------------------------------------------------
+      // 'J': 楽器からの演奏参加予告．同期に参加する楽器を読み取る
       case 'J':
       if(pktSize >= 2){
         uint8_t instId = packetBuffer[1];
@@ -600,7 +552,7 @@ void loop() {
       }
       break;
 
-      // 追加: 子機からのBPM提案を受信
+      // 子機からのBPM提案を受信
       case 'M':
         if (pktSize >= 3) {
           uint8_t bpmVal = packetBuffer[1];
@@ -617,10 +569,8 @@ void loop() {
 
       default: break;
     }
-  // } else if (pktSize > 0) {
-  //   while (Udp.available()) Udp.read();
   } else {
-    Udp.read(); // 空読みして破棄
+    Udp.read(); // 空読みして廃棄
   }
   pktSize = Udp.parsePacket(); // 次のパケットがあるか確認
   }
@@ -648,12 +598,11 @@ void loop() {
           state = 1;
           lastTick = micros();
 
-          // 初回確定時に自身へ適用 ＆ 即座にN通信で子機にばら撒く！
+          // 初回確定時に自身へ適用 ＆ 即座にN通信で子機に送信
           currentBpmLevel = curLaserBpm;
           setBpm(currentBpmLevel);
           sendNPacket(currentBpmLevel);
 
-          // setBpm(syncManager.getCorrectedBPM());
           Serial.println(F("[S0→1] BPM安定"));
         }
       }
@@ -663,11 +612,9 @@ void loop() {
     case 1:
       updateTick();
       if (laser) {
-        // setBpm(syncManager.getCorrectedBPM());
         receivedBpmLevels[drumInstId] = syncManager.getCorrectedBPM(); // 配列上書きのみ
         if (checkSyncReady()) {
-          // state2へ移行。elapsedPlayTick は state3移行後に開始するが、
-          // O通信の送信タイミング算出のためにカウントはここから始める
+          // state2へ移行。elapsedPlayTick は state3移行後に開始するが、O通信の送信タイミング算出のためにカウントはここから始める
           state = 2;
           elapsedPlayTick = -O_ADVANCE_TICKS;
           memset(oSentCount, 0, sizeof(oSentCount));
@@ -679,8 +626,7 @@ void loop() {
       break;
 
     // --- state2: 同期完了・演奏開始待ち ---
-    // elapsedPlayTick を進めながら O通信タイミングを監視する。
-    // state3への移行は processOCommands() 内でドラム自身の開始タイミングが来たとき。
+    // elapsedPlayTick を進めながら O通信タイミングを監視する。state3への移行は processOCommands() 内でドラム自身の開始タイミングが来たとき。
     case 2:
       updateTick();
       if (laser) receivedBpmLevels[drumInstId] = syncManager.getCorrectedBPM();
@@ -699,20 +645,8 @@ void loop() {
   }
 }
 
-// ==========================================
 // 同期完了チェック
 //   接続済み楽器が1台以上 かつ 全員のdiffが SYNC_READY_THRESHOLD以内
-// ==========================================
-// bool checkSyncReady() {
-//   bool any = false;
-//   for (uint8_t i = 1; i < MAX_INSTRUMENTS; i++) {
-//     if (isInstConnected[i]) {
-//       any = true;
-//       if (abs(lastReceivedDiff[i]) > SYNC_READY_THRESHOLD) return false;
-//     }
-//   }
-//   return any;
-// }
 bool checkSyncReady() {
   bool expectedToJoin = false;
   
@@ -720,7 +654,7 @@ bool checkSyncReady() {
     if (isInstJoin[i]) {
       expectedToJoin = true; // 参加予定の楽器が少なくとも1台いる
 
-      float SYNC_READY_THRESHOLD = 50 / tickIval;// 50ms超えてたら同期ができていないとみなすから50
+      float SYNC_READY_THRESHOLD = 60 * 1000 / tickIval;// 60ms超えてたら同期ができていないとみなすから50
       
       // 参加予定だが未接続、または同期のズレが大きい場合は「まだ準備未完了」
       if (!isInstConnected[i] || abs(lastReceivedDiff[i]) > SYNC_READY_THRESHOLD) {
@@ -730,7 +664,7 @@ bool checkSyncReady() {
   }
   
   // 参加予定の全楽器が条件をクリアしていれば true。
-  // ※もし「他楽器が0台（ドラムソロ）でも開始させたい」場合は、return true; にしてください。
+  // ※もし「他楽器が0台（ドラムソロ）でも開始させたい」場合は、return true;
   return expectedToJoin; 
 }
 
@@ -789,101 +723,6 @@ void processOCommands() {
       }
     }
   }
-  // if (currentSongId < 0 || currentSongId >= MAX_SONGS) return;
-
-  // for (int i = 0; i < MAX_EVENTS; i++) {
-  //   if (startSequence[currentSongId][i][0] == -1) break;
-  //   if (oSentFlags[i]) continue;
-
-  //   int32_t evTick   = startSequence[currentSongId][i][0];
-  //   int     instId   = startSequence[currentSongId][i][1];
-  //   int32_t sendTick = evTick - O_ADVANCE_TICKS;  // このelapsedで送信する
-  //   //int32_t sendTick = evTick;  // このelapsedで送信する
-
-  //   if (elapsedPlayTick < sendTick) continue;  // まだ早い
-
-  //   // 送信タイミング到達
-  //   oSentFlags[i] = true;
-
-  //   if (instId == drumInstId) {
-  //     // ドラム自身: elapsedPlayTick が evTick に達したら演奏開始
-  //     // （O通信不要。sendTick < 0 の場合はstate2移行直後にここへ来る）
-  //     // ここでは「evTickに達したか」だけチェック
-  //     if (elapsedPlayTick >= evTick) {
-  //       if (!isDrumPlaying) {
-  //         isDrumPlaying = true;
-  //         // 曲IDに応じた初期値セット
-  //         curTick  = songStartParams[currentSongId].startTick;
-  //         scoreIdx = songStartParams[currentSongId].startNoteIdx;
-  //         state    = 3;
-  //         Serial.println(F("[DRUM] 演奏開始"));
-  //       }
-  //     } else {
-  //       // まだ evTick に達していない（sendTick ≤ elapsed < evTick）→ 待機
-  //       oSentFlags[i] = false;  // まだ送信扱いにしない
-  //     }
-  //   } else {
-  //     // 変更点：他楽器へのO通信処理
-  //     if(!isInstJoin[instId]){
-  //       // 参加していない楽器は無視（フラグはtrueのままなので次回以降スキップされる）
-  //     } else if (isInstConnected[instId]) {
-  //       // 他楽器へ O通信を送信
-  //       // startGlobalTick = 現在のglobalTick + (evTick - elapsedPlayTick)
-  //       // 「あと何Tick後に演奏開始してほしいか」をglobalTick基準で伝える
-  //       int32_t  ticksUntilStart = evTick - elapsedPlayTick;
-  //       uint32_t startGlobalTick = (uint32_t)((int32_t)globalTick + ticksUntilStart);
-  //       sendOPacket(instId, currentSongId, startGlobalTick);
-  //       Serial.print(F("[O送信] instId=")); Serial.print(instId);
-  //       Serial.print(F(" startGlobalTick=")); Serial.println(startGlobalTick);
-  //     }else {
-  //       // 参加予定だが未接続（基本ここには来ない設計ですが安全策として）
-  //       oSentFlags[i] = false; // 送信失敗として次回再試行
-  //     }
-  //   }
-  // }
-  // -------------------------------------------------------
-  // ５: O_ADVANCE_TICKS×2以内に演奏開始するドラム以外の楽器が
-  //     存在しない場合に、不必要な待機をスキップする。
-  //
-  //   state2 の最初の1回だけ判定する（isDrumPlaying が false かつ state==2）。
-  //   ・ドラム以外で O_ADVANCE_TICKS*2 以内に開始予定の楽器がある
-  //       → その最早開始Tick - O_ADVANCE_TICKS に elapsedPlayTick を合わせる
-  //   ・そのような楽器が1台もない（ドラムだけ、またはドラムのみ0から始まる）
-  //       → elapsedPlayTick = 0 にして即ドラム演奏開始へ
-  // -------------------------------------------------------
-  // if (state == 2 && !isDrumPlaying) {
-  //   int32_t earliestNonDrum = INT32_MAX;
-  //   for (int i = 0; i < MAX_EVENTS; i++) {
-  //     int32_t evTick = startSequence[currentSongId][i][0];
-  //     int     instId = startSequence[currentSongId][i][1];
-  //     if (evTick == -1) break;
-  //     // 変更点：参加していない楽器(isInstJoin == false)は最短開始時間の計算から除外する
-  //     if (instId != drumInstId && isInstJoin[instId] && evTick < earliestNonDrum) {
-  //       earliestNonDrum = evTick;
-  //     }
-  //   }
-
-  //   if (earliestNonDrum == INT32_MAX || earliestNonDrum > O_ADVANCE_TICKS * 2) {
-  //     // ドラム以外に O_ADVANCE_TICKS*2 以内の開始予定がない → 即開始
-  //     if (elapsedPlayTick < 0) {
-  //       elapsedPlayTick = 0;
-  //       Serial.println(F("[SKIP] 近接非ドラム楽器なし: elapsedPlayTick=0 に即進め"));
-  //     }
-  //   } else {
-  //     // 最早の非ドラム楽器の O通信送信タイミングに合わせる
-  //     int32_t targetElapsed = earliestNonDrum - O_ADVANCE_TICKS;
-  //     if (elapsedPlayTick < targetElapsed) {
-  //       elapsedPlayTick = targetElapsed;
-  //       Serial.print(F("[SKIP] elapsedPlayTick を ")); Serial.print(targetElapsed);
-  //       Serial.println(F(" に調整"));
-  //     }
-  //   }
-  // }
-  // -------------------------------------------------------
-  // ５: 無駄な待機のスキップ処理（修正版）
-  //    ドラム自身も含めた参加楽器の中で、最も早く演奏開始するTickを探し、
-  //    そこから O_ADVANCE_TICKS 前までタイムラインを調整する。
-  // -------------------------------------------------------
   if (state == 2 && !isDrumPlaying) {
     int32_t earliestEvent = INT32_MAX;
     for (int i = 0; i < MAX_EVENTS; i++) {
@@ -913,24 +752,7 @@ void processOCommands() {
   }
 }
 
-// ==========================================
-// O通信パケット送信
-//   [0]='O' [1]=songId [2..5]=startGlobalTick(uint32 big-endian)
-// ==========================================
-// void sendOPacket(uint8_t instId, uint8_t songId, uint32_t startGlobalTick) {
-//   for(int i=0;i<3;i++){
-//     Udp.beginPacket(instIP(instId), LOCAL_PORT);
-//     Udp.write('O');
-//     Udp.write(songId);
-//     Udp.write((uint8_t)((startGlobalTick >> 24) & 0xFF));
-//     Udp.write((uint8_t)((startGlobalTick >> 16) & 0xFF));
-//     Udp.write((uint8_t)((startGlobalTick >>  8) & 0xFF));
-//     Udp.write((uint8_t)( startGlobalTick        & 0xFF));
-//     Udp.endPacket();
-//     delay(3); // 🚨 Wi-Fiのバッファ溢れを防ぐための必須の遅延
-//   }
-// }
-// O通信を「1回だけ(delayなしで)」送る専用の関数を作成
+// O通信を「1回だけ(delayなしで)」送る専用の関数
 void sendOPacket_Single(uint8_t instId, uint8_t songId, uint32_t startGlobalTick) {
   Udp.beginPacket(instIP(instId), LOCAL_PORT);
   Udp.write('O');
@@ -940,18 +762,11 @@ void sendOPacket_Single(uint8_t instId, uint8_t songId, uint32_t startGlobalTick
   Udp.write((uint8_t)((startGlobalTick >>  8) & 0xFF));
   Udp.write((uint8_t)( startGlobalTick        & 0xFF));
   Udp.endPacket();
-  // ★ delayなし。これなら演奏のタイミングはズレない！
 }
 
-// 🔽🔽 5. ファイルの下の方、sendOPacket() の下あたりに追加 🔽🔽
-// ==========================================
 // N通信パケット送信 (確定BPMを全参加楽器へブロードキャスト)
-//   [0]='N' [1]=bpm(uint8)
-// ==========================================
 void sendNPacket(uint8_t bpm) {
-  // for(int k=0;k<3;k++){
     for (int i = 1; i < MAX_INSTRUMENTS; i++) {
-    // if (isInstJoin[i] && isInstConnected[i]) {
       Udp.beginPacket(instIP(i), LOCAL_PORT);
       Udp.write('N');
       Udp.write(bpm);
@@ -962,7 +777,6 @@ void sendNPacket(uint8_t bpm) {
   // }
 }
 
-//ついでにRも
 void sendRPacket(uint8_t instId,int32_t diff){
   // R通信: diffのみ返信（O通信は別途 sendOPacket で送る）
   Udp.beginPacket(instIP(instId), LOCAL_PORT);
@@ -981,7 +795,7 @@ void updateTick() {
   if (tickIval == 0) return;
   uint32_t now = micros();
   while (now - lastTick >= tickIval) {
-    uint32_t currentIval = tickIval; // ★ループ突入時の値を保存
+    uint32_t currentIval = tickIval; // ループ突入時の値を保存
 
     globalTick++;
 
@@ -1014,7 +828,7 @@ void updateTick() {
       curTick++;
     }
     
-    lastTick += currentIval; // ★書き換えられていても元の値を足す
+    lastTick += currentIval; // 書き換えられていても元の値を足す
   }
 }
 
@@ -1039,7 +853,7 @@ uint8_t determineSystemBpmLevel() {
   uint8_t validLevels[MAX_INSTRUMENTS];
   uint8_t validCount = 0;
 
-  // 1. 有効なデータ（参加中かつデータがある楽器）だけを抽出
+  // 有効なデータ（参加中かつデータがある楽器）だけを抽出
   for (int i = 0; i < MAX_INSTRUMENTS; i++) {
     if ((i == drumInstId || isInstJoin[i]) && receivedBpmLevels[i] > 0) {
       validLevels[validCount] = receivedBpmLevels[i];
@@ -1050,7 +864,7 @@ uint8_t determineSystemBpmLevel() {
   if (validCount == 0) return currentBpmLevel; // データが一つもなければ前回維持
   if (validCount == 1) return validLevels[0];  // 1台だけならそれを採用
 
-  // 2. 配列を小さい順にソート（バブルソートで十分）
+  // 2. 配列を小さい順にバブルソート
   for (int i = 0; i < validCount - 1; i++) {
     for (int j = 0; j < validCount - i - 1; j++) {
       if (validLevels[j] > validLevels[j + 1]) {
@@ -1073,7 +887,7 @@ uint8_t determineSystemBpmLevel() {
     // もし2つの値が同じなら、それが中央値
     if (mid1 == mid2) return mid1;
 
-    // 異なる場合、前回値（currentBpmLevel）と差が小さい方を採用！
+    // 異なる場合、前回値（currentBpmLevel）と差が小さい方を採用
     int diff1 = abs((int)mid1 - (int)currentBpmLevel);
     int diff2 = abs((int)mid2 - (int)currentBpmLevel);
 
@@ -1103,8 +917,8 @@ void sendPacket() {
 }
 \end{lstlisting}
 
-\subsection{flute\_0706.ino}
-\begin{lstlisting}[caption={flute\_0706.ino（楽譜データ省略）}, label={lst:douki_flute_full}]
+\subsection{piano\_0706.ino（スレーブ機）}
+\begin{lstlisting}[caption={piano\_0706.ino（楽譜データは冒頭2小節のみ掲載）}, label={lst:douki_piano_full}]
 #include <WiFiS3.h>
 #include <WiFiUdp.h>
 
@@ -1112,70 +926,70 @@ const char SSID[] = "hackathon001-WPA2";
 const char PASS[] = "hackathon001";
 
 // ★楽器ごとに変更（ピアノ=12, ストリングス=13, フルート=14）
-IPAddress localIP(192, 168, 11, 14);
+IPAddress localIP(192, 168, 11, 12);
 IPAddress drumIP (192, 168, 11, 11);
 const uint16_t LOCAL_PORT = 5005;
 
 // ★楽器ID（0=ドラム, 1=ピアノ, 2=ストリングス, 3=フルート）
-const uint8_t MY_INST_ID = 3;
+const uint8_t MY_INST_ID = 1;
 
 WiFiUDP Udp;
+// UDP通信で受信したパケットのデータを一時的に格納
 uint8_t packetBuffer[32];
 
-const int CDS_PIN           = A0;
-const int CDS_ON_THRESHOLD  = 1010; // 起動直後だけ使う仮しきい値
-const int CDS_OFF_THRESHOLD = 980;  // 起動直後だけ使う仮しきい値
+const int CDS_PIN           = A0; //CdSセルを接続するアナログ入力ピン番号を定義
+const int CDS_ON_THRESHOLD  = 820; // 起動直後だけ使う仮しきい値
+const int CDS_OFF_THRESHOLD = 800;  // 起動直後だけ使う仮しきい値
 const int CDS_MIN_DELTA = 25;       // 暗い状態との差がこれ未満ならレーザー扱いしない
 const uint8_t CDS_PEAK_HISTORY = 4; // 直近何回分のピークからしきい値を決めるか
 const uint8_t CDS_ON_RATIO = 65;    // baselineからピークまでの65%をONしきい値にする
 const uint8_t CDS_OFF_RATIO = 35;   // baselineからピークまでの35%をOFFしきい値にする
 const int CDS_THRESHOLD_STEP_LIMIT = 25; // 1回の検出でしきい値が動きすぎない上限
 const unsigned long CDS_STARTUP_CALIBRATION_MS = 1000; // 起動直後の誤検出防止時間
-const unsigned long DEBOUNCE_MS = 20;
-
+const unsigned long DEBOUNCE_MS = 20;// 直前の検知からこの時間未満の再検知を無視するデバウンス時間を定義
 const int BPM_LIST[] = { 60, 90, 120, 150, 180 };
 // 段階1~5(BPM_LISTと対応)の実測の1周あたり時間[ms]。理論値(30000/BPM)では観覧車の
 // 実際の回転速度と合わないことが判明したため、実測値でBPMを判定する。
-const float ROTATION_PERIOD_LIST[] = {230, 180, 140, 110, 80};//pwmと大体対応させている
-const int MIN_STABLE_COUNT  = 3;
+const float ROTATION_PERIOD_LIST[] = {380, 280, 210, 160, 100};//pwmと大体対応させている
+const int MIN_STABLE_COUNT  = 3; //BPM確定（安定）とみなす連続一致回数を定義
 
-// ==========================================
-// 楽譜データ（★楽器ごとに書き換える★）
-// ==========================================
+// 楽譜データ
 struct NoteData {
-  uint16_t timing;
-  uint16_t duration;
-  uint8_t  pitch;
-  uint8_t  startVelocity;
-  uint8_t  endVelocity;
-  uint8_t  type;
+  uint16_t timing; // 発音タイミング
+  uint16_t duration; // 発音の長さ（Tick単位）
+  uint8_t  pitch; // 音高を示すMIDIノート番号（0〜127）
+  uint8_t  startVelocity; // 発音開始時の強さ（0〜127）
+  uint8_t  endVelocity; // 発音開始時の強さ（0〜127）
+  uint8_t  type; // 発音開始時の強さ（0〜127）
 };
 
 const NoteData Note[] = {
 
   // 【1小節目】
-  {0, 24, 72, 80, 80, 0}, // [0] C5
-  {24, 24, 74, 80, 80, 0}, // [1] D5
-  {48, 24, 76, 80, 80, 0}, // [2] E5
-  {72, 24, 77, 80, 80, 0}, // [3] F5
+  {0, 24, 60, 96, 80, 0}, // [0] C4
+  {24, 24, 62, 96, 80, 0}, // [1] D4
+  {48, 24, 64, 96, 80, 0}, // [2] E4
+  {72, 24, 65, 96, 80, 0}, // [3] F4
 
   // 【2小節目】
-  {96, 24, 76, 80, 80, 0}, // [4] E5
-  {120, 24, 74, 80, 80, 0}, // [5] D5
-  {144, 36, 72, 80, 80, 0}, // [6] C5
+  {96, 24, 64, 96, 80, 0}, // [4] E4
+  {120, 24, 62, 96, 80, 0}, // [5] D4
+  {144, 36, 60, 96, 80, 0}, // [6] C4
 
-  // ...（以下、同様の形式の楽譜データが続くため省略）...
+
+  // …（以降，末尾まで同一形式の楽譜データが続くため省略）…
+
 };
 
 const uint16_t note_count = sizeof(Note) / sizeof(Note[0]); //音符の数(配列に含まれている合計/音符1つあたりの要素数)
-uint16_t scoreIdx = 0;
+uint16_t scoreIdx = 0; // 次に発音する予定のデータのインデックス
 
 // ==========================================
 // Tick管理変数
 // ==========================================
-uint32_t globalTick   = 0;
-uint32_t curTick      = 0;   // 楽譜用Tick
-uint32_t lastTick     = 0;
+uint32_t globalTick   = 0; //全体基準のTick
+uint32_t curTick      = 0;  // 楽譜用Tick
+uint32_t lastTick     = 0; // updateTick用タイムスタンプ
 
 uint32_t baseTickIval = 0;   // BPMから計算した基本interval [µs/tick]
 uint32_t tickIval     = 0;   // 実際に使うinterval（同期補正あり）
@@ -1184,25 +998,17 @@ int32_t  lastDiff       = 0; // 直近のdiff（BPM変化時の再計算用）
 uint32_t lastTPacketMicroTime = 0; //直近のTパケット送信時の時刻Micro
 uint32_t lastTPacketTick = 0; // 直近のTパケット送信時のglobalTick（drumNotStarted判定用）
 
-// ==========================================
-// ドラム起動前同期フラグ
-//   true  : ドラムがまだglobalTickを加算していない（-diff == globalTick が続いている）
-//   false : ドラムが動き出した（初回のみ即時同期を実施済み）
-// E通信を受信したらtrueに戻す
-// ==========================================
-bool drumNotStarted = true;
+bool drumNotStarted = true;// ドラム起動前同期フラグ
 
-uint8_t curBpm = 0;
-uint8_t curVol = 50;
+uint8_t curBpm = 0; // 現在のBPM
+uint8_t curVol = 50; // 現在の音量
 
 // 演奏管理
-bool     waitingForStart  = false;  // O通信を受信して演奏開始globalTickを待っている
-uint32_t startGlobalTick  = 0;      // ドラムから指定された演奏開始globalTick
-uint8_t  currentSongId    = 0;
+bool     waitingForStart  = false; // O通信を受信して演奏開始globalTickを待っている
+uint32_t startGlobalTick  = 0;  // ドラムから指定された演奏開始globalTick
+uint8_t  currentSongId    = 0; // 現在の曲のID
 
-// ==========================================
 // SyncManager（レーザー検知・BPM安定判定）
-// ==========================================
 class SyncManager {
 public:
   SyncManager()
@@ -1216,6 +1022,7 @@ public:
     clearPeakHistory();
   }
 
+  // 全ての内部状態を初期値に戻す
   void reset() {
     lastDetectTime = 0;
     correctedBPM = 0;
@@ -1238,6 +1045,7 @@ public:
     clearPeakHistory();
   }
 
+  // CdSの読み取り値と現在時刻から，しきい値較正・エッジ検出・デバウンスを行い，レーザー検知時にtrueを返す．
   bool update(int cdsValue, unsigned long nowMs) {
     if (calibrationStartMs == 0) calibrationStartMs = nowMs;
     if (!detectLight(cdsValue, nowMs)) return false;
@@ -1254,30 +1062,32 @@ public:
     return true;
   }
 
+  // 補正後の値を取得する窓口関数．
   int getCorrectedBPM() const { return correctedBPM; }
   int getStableCount()  const { return stableCount; }
 
 private:
-  unsigned long lastDetectTime;
-  int           correctedBPM;
-  int           stableCount;
-  int           prevCorrectedBPM;
-  bool          laserOn;
-  int           baseline;
-  bool          baselineReady;
-  int           onThreshold;
-  int           offThreshold;
-  int           pulsePeak;
-  int           peakHistory[CDS_PEAK_HISTORY];
-  uint8_t       peakIndex;
-  uint8_t       peakCount;
-  bool          calibrated;
-  bool          startupCalibrated;
-  bool          waitingForRelease;
-  unsigned long calibrationStartMs;
-  int           startupMin;
-  int           releaseThreshold;
+  unsigned long lastDetectTime; // 直前にレーザー検知が確定した時刻を格納
+  int correctedBPM; // 今回レーザーが通過したときの間隔（BPM）
+  int stableCount; // 同じBPMが何回連続で出たか
+  int prevCorrectedBPM; // 前回レーザーが通過したときの間隔(BPM)
+  bool laserOn; // 現在レーザーがCdSセルに当たっているかを格納
+  int baseline; // 暗状態（レーザー非通過時）の読み取り値の追従値を格納
+  bool baselineReady; // baselineの初期値取得が完了したかを格納
+  int onThreshold; // 現在有効なON判定しきい値を格納
+  int offThreshold; // 現在有効なOFF判定しきい値を格納
+  int pulsePeak; // 検知中のパルスにおける読み取り値の最大値を一時的に格納
+  int peakHistory[CDS_PEAK_HISTORY]; // しきい値較正に用いる直近ピーク値を保持する配列
+  uint8_t peakIndex; // peakHistory内の現在の書き込み位置を管理するインデックス
+  uint8_t peakCount; // peakHistoryに記録済みのピーク数を格納
+  bool calibrated; // しきい値の較正が一度でも行われたかを格納
+  bool startupCalibrated; // 起動直後のキャリブレーション期間が終了したかを格納
+  bool waitingForRelease; // 起動時に暗転待ち状態かを格納
+  unsigned long calibrationStartMs; // 起動キャリブレーションを開始した時刻を格納
+  int startupMin; // 起動キャリブレーション中に観測された最小値を格納
+  int releaseThreshold; // waitingForRelease状態を解除する判定値を格納
 
+  // レーザーのON/OFF判定，起動時キャリブレーション，ベースライン更新を行う．
   bool detectLight(int v, unsigned long nowMs) {
     if (!baselineReady) {
       baseline = v;
@@ -1329,6 +1139,7 @@ private:
     return false;
   }
 
+  // 検知したピーク値を記録し，ON/OFF判定しきい値を再較正する．
   void registerPeak(int peak) {
     if (peak - baseline < CDS_MIN_DELTA) return;
 
@@ -1357,17 +1168,20 @@ private:
     if (offThreshold >= onThreshold) offThreshold = max(0, onThreshold - 5);
   }
 
+  // 較正前に使用する仮のしきい値を更新する．
   void updateFallbackThresholds() {
     onThreshold = constrain(baseline + CDS_MIN_DELTA, 0, 1023);
     offThreshold = constrain(baseline + CDS_MIN_DELTA / 2, 0, max(0, onThreshold - 5));
   }
 
+  // しきい値が一度に変化する最大量を制限する．
   int limitStep(int current, int target, int limit) {
     if (target > current + limit) return current + limit;
     if (target < current - limit) return current - limit;
     return target;
   }
 
+  // ピーク履歴を初期化する．
   void clearPeakHistory() {
     for (uint8_t i = 0; i < CDS_PEAK_HISTORY; i++) peakHistory[i] = 0;
   }
@@ -1395,12 +1209,8 @@ SyncManager syncManager;
 int state = 4;
 
 
-
-// ==========================================
 // 楽譜遷移（ジャンプ）定義
 // jumpTable[曲ID][ジャンプ番号][0=トリガーtick, 1=ジャンプ先tick, 2=ジャンプ先scoreIdx]
-// 終端は {-1, -1, -1}
-// ==========================================
 const int MAX_SONGS = 5;
 const int MAX_JUMPS = 20;
 const int32_t jumpTable[MAX_SONGS][MAX_JUMPS][3] = {
@@ -1428,17 +1238,14 @@ const int32_t jumpTable[MAX_SONGS][MAX_JUMPS][3] = {
 
 uint8_t currentJumpIdx = 0; // 現在のジャンプインデックス
 
-// ==========================================
 // 曲ごとの初期設定データ
-// ==========================================
-
 struct SongStartData {
   uint32_t startTick;
   uint16_t startNoteIdx;
 };
 
 // Processingの設定に合わせた初期値の定義
-// インデックスがそのまま currentSongId に対応します
+// インデックスがそのまま currentSongId に対応
 const SongStartData songStartParams[MAX_SONGS] = {
   {0, 0},       // 曲ID: 0 (かえるのうた)
   {1536, 29},   // 曲ID: 1 (酒場でブギウギ)
@@ -1487,20 +1294,9 @@ void loop() {
     uint8_t payload = packetBuffer[1];
 
     switch (header) {
-
-      // -------------------------------------------------------
       // 'R': ドラムからのdiff返信
-      //   [0]='R' [1..4]=diff(int32 big-endian)
-      //
-      //   ドラム起動前判定：
-      //     -diff == globalTick（つまり globalTick + diff == 0）
-      //     → ドラムはまだglobalTickを加算していない。自身もリセット。
-      //   ドラムが動き出した初回：
-      //     上記条件が初めてfalseになった → globalTick -= diff で即時同期。
-      //   以降は通常のdiff補正（applyDiffCorrection）へ。
-      // -------------------------------------------------------
       case 'R':
-        // 【追加】停止中（4）や安定待ち（0）に届いた過去のR通信は「遅延ゴミ（Stale Packet）」なので完全無視する！
+        // 停止中（4）や安定待ち（0）に届いた過去のR通信は遅延ゴミなので無視
         if (state == 0 || state == 4) break;
 
         if (pktSize >= 5) {
@@ -1512,7 +1308,7 @@ void loop() {
           
           // 遅延（レイテンシ）補正の計算
           uint32_t rtt = micros() - lastTPacketMicroTime;
-          // 【安全対策】往復時間が長すぎる(例:200ms以上)場合は古いパケットとみなして破棄
+          // 【安全対策】往復時間が長すぎる場合は古いパケットとみなして破棄
           if (rtt > 1000 * 1000) {
             Serial.println(F("[R] パケット遅延過大のためスキップ"));
             break; 
@@ -1573,14 +1369,7 @@ void loop() {
         }
         break;
 
-      // -------------------------------------------------------
       // 'O': ドラムからの演奏開始指示
-      //   [0]='O' [1]=songId [2..5]=startGlobalTick(uint32 big-endian)
-      //
-      //   自身のglobalTickと startGlobalTick を比較して：
-      //   ・まだ到達していない → waitingForStart=true で待つ
-      //   ・すでに超過している → 超過分だけ curTick をオフセットして即演奏開始
-      // -------------------------------------------------------
       case 'O':
         if (pktSize >= 6) {
           if(waitingForStart || state == 2) return;
@@ -1625,10 +1414,7 @@ void loop() {
         break;
       }
 
-      // -------------------------------------------------------
       // 'E': 演奏終了通知（指揮機から）
-      //   drumNotStarted フラグをリセットし、次の演奏開始に備える
-      // -------------------------------------------------------
       case 'E':
         drumNotStarted  = true;
         waitingForStart = false;
@@ -1643,9 +1429,7 @@ void loop() {
         break;
 
       // -------------------------------------------------------
-      // 'S': 演奏開始通知（指揮機から）
-      //   ドラムに対して演奏への参加を申請する
-      // -------------------------------------------------------
+      // 'S': 演奏開始通知（指揮機から）．ドラムに対して演奏への参加を申請
       case 'S':
         drumNotStarted  = true;
         waitingForStart = false;
@@ -1662,17 +1446,9 @@ void loop() {
 
         Serial.println(F("[S] ドラムに同期予告を送信。"));
 
-        //だーめ
-        // delayがあるため，加速が終わった時点で、バッファに溜まっている2回め・3回めのパケットを捨てる（ボタンが動くようにする）
-        // Serial.println("連射された残りのパケットをクリアします。");
-        // while(Udp.parsePacket() > 0) {
-        //   while(Udp.available()) {
-        //     Udp.read(); 
-        //   }
-        // }
         break;
 
-        // 追加: マスターからの確定BPMを受信
+        // マスターからの確定BPMを受信
       case 'N':
         if (pktSize >= 2) {
           uint8_t confirmedBpm = packetBuffer[1];
@@ -1684,8 +1460,6 @@ void loop() {
 
       default: break;
     }
-  // } else if (pktSize > 0) {
-  //   while (Udp.available()) Udp.read();
   } else {
     Udp.read(); // 空読みして破棄
   }
@@ -1708,7 +1482,7 @@ void loop() {
         Serial.print(F("[S0] BPM=")); Serial.print(curLaserBpm);
         Serial.print(F(" stable=")); Serial.println(s);
 
-        sendMPacket(curLaserBpm); // M通信でドラムに提案！
+        sendMPacket(curLaserBpm); // M通信でドラムに提案
 
         if (s >= MIN_STABLE_COUNT) {
           state = 1;
@@ -1725,10 +1499,10 @@ void loop() {
       updateTick();
       if (laser) {
         static unsigned long lastSentTime = 0;
-        if (now - lastSentTime > 200) { // 🚨 200ms以内の連続送信（チャタリング）をブロック
+        if (now - lastSentTime > 200) { // 200ms以内の連続送信（チャタリング）をブロック
         // setBpm(syncManager.getCorrectedBPM());
         // レーザー通過のたびにTパケットを送信してdiff返信を要求
-          sendMPacket(syncManager.getCorrectedBPM()); // M通信で提案！
+          sendMPacket(syncManager.getCorrectedBPM()); // M通信で提案
           lastTPacketTick = globalTick;
           sendTPacket();
           lastSentTime = now;
@@ -1750,10 +1524,10 @@ void loop() {
       updateTick();
       if (laser) {
         static unsigned long lastSentTime = 0;
-        if (now - lastSentTime > 200) { // 🚨 200ms以内の連続送信（チャタリング）をブロック
+        if (now - lastSentTime > 200) { //200ms以内の連続送信（チャタリング）をブロック
         // setBpm(syncManager.getCorrectedBPM());
         // レーザー通過のたびにTパケットを送信してdiff返信を要求
-          sendMPacket(syncManager.getCorrectedBPM()); // M通信で提案！
+          sendMPacket(syncManager.getCorrectedBPM()); // M通信で提案
           lastTPacketTick = globalTick;
           sendTPacket();
           lastSentTime = now;
@@ -1761,7 +1535,7 @@ void loop() {
       }
       break;
     
-    // --- state4: システム停止（笑）中 ---
+    // --- state4: システム停止中 ---
     // case 4: break; 
   }
 }
@@ -1774,1680 +1548,28 @@ void loop() {
 // ==========================================
 void applyDiffCorrection(int32_t diff) {
   if (baseTickIval == 0) return;
-
-  float SYNC_READY_THRESHOLD = 50 / baseTickIval;
-  
-  if (abs(diff) <= SYNC_READY_THRESHOLD) {
-    // 不感帯：ズレが±2 Tick以内なら何もしない（ネットワーク遅延のブレを吸収）
-    tickIval = baseTickIval;
-    ticksToCorrect = 0;
-  } else if (diff <= -24) {
-    // 大幅に早い → ×2 で -diff Tick間遅らせる
-    tickIval       = baseTickIval * 2;
-    ticksToCorrect = -diff;
-    Serial.println(F("[SYNC] 大幅早い: ×2"));
-  } else if (diff >= 24) {
-    // 大幅に遅い → ×2/3 で diff×3 Tick間速める
-    tickIval       = baseTickIval * 2 / 3;
-    ticksToCorrect = diff * 3;
-    Serial.println(F("[SYNC] 大幅遅い: ×2/3"));
-  } else {
-    // 小さいズレ → 次の48Tickでdiffを吸収する比率補正
-    tickIval       = (uint32_t)((48UL * baseTickIval) / (48 + diff));
-    ticksToCorrect = 48 + diff;
-    Serial.print(F("[SYNC] 微補正 diff=")); Serial.println(diff);
-  }
-
-  uint8_t sendProcessingBpm = (uint8_t)(60000000UL / (tickIval * 24));
-  Serial.print('B'); Serial.print(','); Serial.print(sendProcessingBpm); Serial.print('\n');
-}
-
-// ==========================================
-// BPM更新
-// ==========================================
-void setBpm(uint8_t bpm) {
-  if (bpm == curBpm) return;
-  curBpm       = bpm;
-  uint32_t oldBaseTickIval = baseTickIval;
-  baseTickIval = 60000000UL / (uint32_t)bpm / 24;
-
-  // if (ticksToCorrect > 0) {
-  //   // BPM変化後も補正を継続する場合は lastDiff で再計算
-  //   applyDiffCorrection(lastDiff);
-  //   Serial.println(F("[BPM変化] 補正を再計算"));
-  if (oldBaseTickIval > 0 && ticksToCorrect > 0) {
-    // 昔のズレ(lastDiff)で計算し直すのではなく、現在の補正スピードを新しいBPMの比率に合わせてスケールさせるだけ
-    tickIval = (tickIval * baseTickIval) / oldBaseTickIval;
-    Serial.println(F("[BPM変化] 補正スピードを新BPMにスケール"));
-  } else {
-    tickIval = baseTickIval;
-  }
-
-  uint8_t sendProcessingBpm = (uint8_t)(60000000UL / (tickIval * 24));
-  Serial.print('B'); Serial.print(','); Serial.print(sendProcessingBpm); Serial.print('\n');
-}
-
-// ==========================================
-// Tパケット送信（自身のglobalTickをドラムへ）
-//   [0]='T' [1..4]=globalTick(uint32 big-endian) [5]=MY_INST_ID
-// ==========================================
-void sendTPacket() {
-  Udp.beginPacket(drumIP, LOCAL_PORT);
-  Udp.write('T');
-  Udp.write((uint8_t)((globalTick >> 24) & 0xFF));
-  Udp.write((uint8_t)((globalTick >> 16) & 0xFF));
-  Udp.write((uint8_t)((globalTick >>  8) & 0xFF));
-  Udp.write((uint8_t)( globalTick        & 0xFF));
-  Udp.write(MY_INST_ID);
-  Udp.endPacket();
-  lastTPacketMicroTime = micros();
-}
-
-void sendJPacket() {
-  for(int i=0;i<3;i++){
-    Udp.beginPacket(drumIP, LOCAL_PORT);
-    Udp.write('J');
-    Udp.write(MY_INST_ID);
-    Udp.endPacket();
-    delay(3); // 🚨 Wi-Fiのバッファ溢れを防ぐための必須の遅延
-  }
-}
-
-// 🔽🔽 4. ファイルの下の方、sendTPacket() の下あたりに追加 🔽🔽
-// ==========================================
-// M通信送信（自身のレーザーBPMをドラムへ提案）
-//   [0]='M' [1]=bpm(uint8) [2]=MY_INST_ID
-// ==========================================
-void sendMPacket(uint8_t bpm) {
-  // for(int i=0;i<3;i++){
-    Udp.beginPacket(drumIP, LOCAL_PORT);
-    Udp.write('M');
-    Udp.write(bpm);
-    Udp.write(MY_INST_ID);
-    Udp.endPacket();
-  // }
-}
-
-// ==========================================
-// Tick管理
-// ==========================================
-void updateTick() {
-  if (tickIval == 0) return;
-  uint32_t now = micros();
-  while (now - lastTick >= tickIval) {
-    uint32_t currentIval = tickIval; // ★ループ突入時の値を保存
-
-    globalTick++;
-
-    // 補正カウントダウン
-    if (ticksToCorrect > 0) {
-      ticksToCorrect--;
-      if (ticksToCorrect == 0) {
-        tickIval = baseTickIval;
-        Serial.println(F("[SYNC] 補正完了"));
-      }
-    }
-
-    if (state == 2) {
-      // ジャンプ（ループ）処理の判定
-      if (jumpTable[currentSongId][currentJumpIdx][0] != -1 && curTick == jumpTable[currentSongId][currentJumpIdx][0]) {
-        curTick  = jumpTable[currentSongId][currentJumpIdx][1];
-        scoreIdx = jumpTable[currentSongId][currentJumpIdx][2];
-        currentJumpIdx++;
-        
-        if (currentJumpIdx >= MAX_JUMPS || jumpTable[currentSongId][currentJumpIdx][0] == -1) {
-          currentJumpIdx = 0;
-        }
-      }
-
-      sendPacket();
-      curTick++;
-    }
-
-    lastTick += currentIval; // ★書き換えられていても元の値を足す
-  }
-}
-
-// ==========================================
-// ノート送信（Processingへ）
-// ==========================================
-void sendPacket() {
-  while (scoreIdx < note_count && Note[scoreIdx].timing <= curTick) {
-    //uint8_t vs = (uint8_t)((uint16_t)Note[scoreIdx].startVelocity * curVol / 50);
-    //uint8_t ve = (uint8_t)((uint16_t)Note[scoreIdx].endVelocity   * curVol / 50);
-    Serial.print('N'); Serial.print(',');
-    Serial.print(Note[scoreIdx].pitch);    Serial.print(',');
-    Serial.print(Note[scoreIdx].duration); Serial.print(',');
-    Serial.print(Note[scoreIdx].startVelocity); Serial.print(',');
-    Serial.print(Note[scoreIdx].endVelocity); Serial.print(',');
-    Serial.println(Note[scoreIdx].type);
-    scoreIdx++;
-  }
-}
-\end{lstlisting}
-
-\subsection{piano\_0706.ino}
-\begin{lstlisting}[caption={piano\_0706.ino（楽譜データ省略）}, label={lst:douki_piano_full}]
-#include <WiFiS3.h>
-#include <WiFiUdp.h>
-
-const char SSID[] = "hackathon001-WPA2";
-const char PASS[] = "hackathon001";
-
-// ★楽器ごとに変更（ピアノ=12, ストリングス=13, フルート=14）
-IPAddress localIP(192, 168, 11, 12);
-IPAddress drumIP (192, 168, 11, 11);
-const uint16_t LOCAL_PORT = 5005;
-
-// ★楽器ID（0=ドラム, 1=ピアノ, 2=ストリングス, 3=フルート）
-const uint8_t MY_INST_ID = 1;
-
-WiFiUDP Udp;
-uint8_t packetBuffer[32];
-
-const int CDS_PIN           = A0;
-const int CDS_ON_THRESHOLD  = 1010; // 起動直後だけ使う仮しきい値
-const int CDS_OFF_THRESHOLD = 980;  // 起動直後だけ使う仮しきい値
-const int CDS_MIN_DELTA = 25;       // 暗い状態との差がこれ未満ならレーザー扱いしない
-const uint8_t CDS_PEAK_HISTORY = 4; // 直近何回分のピークからしきい値を決めるか
-const uint8_t CDS_ON_RATIO = 65;    // baselineからピークまでの65%をONしきい値にする
-const uint8_t CDS_OFF_RATIO = 35;   // baselineからピークまでの35%をOFFしきい値にする
-const int CDS_THRESHOLD_STEP_LIMIT = 25; // 1回の検出でしきい値が動きすぎない上限
-const unsigned long CDS_STARTUP_CALIBRATION_MS = 1000; // 起動直後の誤検出防止時間
-const unsigned long DEBOUNCE_MS = 20;
-const int BPM_LIST[] = { 60, 90, 120, 150, 180 };
-// 段階1~5(BPM_LISTと対応)の実測の1周あたり時間[ms]。理論値(30000/BPM)では観覧車の
-// 実際の回転速度と合わないことが判明したため、実測値でBPMを判定する。
-const float ROTATION_PERIOD_LIST[] = {230, 180, 140, 110, 80};//pwmと大体対応させている
-const int MIN_STABLE_COUNT  = 3;
-
-// ==========================================
-// 楽譜データ（★楽器ごとに書き換える★）
-// ==========================================
-struct NoteData {
-  uint16_t timing;
-  uint16_t duration;
-  uint8_t  pitch;
-  uint8_t  startVelocity;
-  uint8_t  endVelocity;
-  uint8_t  type;
-};
-
-const NoteData Note[] = {
-
-  // 【1小節目】
-  {0, 24, 60, 96, 80, 0}, // [0] C4
-  {24, 24, 62, 96, 80, 0}, // [1] D4
-  {48, 24, 64, 96, 80, 0}, // [2] E4
-  {72, 24, 65, 96, 80, 0}, // [3] F4
-
-  // 【2小節目】
-  {96, 24, 64, 96, 80, 0}, // [4] E4
-  {120, 24, 62, 96, 80, 0}, // [5] D4
-  {144, 36, 60, 96, 80, 0}, // [6] C4
-
-  // ...（以下、同様の形式の楽譜データが続くため省略）...
-};
-
-const uint16_t note_count = sizeof(Note) / sizeof(Note[0]); //音符の数(配列に含まれている合計/音符1つあたりの要素数)
-uint16_t scoreIdx = 0;
-
-// ==========================================
-// Tick管理変数
-// ==========================================
-uint32_t globalTick   = 0;
-uint32_t curTick      = 0;   // 楽譜用Tick
-uint32_t lastTick     = 0;
-
-uint32_t baseTickIval = 0;   // BPMから計算した基本interval [µs/tick]
-uint32_t tickIval     = 0;   // 実際に使うinterval（同期補正あり）
-int32_t  ticksToCorrect = 0; // 補正残りTick数
-int32_t  lastDiff       = 0; // 直近のdiff（BPM変化時の再計算用）
-uint32_t lastTPacketMicroTime = 0; //直近のTパケット送信時の時刻Micro
-uint32_t lastTPacketTick = 0; // 直近のTパケット送信時のglobalTick（drumNotStarted判定用）
-
-// ==========================================
-// ドラム起動前同期フラグ
-//   true  : ドラムがまだglobalTickを加算していない（-diff == globalTick が続いている）
-//   false : ドラムが動き出した（初回のみ即時同期を実施済み）
-// E通信を受信したらtrueに戻す
-// ==========================================
-bool drumNotStarted = true;
-
-uint8_t curBpm = 0;
-uint8_t curVol = 50;
-
-// 演奏管理
-bool     waitingForStart  = false;  // O通信を受信して演奏開始globalTickを待っている
-uint32_t startGlobalTick  = 0;      // ドラムから指定された演奏開始globalTick
-uint8_t  currentSongId    = 0;
-
-// ==========================================
-// SyncManager（レーザー検知・BPM安定判定）
-// ==========================================
-class SyncManager {
-public:
-  SyncManager()
-    : lastDetectTime(0), correctedBPM(0),
-      stableCount(0), prevCorrectedBPM(0), laserOn(false),
-      baseline(0), baselineReady(false),
-      onThreshold(CDS_ON_THRESHOLD), offThreshold(CDS_OFF_THRESHOLD),
-      pulsePeak(0), peakIndex(0), peakCount(0),
-      calibrated(false), startupCalibrated(false), waitingForRelease(false),
-      calibrationStartMs(0), startupMin(1023), releaseThreshold(0) {
-    clearPeakHistory();
-  }
-
-  void reset() {
-    lastDetectTime = 0;
-    correctedBPM = 0;
-    stableCount = 0;
-    prevCorrectedBPM = 0;
-    laserOn = false;
-    baseline = 0;
-    baselineReady = false;
-    onThreshold = CDS_ON_THRESHOLD;
-    offThreshold = CDS_OFF_THRESHOLD;
-    pulsePeak = 0;
-    peakIndex = 0;
-    peakCount = 0;
-    calibrated = false;
-    startupCalibrated = false;
-    waitingForRelease = false;
-    calibrationStartMs = 0;
-    startupMin = 1023;
-    releaseThreshold = 0;
-    clearPeakHistory();
-  }
-
-  bool update(int cdsValue, unsigned long nowMs) {
-    if (calibrationStartMs == 0) calibrationStartMs = nowMs;
-    if (!detectLight(cdsValue, nowMs)) return false;
-    if (nowMs - lastDetectTime < DEBOUNCE_MS) return false;
-    if (lastDetectTime != 0) {
-      unsigned long interval = nowMs - lastDetectTime;
-      int newBPM = intervalToBpm((float)interval);
-      if (newBPM == prevCorrectedBPM) stableCount++;
-      else                             stableCount = 1;
-      prevCorrectedBPM = newBPM;
-      correctedBPM     = newBPM;
-    }
-    lastDetectTime = nowMs;
-    return true;
-  }
-
-  int getCorrectedBPM() const { return correctedBPM; }
-  int getStableCount()  const { return stableCount; }
-
-private:
-  unsigned long lastDetectTime;
-  int           correctedBPM;
-  int           stableCount;
-  int           prevCorrectedBPM;
-  bool          laserOn;
-  int           baseline;
-  bool          baselineReady;
-  int           onThreshold;
-  int           offThreshold;
-  int           pulsePeak;
-  int           peakHistory[CDS_PEAK_HISTORY];
-  uint8_t       peakIndex;
-  uint8_t       peakCount;
-  bool          calibrated;
-  bool          startupCalibrated;
-  bool          waitingForRelease;
-  unsigned long calibrationStartMs;
-  int           startupMin;
-  int           releaseThreshold;
-
-  bool detectLight(int v, unsigned long nowMs) {
-    if (!baselineReady) {
-      baseline = v;
-      startupMin = v;
-      baselineReady = true;
-      updateFallbackThresholds();
-    }
-
-    // 起動直後にレーザーが当たっていても、最初の1秒は検出せず暗い側の値を探す
-    if (!startupCalibrated) {
-      if (v < startupMin) startupMin = v;
-      baseline = startupMin;
-      updateFallbackThresholds();
-      if (nowMs - calibrationStartMs < CDS_STARTUP_CALIBRATION_MS) return false;
-      startupCalibrated = true;
-      waitingForRelease = (v >= onThreshold);
-      releaseThreshold = (baseline > 1023 - CDS_MIN_DELTA) ? baseline - CDS_MIN_DELTA : offThreshold;
-      return false;
-    }
-
-    if (waitingForRelease) {
-      if (v <= releaseThreshold) {
-        baseline = v;
-        updateFallbackThresholds();
-        waitingForRelease = false;
-      }
-      return false;
-    }
-
-    if (!laserOn) {
-      if (v < baseline) baseline = v;
-      else baseline = (baseline * 31 + v) / 32;
-      if (!calibrated) updateFallbackThresholds();
-    }
-
-    if (!laserOn && v >= onThreshold) {
-      laserOn = true;
-      pulsePeak = v;
-      return true;
-    }
-
-    if (laserOn) {
-      if (v > pulsePeak) pulsePeak = v;
-      if (v <= offThreshold) {
-        laserOn = false;
-        registerPeak(pulsePeak);
-      }
-    }
-    return false;
-  }
-
-  void registerPeak(int peak) {
-    if (peak - baseline < CDS_MIN_DELTA) return;
-
-    peakHistory[peakIndex] = peak;
-    peakIndex = (peakIndex + 1) % CDS_PEAK_HISTORY;
-    if (peakCount < CDS_PEAK_HISTORY) peakCount++;
-    if (peakCount < 3) return;
-
-    long sum = 0;
-    for (uint8_t i = 0; i < peakCount; i++) sum += peakHistory[i];
-    int peakAvg = sum / peakCount;
-    int amplitude = peakAvg - baseline;
-    if (amplitude < CDS_MIN_DELTA) return;
-
-    int targetOn = constrain(baseline + (amplitude * CDS_ON_RATIO) / 100, 0, 1023);
-    int targetOff = constrain(baseline + (amplitude * CDS_OFF_RATIO) / 100, 0, targetOn - 5);
-
-    if (!calibrated) {
-      onThreshold = targetOn;
-      offThreshold = targetOff;
-      calibrated = true;
-    } else {
-      onThreshold = limitStep(onThreshold, targetOn, CDS_THRESHOLD_STEP_LIMIT);
-      offThreshold = limitStep(offThreshold, targetOff, CDS_THRESHOLD_STEP_LIMIT);
-    }
-    if (offThreshold >= onThreshold) offThreshold = max(0, onThreshold - 5);
-  }
-
-  void updateFallbackThresholds() {
-    onThreshold = constrain(baseline + CDS_MIN_DELTA, 0, 1023);
-    offThreshold = constrain(baseline + CDS_MIN_DELTA / 2, 0, max(0, onThreshold - 5));
-  }
-
-  int limitStep(int current, int target, int limit) {
-    if (target > current + limit) return current + limit;
-    if (target < current - limit) return current - limit;
-    return target;
-  }
-
-  void clearPeakHistory() {
-    for (uint8_t i = 0; i < CDS_PEAK_HISTORY; i++) peakHistory[i] = 0;
-  }
-
-  // 実測の1周時間テーブルの中から最も近いものを探し、対応するBPM_LISTの値を返す
-  int intervalToBpm(float intervalMs) {
-    int best = BPM_LIST[0]; float bestD = fabs(intervalMs - ROTATION_PERIOD_LIST[0]);
-    for (int i = 1; i < 5; i++) {
-      float d = fabs(intervalMs - ROTATION_PERIOD_LIST[i]);
-      if (d < bestD) { bestD = d; best = BPM_LIST[i]; }
-    }
-    return best;
-  }
-};
-
-SyncManager syncManager;
-
-// ==========================================
-// state:
-//   0 = 待機（BPM安定待ち）
-//   1 = BPM安定、ドラムと同期中（Tパケット送信・diff収束待ち）
-//   2 = 演奏中
-//   4 = システム停止中
-// ==========================================
-int state = 4;
-
-
-
-// ==========================================
-// 楽譜遷移（ジャンプ）定義
-// jumpTable[曲ID][ジャンプ番号][0=トリガーtick, 1=ジャンプ先tick, 2=ジャンプ先scoreIdx]
-// 終端は {-1, -1, -1}
-// ==========================================
-const int MAX_SONGS = 5;
-const int MAX_JUMPS = 20;
-const int32_t jumpTable[MAX_SONGS][MAX_JUMPS][3] = {
-  { // 曲ID: 0 かえるのうた
-    {1536, 0, 0},
-    {-1, -1, -1}
-  },
-  {
-    {2880, 1728, 48}, {2784, 2880, 281}, {4512, 1728, 48},
-    {-1, -1, -1}
-  },
-  {
-    {5760, 4608, 651}, {5736, 5832, 850}, {6432, 5856, 856}, {6216, 6456, 993}, {6816, 4608, 651}, {5760, 6816, 1046}, {8832, 4608, 651},
-    {-1, -1, -1}
-  },
-  {
-    {9240, 8856, 1399}, {10008, 9240, 1499}, {10392, 10008, 1669}, {10776, 10392, 1783}, {11544, 10776, 1895}, {11544, 10008, 1669}, {10392, 10008, 1669}, {10392, 8856, 1399}, {9240, 8856, 1399}, {10008, 11544, 2111}, {11928, 11544, 2111}, {11904, 11952, 2225}, {13632, 8856, 1399},
-    {-1, -1, -1}
-  },
-  {
-    {16488, 14952, 2899},
-    {-1, -1, -1}
-  }
-};
-
-uint8_t currentJumpIdx = 0; // 現在のジャンプインデックス
-
-// ==========================================
-// 曲ごとの初期設定データ
-// ==========================================
-
-struct SongStartData {
-  uint32_t startTick;
-  uint16_t startNoteIdx;
-};
-
-// Processingの設定に合わせた初期値の定義
-// インデックスがそのまま currentSongId に対応します
-const SongStartData songStartParams[MAX_SONGS] = {
-  {0, 0},       // 曲ID: 0 (かえるのうた)
-  {1536, 29},   // 曲ID: 1 (酒場でブギウギ)
-  {4608, 651},  // 曲ID: 2 (王宮のメヌエット)
-  {8856, 1399}, // 曲ID: 3 (トルコ行進曲)
-  {13632, 2638} // 曲ID: 4 (序曲)
-};
-
-
-
-// ==========================================
-// 関数宣言
-// ==========================================
-void updateTick();
-void setBpm(uint8_t bpm);
-void applyDiffCorrection(int32_t diff);
-void sendTPacket();
-void sendPacket();
-void sendMPacket(uint8_t bpm);
-
-// ==========================================
-// セットアップ
-// ==========================================
-void setup() {
-  Serial.begin(115200);
-  WiFi.config(localIP);
-  WiFi.begin(SSID, PASS);
-  Serial.print("Connecting WiFi...");
-  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
-  Serial.println("\nWiFi Connected!");
-  Udp.begin(LOCAL_PORT);
-  Serial.println("state=0 BPM安定待ち");
-}
-
-// ==========================================
-// メインループ
-// ==========================================
-void loop() {
-  unsigned long now      = millis();
-  int           cdsValue = analogRead(CDS_PIN);
-
-  // ---- UDP受信 ----
-  int pktSize = Udp.parsePacket();
-  while (pktSize > 0) {
-  if (pktSize >= 2) {
-    Udp.read(packetBuffer, sizeof(packetBuffer));
-    char    header  = (char)packetBuffer[0];
-    uint8_t payload = packetBuffer[1];
-
-    switch (header) {
-
-      // -------------------------------------------------------
-      // 'R': ドラムからのdiff返信
-      //   [0]='R' [1..4]=diff(int32 big-endian)
-      //
-      //   ドラム起動前判定：
-      //     -diff == globalTick（つまり globalTick + diff == 0）
-      //     → ドラムはまだglobalTickを加算していない。自身もリセット。
-      //   ドラムが動き出した初回：
-      //     上記条件が初めてfalseになった → globalTick -= diff で即時同期。
-      //   以降は通常のdiff補正（applyDiffCorrection）へ。
-      // -------------------------------------------------------
-      case 'R':
-        // 【追加】停止中（4）や安定待ち（0）に届いた過去のR通信は「遅延ゴミ（Stale Packet）」なので完全無視する！
-        if (state == 0 || state == 4) break;
-
-        if (pktSize >= 5) {
-          int32_t rawDiff =
-            ((int32_t)(int8_t)packetBuffer[1] << 24) |
-            ((int32_t)packetBuffer[2] << 16) |
-            ((int32_t)packetBuffer[3] <<  8) |
-             (int32_t)packetBuffer[4];
-          
-          // 遅延（レイテンシ）補正の計算
-          uint32_t rtt = micros() - lastTPacketMicroTime;
-          // 【安全対策】往復時間が長すぎる(例:200ms以上)場合は古いパケットとみなして破棄
-          if (rtt > 1000 * 1000) {
-            Serial.println(F("[R] パケット遅延過大のためスキップ"));
-            break; 
-          }
-
-          uint32_t latencyMicros = rtt / 2; // 片道遅延
-          int32_t latencyTicks = 0;
-
-          if (baseTickIval > 0) {
-            // 四捨五入してTick数に変換: (値 + 割る数の半分) / 割る数
-            latencyTicks = (int32_t)((latencyMicros + (baseTickIval / 2)) / baseTickIval);
-          }
-
-          // ドラム機の勘違い（遅延分）を差し引いて真のズレを計算
-          int32_t diff = rawDiff - latencyTicks; 
-
-          Serial.print(F("[R] rawDiff=")); Serial.print(rawDiff);
-          Serial.print(F(" latencyTicks=")); Serial.print(latencyTicks);
-          Serial.print(F(" trueDiff=")); Serial.println(diff);
-
-          // Serial.print(F("[R] diff=")); Serial.println(diff);
-
-          if (drumNotStarted) {
-            if ((int32_t)lastTPacketTick + diff == 0) {
-              // Tパケット送信時点でドラムはまだ0。自身もリセットして足並みを揃える
-              globalTick = 0;
-              lastTick   = micros(); // Tick計測の基点もリセット
-              Serial.println(F("[R] ドラム未起動: globalTick リセット"));
-            } else {
-              // ドラムが動き出した初回：即時同期
-              drumNotStarted = false;
-              globalTick = (uint32_t)((int32_t)globalTick + diff);
-              lastDiff   = diff;
-              Serial.print(F("[R] ドラム起動検知: 即時同期 globalTick="));
-              Serial.println(globalTick);
-              // 以降は通常補正も適用
-              if (state >= 1) {
-                // 「補正が完了している」または「緊急事態（ズレが24Tick以上）」の時だけ補正を更新
-                if (ticksToCorrect == 0 || abs(diff) >= 24) {
-                  applyDiffCorrection(diff);
-                } else {
-                  Serial.println(F("[R] 補正中のため新規R通信の適用をスキップ"));
-                }
-              }
-            }
-          } else {
-            // 通常の同期補正
-            lastDiff = diff;
-            if (state >= 1) {
-              // 「補正が完了している」または「緊急事態（ズレが24Tick以上）」の時だけ補正を更新
-              if (ticksToCorrect == 0 || abs(diff) >= 24) {
-                applyDiffCorrection(diff);
-              } else {
-                Serial.println(F("[R] 補正中のため新規R通信の適用をスキップ"));
-              }
-            }
-          }
-        }
-        break;
-
-      // -------------------------------------------------------
-      // 'O': ドラムからの演奏開始指示
-      //   [0]='O' [1]=songId [2..5]=startGlobalTick(uint32 big-endian)
-      //
-      //   自身のglobalTickと startGlobalTick を比較して：
-      //   ・まだ到達していない → waitingForStart=true で待つ
-      //   ・すでに超過している → 超過分だけ curTick をオフセットして即演奏開始
-      // -------------------------------------------------------
-      case 'O':
-        if (pktSize >= 6) {
-          if(waitingForStart || state == 2) return;
-          
-          uint8_t  songId  = packetBuffer[1];
-          uint32_t sgt =
-            ((uint32_t)packetBuffer[2] << 24) |
-            ((uint32_t)packetBuffer[3] << 16) |
-            ((uint32_t)packetBuffer[4] <<  8) |
-             (uint32_t)packetBuffer[5];
-
-          currentSongId   = songId;
-          startGlobalTick = sgt;
-
-          Serial.print(F("[O] songId=")); Serial.print(songId);
-          Serial.print(F(" startGlobalTick=")); Serial.println(sgt);
-
-          // 既に超過していたらスキップして即開始
-          if ((int32_t)(globalTick - sgt) >= 0) {
-            // 超過分だけ curTick を進める
-            uint32_t overrun = globalTick - sgt;
-            curTick   = songStartParams[currentSongId].startTick + overrun;
-            scoreIdx  = songStartParams[currentSongId].startNoteIdx;
-            // overrunより前のノートをスキップ
-            while (scoreIdx < note_count && Note[scoreIdx].timing < curTick) scoreIdx++;
-            state = 2;
-            Serial.print(F("[O] 超過済み。overrun=")); Serial.print(overrun);
-            Serial.println(F(" Tick → 即開始"));
-          } else {
-            waitingForStart = true;
-            Serial.println(F("[O] 開始待機中..."));
-          }
-        }
-        break;
-
-      case 'V': {
-        uint8_t vol = (payload >= 1 && payload <= 5) ? (payload * 10) : 30;
-        if (vol != curVol) {
-          curVol = vol;
-          Serial.print('V'); Serial.print(','); Serial.print(vol); Serial.print('\n');
-        }
-        break;
-      }
-
-      // -------------------------------------------------------
-      // 'E': 演奏終了通知（指揮機から）
-      //   drumNotStarted フラグをリセットし、次の演奏開始に備える
-      // -------------------------------------------------------
-      case 'E':
-        drumNotStarted  = true;
-        waitingForStart = false;
-        state           = 4;  // BPMは確定済みのままstate1に戻す 観覧車も停止するため1ではなく0
-        curTick         = 0;
-        scoreIdx        = 0;
-        globalTick      = 0;
-        curBpm          = 0;  // 追加: BPMリセット
-        tickIval        = 0;  // 追加
-        baseTickIval    = 0;  // 追加
-        Serial.println(F("[E] 演奏終了。drumNotStarted リセット"));
-        break;
-
-      // -------------------------------------------------------
-      // 'S': 演奏開始通知（指揮機から）
-      //   ドラムに対して演奏への参加を申請する
-      // -------------------------------------------------------
-      case 'S':
-        drumNotStarted  = true;
-        waitingForStart = false;
-        state           = 0;  // BPMは確定済みのままstate1に戻す 観覧車も停止するため1ではなく0
-        curTick         = 0;
-        scoreIdx        = 0;
-        globalTick      = 0;
-        currentJumpIdx  = 0; // ジャンプインデックスも初期化
-        Serial.println(F("[S] 演奏開始。drumNotStarted リセット"));
-
-        syncManager.reset();
-
-        sendJPacket();
-
-        Serial.println(F("[S] ドラムに同期予告を送信。"));
-
-        //だーめ
-        // delayがあるため，加速が終わった時点で、バッファに溜まっている2回め・3回めのパケットを捨てる（ボタンが動くようにする）
-        // Serial.println("連射された残りのパケットをクリアします。");
-        // while(Udp.parsePacket() > 0) {
-        //   while(Udp.available()) {
-        //     Udp.read(); 
-        //   }
-        // }
-        break;
-
-        // 追加: マスターからの確定BPMを受信
-      case 'N':
-        if (pktSize >= 2) {
-          uint8_t confirmedBpm = packetBuffer[1];
-          setBpm(confirmedBpm);
-          Serial.print(F("[N] 確定BPM受信: ")); Serial.println(confirmedBpm);
-        }
-        break;
-      
-
-      default: break;
-    }
-  // } else if (pktSize > 0) {
-  //   while (Udp.available()) Udp.read();
-  } else {
-    Udp.read(); // 空読みして破棄
-  }
-  pktSize = Udp.parsePacket(); // 次のパケットがあるか確認
-  }
-
-  if (state == 4) return;
-
-  // ---- レーザー検知 ----
-  bool laser = syncManager.update(cdsValue, now);
-
-  // ---- ステートマシン ----
-  switch (state) {
-
-    // --- state0: BPM安定待ち ---
-    case 0:
-      if (laser) {
-        int s = syncManager.getStableCount();
-        uint8_t curLaserBpm = syncManager.getCorrectedBPM();
-        Serial.print(F("[S0] BPM=")); Serial.print(curLaserBpm);
-        Serial.print(F(" stable=")); Serial.println(s);
-
-        sendMPacket(curLaserBpm); // M通信でドラムに提案！
-
-        if (s >= MIN_STABLE_COUNT) {
-          state = 1;
-          lastTick = micros();
-          // setBpm(syncManager.getCorrectedBPM());
-
-          Serial.println(F("[S0→1] BPM安定(N通信待ち)"));
-        }
-      }
-      break;
-
-    // --- state1: 同期中 ---
-    case 1:
-      updateTick();
-      if (laser) {
-        static unsigned long lastSentTime = 0;
-        if (now - lastSentTime > 200) { // 🚨 200ms以内の連続送信（チャタリング）をブロック
-        // setBpm(syncManager.getCorrectedBPM());
-        // レーザー通過のたびにTパケットを送信してdiff返信を要求
-          sendMPacket(syncManager.getCorrectedBPM()); // M通信で提案！
-          lastTPacketTick = globalTick;
-          sendTPacket();
-          lastSentTime = now;
-        }
-      }
-
-      // waitingForStart かつ startGlobalTick に到達したら演奏開始
-      if (waitingForStart && (int32_t)(globalTick - startGlobalTick) >= 0) {
-        waitingForStart = false;
-        curTick  = songStartParams[currentSongId].startTick;
-        scoreIdx = songStartParams[currentSongId].startNoteIdx;
-        state    = 2;
-        Serial.println(F("[S1→2] 演奏開始！"));
-      }
-      break;
-
-    // --- state2: 演奏中 ---
-    case 2:
-      updateTick();
-      if (laser) {
-        static unsigned long lastSentTime = 0;
-        if (now - lastSentTime > 200) { // 🚨 200ms以内の連続送信（チャタリング）をブロック
-        // setBpm(syncManager.getCorrectedBPM());
-        // レーザー通過のたびにTパケットを送信してdiff返信を要求
-          sendMPacket(syncManager.getCorrectedBPM()); // M通信で提案！
-          lastTPacketTick = globalTick;
-          sendTPacket();
-          lastSentTime = now;
-        }
-      }
-      break;
-    
-    // --- state4: システム停止（笑）中 ---
-    // case 4: break; 
-  }
-}
-
-// ==========================================
-// diff補正によるtickIval算出
-//   diff = drumGlobalTick - myGlobalTick
-//   diff > 0: 自分が遅れている → 速く進む（tickIvalを小さく）
-//   diff < 0: 自分が早すぎる  → 遅く進む（tickIvalを大きく）
-// ==========================================
-void applyDiffCorrection(int32_t diff) {
-  if (baseTickIval == 0) return;
-
-  float SYNC_READY_THRESHOLD = 50 / baseTickIval;
-  
-  if (abs(diff) <= SYNC_READY_THRESHOLD) {
-    // 不感帯：ズレが±2 Tick以内なら何もしない（ネットワーク遅延のブレを吸収）
-    tickIval = baseTickIval;
-    ticksToCorrect = 0;
-  } else if (diff <= -24) {
-    // 大幅に早い → ×2 で -diff Tick間遅らせる
-    tickIval       = baseTickIval * 2;
-    ticksToCorrect = -diff;
-    Serial.println(F("[SYNC] 大幅早い: ×2"));
-  } else if (diff >= 24) {
-    // 大幅に遅い → ×2/3 で diff×3 Tick間速める
-    tickIval       = baseTickIval * 2 / 3;
-    ticksToCorrect = diff * 3;
-    Serial.println(F("[SYNC] 大幅遅い: ×2/3"));
-  } else {
-    // 小さいズレ → 次の48Tickでdiffを吸収する比率補正
-    tickIval       = (uint32_t)((48UL * baseTickIval) / (48 + diff));
-    ticksToCorrect = 48 + diff;
-    Serial.print(F("[SYNC] 微補正 diff=")); Serial.println(diff);
-  }
-
-  uint8_t sendProcessingBpm = (uint8_t)(60000000UL / (tickIval * 24));
-  Serial.print('B'); Serial.print(','); Serial.print(sendProcessingBpm); Serial.print('\n');
-}
-
-// ==========================================
-// BPM更新
-// ==========================================
-void setBpm(uint8_t bpm) {
-  if (bpm == curBpm) return;
-  curBpm       = bpm;
-  uint32_t oldBaseTickIval = baseTickIval;
-  baseTickIval = 60000000UL / (uint32_t)bpm / 24;
-
-  // if (ticksToCorrect > 0) {
-  //   // BPM変化後も補正を継続する場合は lastDiff で再計算
-  //   applyDiffCorrection(lastDiff);
-  //   Serial.println(F("[BPM変化] 補正を再計算"));
-  if (oldBaseTickIval > 0 && ticksToCorrect > 0) {
-    // 昔のズレ(lastDiff)で計算し直すのではなく、現在の補正スピードを新しいBPMの比率に合わせてスケールさせるだけ
-    tickIval = (tickIval * baseTickIval) / oldBaseTickIval;
-    Serial.println(F("[BPM変化] 補正スピードを新BPMにスケール"));
-  } else {
-    tickIval = baseTickIval;
-  }
-
-  uint8_t sendProcessingBpm = (uint8_t)(60000000UL / (tickIval * 24));
-  Serial.print('B'); Serial.print(','); Serial.print(sendProcessingBpm); Serial.print('\n');
-}
-
-// ==========================================
-// Tパケット送信（自身のglobalTickをドラムへ）
-//   [0]='T' [1..4]=globalTick(uint32 big-endian) [5]=MY_INST_ID
-// ==========================================
-void sendTPacket() {
-  Udp.beginPacket(drumIP, LOCAL_PORT);
-  Udp.write('T');
-  Udp.write((uint8_t)((globalTick >> 24) & 0xFF));
-  Udp.write((uint8_t)((globalTick >> 16) & 0xFF));
-  Udp.write((uint8_t)((globalTick >>  8) & 0xFF));
-  Udp.write((uint8_t)( globalTick        & 0xFF));
-  Udp.write(MY_INST_ID);
-  Udp.endPacket();
-  lastTPacketMicroTime = micros();
-}
-
-void sendJPacket() {
-  for(int i=0;i<3;i++){
-    Udp.beginPacket(drumIP, LOCAL_PORT);
-    Udp.write('J');
-    Udp.write(MY_INST_ID);
-    Udp.endPacket();
-    delay(3); // 🚨 Wi-Fiのバッファ溢れを防ぐための必須の遅延
-  }
-}
-
-// 🔽🔽 4. ファイルの下の方、sendTPacket() の下あたりに追加 🔽🔽
-// ==========================================
-// M通信送信（自身のレーザーBPMをドラムへ提案）
-//   [0]='M' [1]=bpm(uint8) [2]=MY_INST_ID
-// ==========================================
-void sendMPacket(uint8_t bpm) {
-  // for(int i=0;i<3;i++){
-    Udp.beginPacket(drumIP, LOCAL_PORT);
-    Udp.write('M');
-    Udp.write(bpm);
-    Udp.write(MY_INST_ID);
-    Udp.endPacket();
-  // }
-}
-
-// ==========================================
-// Tick管理
-// ==========================================
-void updateTick() {
-  if (tickIval == 0) return;
-  uint32_t now = micros();
-  while (now - lastTick >= tickIval) {
-    uint32_t currentIval = tickIval; // ★ループ突入時の値を保存
-
-    globalTick++;
-
-    // 補正カウントダウン
-    if (ticksToCorrect > 0) {
-      ticksToCorrect--;
-      if (ticksToCorrect == 0) {
-        tickIval = baseTickIval;
-        Serial.println(F("[SYNC] 補正完了"));
-      }
-    }
-
-    if (state == 2) {
-      // ジャンプ（ループ）処理の判定
-      if (jumpTable[currentSongId][currentJumpIdx][0] != -1 && curTick == jumpTable[currentSongId][currentJumpIdx][0]) {
-        curTick  = jumpTable[currentSongId][currentJumpIdx][1];
-        scoreIdx = jumpTable[currentSongId][currentJumpIdx][2];
-        currentJumpIdx++;
-        
-        if (currentJumpIdx >= MAX_JUMPS || jumpTable[currentSongId][currentJumpIdx][0] == -1) {
-          currentJumpIdx = 0;
-        }
-      }
-
-      sendPacket();
-      curTick++;
-    }
-
-    lastTick += currentIval; // ★書き換えられていても元の値を足す
-  }
-}
-
-// ==========================================
-// ノート送信（Processingへ）
-// ==========================================
-void sendPacket() {
-  while (scoreIdx < note_count && Note[scoreIdx].timing <= curTick) {
-    //uint8_t vs = (uint8_t)((uint16_t)Note[scoreIdx].startVelocity * curVol / 50);
-    //uint8_t ve = (uint8_t)((uint16_t)Note[scoreIdx].endVelocity   * curVol / 50);
-    Serial.print('N'); Serial.print(',');
-    Serial.print(Note[scoreIdx].pitch);    Serial.print(',');
-    Serial.print(Note[scoreIdx].duration); Serial.print(',');
-    Serial.print(Note[scoreIdx].startVelocity); Serial.print(',');
-    Serial.print(Note[scoreIdx].endVelocity); Serial.print(',');
-    Serial.println(Note[scoreIdx].type);
-    scoreIdx++;
-  }
-}
-\end{lstlisting}
-
-\subsection{strings\_0706.ino}
-\begin{lstlisting}[caption={strings\_0706.ino（楽譜データ省略）}, label={lst:douki_strings_full}]
-#include <WiFiS3.h>
-#include <WiFiUdp.h>
-
-const char SSID[] = "hackathon001-WPA2";
-const char PASS[] = "hackathon001";
-
-// ★楽器ごとに変更（ピアノ=12, ストリングス=13, フルート=14）
-IPAddress localIP(192, 168, 11, 13);
-IPAddress drumIP (192, 168, 11, 11);
-const uint16_t LOCAL_PORT = 5005;
-
-// ★楽器ID（0=ドラム, 1=ピアノ, 2=ストリングス, 3=フルート）
-const uint8_t MY_INST_ID = 2;
-
-WiFiUDP Udp;
-uint8_t packetBuffer[32];
-
-const int CDS_PIN           = A0;
-const int CDS_ON_THRESHOLD  = 800; // 起動直後だけ使う仮しきい値
-const int CDS_OFF_THRESHOLD = 780;  // 起動直後だけ使う仮しきい値
-const int CDS_MIN_DELTA = 25;       // 暗い状態との差がこれ未満ならレーザー扱いしない
-const uint8_t CDS_PEAK_HISTORY = 4; // 直近何回分のピークからしきい値を決めるか
-const uint8_t CDS_ON_RATIO = 65;    // baselineからピークまでの65%をONしきい値にする
-const uint8_t CDS_OFF_RATIO = 35;   // baselineからピークまでの35%をOFFしきい値にする
-const int CDS_THRESHOLD_STEP_LIMIT = 25; // 1回の検出でしきい値が動きすぎない上限
-const unsigned long CDS_STARTUP_CALIBRATION_MS = 1000; // 起動直後の誤検出防止時間
-const unsigned long DEBOUNCE_MS = 20;
-const int BPM_LIST[] = { 60, 90, 120, 150, 180 };
-// 段階1~5(BPM_LISTと対応)の実測の1周あたり時間[ms]。理論値(30000/BPM)では観覧車の
-// 実際の回転速度と合わないことが判明したため、実測値でBPMを判定する。
-const float ROTATION_PERIOD_LIST[] = {230, 180, 140, 110, 80};//pwmと大体対応させている
-const int MIN_STABLE_COUNT  = 3;
-
-// ==========================================
-// 楽譜データ（★楽器ごとに書き換える★）
-// ==========================================
-struct NoteData {
-  uint16_t timing;
-  uint16_t duration;
-  uint8_t  pitch;
-  uint8_t  startVelocity;
-  uint8_t  endVelocity;
-  uint8_t  type;
-};
-
-const NoteData Note[] = {
-
-  // 【1小節目】
-  {0, 24, 72, 80, 80, 0}, // [0] C5
-  {24, 24, 74, 80, 80, 0}, // [1] D5
-  {48, 24, 76, 80, 80, 0}, // [2] E5
-  {72, 24, 77, 80, 80, 0}, // [3] F5
-
-  // 【2小節目】
-  {96, 24, 76, 80, 80, 0}, // [4] E5
-  {120, 24, 74, 80, 80, 0}, // [5] D5
-  {144, 36, 72, 80, 80, 0}, // [6] C5
-
-  // ...（以下、同様の形式の楽譜データが続くため省略）...
-};
-
-const uint16_t note_count = sizeof(Note) / sizeof(Note[0]); //音符の数(配列に含まれている合計/音符1つあたりの要素数)
-uint16_t scoreIdx = 0;
-
-// ==========================================
-// Tick管理変数
-// ==========================================
-uint32_t globalTick   = 0;
-uint32_t curTick      = 0;   // 楽譜用Tick
-uint32_t lastTick     = 0;
-
-uint32_t baseTickIval = 0;   // BPMから計算した基本interval [µs/tick]
-uint32_t tickIval     = 0;   // 実際に使うinterval（同期補正あり）
-int32_t  ticksToCorrect = 0; // 補正残りTick数
-int32_t  lastDiff       = 0; // 直近のdiff（BPM変化時の再計算用）
-uint32_t lastTPacketMicroTime = 0; //直近のTパケット送信時の時刻Micro
-uint32_t lastTPacketTick = 0; // 直近のTパケット送信時のglobalTick（drumNotStarted判定用）
-
-// ==========================================
-// ドラム起動前同期フラグ
-//   true  : ドラムがまだglobalTickを加算していない（-diff == globalTick が続いている）
-//   false : ドラムが動き出した（初回のみ即時同期を実施済み）
-// E通信を受信したらtrueに戻す
-// ==========================================
-bool drumNotStarted = true;
-
-uint8_t curBpm = 0;
-uint8_t curVol = 50;
-
-// 演奏管理
-bool     waitingForStart  = false;  // O通信を受信して演奏開始globalTickを待っている
-uint32_t startGlobalTick  = 0;      // ドラムから指定された演奏開始globalTick
-uint8_t  currentSongId    = 0;
-
-// ==========================================
-// SyncManager（レーザー検知・BPM安定判定）
-// ==========================================
-class SyncManager {
-public:
-  SyncManager()
-    : lastDetectTime(0), correctedBPM(0),
-      stableCount(0), prevCorrectedBPM(0), laserOn(false),
-      baseline(0), baselineReady(false),
-      onThreshold(CDS_ON_THRESHOLD), offThreshold(CDS_OFF_THRESHOLD),
-      pulsePeak(0), peakIndex(0), peakCount(0),
-      calibrated(false), startupCalibrated(false), waitingForRelease(false),
-      calibrationStartMs(0), startupMin(1023), releaseThreshold(0) {
-    clearPeakHistory();
-  }
-
-  void reset() {
-    lastDetectTime = 0;
-    correctedBPM = 0;
-    stableCount = 0;
-    prevCorrectedBPM = 0;
-    laserOn = false;
-    baseline = 0;
-    baselineReady = false;
-    onThreshold = CDS_ON_THRESHOLD;
-    offThreshold = CDS_OFF_THRESHOLD;
-    pulsePeak = 0;
-    peakIndex = 0;
-    peakCount = 0;
-    calibrated = false;
-    startupCalibrated = false;
-    waitingForRelease = false;
-    calibrationStartMs = 0;
-    startupMin = 1023;
-    releaseThreshold = 0;
-    clearPeakHistory();
-  }
-
-  bool update(int cdsValue, unsigned long nowMs) {
-    if (calibrationStartMs == 0) calibrationStartMs = nowMs;
-    if (!detectLight(cdsValue, nowMs)) return false;
-    if (nowMs - lastDetectTime < DEBOUNCE_MS) return false;
-    if (lastDetectTime != 0) {
-      unsigned long interval = nowMs - lastDetectTime;
-      int newBPM = intervalToBpm((float)interval);
-      if (newBPM == prevCorrectedBPM) stableCount++;
-      else                             stableCount = 1;
-      prevCorrectedBPM = newBPM;
-      correctedBPM     = newBPM;
-    }
-    lastDetectTime = nowMs;
-    return true;
-  }
-
-  int getCorrectedBPM() const { return correctedBPM; }
-  int getStableCount()  const { return stableCount; }
-
-private:
-  unsigned long lastDetectTime;
-  int           correctedBPM;
-  int           stableCount;
-  int           prevCorrectedBPM;
-  bool          laserOn;
-  int           baseline;
-  bool          baselineReady;
-  int           onThreshold;
-  int           offThreshold;
-  int           pulsePeak;
-  int           peakHistory[CDS_PEAK_HISTORY];
-  uint8_t       peakIndex;
-  uint8_t       peakCount;
-  bool          calibrated;
-  bool          startupCalibrated;
-  bool          waitingForRelease;
-  unsigned long calibrationStartMs;
-  int           startupMin;
-  int           releaseThreshold;
-
-  bool detectLight(int v, unsigned long nowMs) {
-    if (!baselineReady) {
-      baseline = v;
-      startupMin = v;
-      baselineReady = true;
-      updateFallbackThresholds();
-    }
-
-    // 起動直後にレーザーが当たっていても、最初の1秒は検出せず暗い側の値を探す
-    if (!startupCalibrated) {
-      if (v < startupMin) startupMin = v;
-      baseline = startupMin;
-      updateFallbackThresholds();
-      if (nowMs - calibrationStartMs < CDS_STARTUP_CALIBRATION_MS) return false;
-      startupCalibrated = true;
-      waitingForRelease = (v >= onThreshold);
-      releaseThreshold = (baseline > 1023 - CDS_MIN_DELTA) ? baseline - CDS_MIN_DELTA : offThreshold;
-      return false;
-    }
-
-    if (waitingForRelease) {
-      if (v <= releaseThreshold) {
-        baseline = v;
-        updateFallbackThresholds();
-        waitingForRelease = false;
-      }
-      return false;
-    }
-
-    if (!laserOn) {
-      if (v < baseline) baseline = v;
-      else baseline = (baseline * 31 + v) / 32;
-      if (!calibrated) updateFallbackThresholds();
-    }
-
-    if (!laserOn && v >= onThreshold) {
-      laserOn = true;
-      pulsePeak = v;
-      return true;
-    }
-
-    if (laserOn) {
-      if (v > pulsePeak) pulsePeak = v;
-      if (v <= offThreshold) {
-        laserOn = false;
-        registerPeak(pulsePeak);
-      }
-    }
-    return false;
-  }
-
-  void registerPeak(int peak) {
-    if (peak - baseline < CDS_MIN_DELTA) return;
-
-    peakHistory[peakIndex] = peak;
-    peakIndex = (peakIndex + 1) % CDS_PEAK_HISTORY;
-    if (peakCount < CDS_PEAK_HISTORY) peakCount++;
-    if (peakCount < 3) return;
-
-    long sum = 0;
-    for (uint8_t i = 0; i < peakCount; i++) sum += peakHistory[i];
-    int peakAvg = sum / peakCount;
-    int amplitude = peakAvg - baseline;
-    if (amplitude < CDS_MIN_DELTA) return;
-
-    int targetOn = constrain(baseline + (amplitude * CDS_ON_RATIO) / 100, 0, 1023);
-    int targetOff = constrain(baseline + (amplitude * CDS_OFF_RATIO) / 100, 0, targetOn - 5);
-
-    if (!calibrated) {
-      onThreshold = targetOn;
-      offThreshold = targetOff;
-      calibrated = true;
-    } else {
-      onThreshold = limitStep(onThreshold, targetOn, CDS_THRESHOLD_STEP_LIMIT);
-      offThreshold = limitStep(offThreshold, targetOff, CDS_THRESHOLD_STEP_LIMIT);
-    }
-    if (offThreshold >= onThreshold) offThreshold = max(0, onThreshold - 5);
-  }
-
-  void updateFallbackThresholds() {
-    onThreshold = constrain(baseline + CDS_MIN_DELTA, 0, 1023);
-    offThreshold = constrain(baseline + CDS_MIN_DELTA / 2, 0, max(0, onThreshold - 5));
-  }
-
-  int limitStep(int current, int target, int limit) {
-    if (target > current + limit) return current + limit;
-    if (target < current - limit) return current - limit;
-    return target;
-  }
-
-  void clearPeakHistory() {
-    for (uint8_t i = 0; i < CDS_PEAK_HISTORY; i++) peakHistory[i] = 0;
-  }
-
-  // 実測の1周時間テーブルの中から最も近いものを探し、対応するBPM_LISTの値を返す
-  int intervalToBpm(float intervalMs) {
-    int best = BPM_LIST[0]; float bestD = fabs(intervalMs - ROTATION_PERIOD_LIST[0]);
-    for (int i = 1; i < 5; i++) {
-      float d = fabs(intervalMs - ROTATION_PERIOD_LIST[i]);
-      if (d < bestD) { bestD = d; best = BPM_LIST[i]; }
-    }
-    return best;
-  }
-};
-
-SyncManager syncManager;
-
-// ==========================================
-// state:
-//   0 = 待機（BPM安定待ち）
-//   1 = BPM安定、ドラムと同期中（Tパケット送信・diff収束待ち）
-//   2 = 演奏中
-//   4 = システム停止中
-// ==========================================
-int state = 4;
-
-
-
-// ==========================================
-// 楽譜遷移（ジャンプ）定義
-// jumpTable[曲ID][ジャンプ番号][0=トリガーtick, 1=ジャンプ先tick, 2=ジャンプ先scoreIdx]
-// 終端は {-1, -1, -1}
-// ==========================================
-const int MAX_SONGS = 5;
-const int MAX_JUMPS = 20;
-const int32_t jumpTable[MAX_SONGS][MAX_JUMPS][3] = {
-  { // 曲ID: 0 かえるのうた
-    {1536, 0, 0},
-    {-1, -1, -1}
-  },
-  {
-    {2880, 1728, 48}, {2784, 2880, 281}, {4512, 1728, 48},
-    {-1, -1, -1}
-  },
-  {
-    {5760, 4608, 651}, {5736, 5832, 850}, {6432, 5856, 856}, {6216, 6456, 993}, {6816, 4608, 651}, {5760, 6816, 1046}, {8832, 4608, 651},
-    {-1, -1, -1}
-  },
-  {
-    {9240, 8856, 1399}, {10008, 9240, 1499}, {10392, 10008, 1669}, {10776, 10392, 1783}, {11544, 10776, 1895}, {11544, 10008, 1669}, {10392, 10008, 1669}, {10392, 8856, 1399}, {9240, 8856, 1399}, {10008, 11544, 2111}, {11928, 11544, 2111}, {11904, 11952, 2225}, {13632, 8856, 1399},
-    {-1, -1, -1}
-  },
-  {
-    {16488, 14952, 3053},
-    {-1, -1, -1}
-  }
-};
-
-uint8_t currentJumpIdx = 0; // 現在のジャンプインデックス
-
-// ==========================================
-// 曲ごとの初期設定データ
-// ==========================================
-
-struct SongStartData {
-  uint32_t startTick;
-  uint16_t startNoteIdx;
-};
-
-// Processingの設定に合わせた初期値の定義
-// インデックスがそのまま currentSongId に対応します
-const SongStartData songStartParams[MAX_SONGS] = {
-  {0, 0},       // 曲ID: 0 (かえるのうた)
-  {1536, 29},   // 曲ID: 1 (酒場でブギウギ)
-  {4608, 651},  // 曲ID: 2 (王宮のメヌエット)
-  {8856, 1399}, // 曲ID: 3 (トルコ行進曲)
-  {13632, 2638} // 曲ID: 4 (序曲)
-};
-
-
-
-// ==========================================
-// 関数宣言
-// ==========================================
-void updateTick();
-void setBpm(uint8_t bpm);
-void applyDiffCorrection(int32_t diff);
-void sendTPacket();
-void sendPacket();
-void sendMPacket(uint8_t bpm);
-
-// ==========================================
-// セットアップ
-// ==========================================
-void setup() {
-  Serial.begin(115200);
-  WiFi.config(localIP);
-  WiFi.begin(SSID, PASS);
-  Serial.print("Connecting WiFi...");
-  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
-  Serial.println("\nWiFi Connected!");
-  Udp.begin(LOCAL_PORT);
-  Serial.println("state=0 BPM安定待ち");
-}
-
-// ==========================================
-// メインループ
-// ==========================================
-void loop() {
-  unsigned long now      = millis();
-  int           cdsValue = analogRead(CDS_PIN);
-  // Serial.println(cdsValue);
-
-  // ---- UDP受信 ----
-  int pktSize = Udp.parsePacket();
-  while (pktSize > 0) {
-  if (pktSize >= 2) {
-    Udp.read(packetBuffer, sizeof(packetBuffer));
-    char    header  = (char)packetBuffer[0];
-    uint8_t payload = packetBuffer[1];
-
-    switch (header) {
-
-      // -------------------------------------------------------
-      // 'R': ドラムからのdiff返信
-      //   [0]='R' [1..4]=diff(int32 big-endian)
-      //
-      //   ドラム起動前判定：
-      //     -diff == globalTick（つまり globalTick + diff == 0）
-      //     → ドラムはまだglobalTickを加算していない。自身もリセット。
-      //   ドラムが動き出した初回：
-      //     上記条件が初めてfalseになった → globalTick -= diff で即時同期。
-      //   以降は通常のdiff補正（applyDiffCorrection）へ。
-      // -------------------------------------------------------
-      case 'R':
-        // 【追加】停止中（4）や安定待ち（0）に届いた過去のR通信は「遅延ゴミ（Stale Packet）」なので完全無視する！
-        if (state == 0 || state == 4) break;
-
-        if (pktSize >= 5) {
-          int32_t rawDiff =
-            ((int32_t)(int8_t)packetBuffer[1] << 24) |
-            ((int32_t)packetBuffer[2] << 16) |
-            ((int32_t)packetBuffer[3] <<  8) |
-             (int32_t)packetBuffer[4];
-          
-          // 遅延（レイテンシ）補正の計算
-          uint32_t rtt = micros() - lastTPacketMicroTime;
-          // 【安全対策】往復時間が長すぎる(例:200ms以上)場合は古いパケットとみなして破棄
-          if (rtt > 1000 * 1000) {
-            // Serial.println(F("[R] パケット遅延過大のためスキップ"));
-            break; 
-          }
-
-          uint32_t latencyMicros = rtt / 2; // 片道遅延
-          int32_t latencyTicks = 0;
-
-          if (baseTickIval > 0) {
-            // 四捨五入してTick数に変換: (値 + 割る数の半分) / 割る数
-            latencyTicks = (int32_t)((latencyMicros + (baseTickIval / 2)) / baseTickIval);
-          }
-
-          // ドラム機の勘違い（遅延分）を差し引いて真のズレを計算
-          int32_t diff = rawDiff - latencyTicks; 
-
-          // Serial.print(F("[R] rawDiff=")); Serial.print(rawDiff);
-          // Serial.print(F(" latencyTicks=")); Serial.print(latencyTicks);
-          // Serial.print(F(" trueDiff=")); Serial.println(diff);
-
-          if (drumNotStarted) {
-            if ((int32_t)lastTPacketTick + diff == 0) {
-              // Tパケット送信時点でドラムはまだ0。自身もリセットして足並みを揃える
-              globalTick = 0;
-              lastTick   = micros(); // Tick計測の基点もリセット
-              // Serial.println(F("[R] ドラム未起動: globalTick リセット"));
-            } else {
-              // ドラムが動き出した初回：即時同期
-              drumNotStarted = false;
-              globalTick = (uint32_t)((int32_t)globalTick + diff);
-              lastDiff   = diff;
-              // Serial.print(F("[R] ドラム起動検知: 即時同期 globalTick="));
-              // Serial.println(globalTick);
-              // 以降は通常補正も適用
-              if (state >= 1) {
-                // 「補正が完了している」または「緊急事態（ズレが24Tick以上）」の時だけ補正を更新
-                if (ticksToCorrect == 0 || abs(diff) >= 24) {
-                  applyDiffCorrection(diff);
-                } else {
-                  // Serial.println(F("[R] 補正中のため新規R通信の適用をスキップ"));
-                }
-              }
-            }
-          } else {
-            // 通常の同期補正
-            lastDiff = diff;
-            if (state >= 1) {
-              // 「補正が完了している」または「緊急事態（ズレが24Tick以上）」の時だけ補正を更新
-              if (ticksToCorrect == 0 || abs(diff) >= 24) {
-                applyDiffCorrection(diff);
-              } else {
-                // Serial.println(F("[R] 補正中のため新規R通信の適用をスキップ"));
-              }
-            }
-          }
-        }
-        break;
-
-      // -------------------------------------------------------
-      // 'O': ドラムからの演奏開始指示
-      //   [0]='O' [1]=songId [2..5]=startGlobalTick(uint32 big-endian)
-      //
-      //   自身のglobalTickと startGlobalTick を比較して：
-      //   ・まだ到達していない → waitingForStart=true で待つ
-      //   ・すでに超過している → 超過分だけ curTick をオフセットして即演奏開始
-      // -------------------------------------------------------
-      case 'O':
-        if (pktSize >= 6) {
-          if(waitingForStart || state == 2) return;
-          
-          uint8_t  songId  = packetBuffer[1];
-          uint32_t sgt =
-            ((uint32_t)packetBuffer[2] << 24) |
-            ((uint32_t)packetBuffer[3] << 16) |
-            ((uint32_t)packetBuffer[4] <<  8) |
-             (uint32_t)packetBuffer[5];
-
-          currentSongId   = songId;
-          startGlobalTick = sgt;
-
-          // Serial.print(F("[O] songId=")); Serial.print(songId);
-          // Serial.print(F(" startGlobalTick=")); Serial.println(sgt);
-
-          // 既に超過していたらスキップして即開始
-          if ((int32_t)(globalTick - sgt) >= 0) {
-            // 超過分だけ curTick を進める
-            uint32_t overrun = globalTick - sgt;
-            curTick   = songStartParams[currentSongId].startTick + overrun;
-            scoreIdx  = songStartParams[currentSongId].startNoteIdx;
-            // overrunより前のノートをスキップ
-            while (scoreIdx < note_count && Note[scoreIdx].timing < curTick) scoreIdx++;
-            state = 2;
-            // Serial.print(F("[O] 超過済み。overrun=")); Serial.print(overrun);
-            // Serial.println(F(" Tick → 即開始"));
-          } else {
-            waitingForStart = true;
-            // Serial.println(F("[O] 開始待機中..."));
-          }
-        }
-        break;
-
-      case 'V': {
-        uint8_t vol = (payload >= 1 && payload <= 5) ? (payload * 10) : 30;
-        if (vol != curVol) {
-          curVol = vol;
-          Serial.print('V'); Serial.print(','); Serial.print(vol); Serial.print('\n');
-        }
-        break;
-      }
-
-      // -------------------------------------------------------
-      // 'E': 演奏終了通知（指揮機から）
-      //   drumNotStarted フラグをリセットし、次の演奏開始に備える
-      // -------------------------------------------------------
-      case 'E':
-        drumNotStarted  = true;
-        waitingForStart = false;
-        state           = 4;  // BPMは確定済みのままstate1に戻す 観覧車も停止するため1ではなく0
-        curTick         = 0;
-        scoreIdx        = 0;
-        globalTick      = 0;
-        curBpm          = 0;  // 追加: BPMリセット
-        tickIval        = 0;  // 追加
-        baseTickIval    = 0;  // 追加
-        // Serial.println(F("[E] 演奏終了。drumNotStarted リセット"));
-        break;
-
-      // -------------------------------------------------------
-      // 'S': 演奏開始通知（指揮機から）
-      //   ドラムに対して演奏への参加を申請する
-      // -------------------------------------------------------
-      case 'S':
-        drumNotStarted  = true;
-        waitingForStart = false;
-        state           = 0;  // BPMは確定済みのままstate1に戻す 観覧車も停止するため1ではなく0
-        curTick         = 0;
-        scoreIdx        = 0;
-        globalTick      = 0;
-        currentJumpIdx  = 0; // ジャンプインデックスも初期化
-        // Serial.println(F("[S] 演奏開始。drumNotStarted リセット"));
-
-        syncManager.reset();
-
-        sendJPacket();
-
-        // Serial.println(F("[S] ドラムに同期予告を送信。"));
-
-        //だーめ
-        // delayがあるため，加速が終わった時点で、バッファに溜まっている2回め・3回めのパケットを捨てる（ボタンが動くようにする）
-        // Serial.println("連射された残りのパケットをクリアします。");
-        // while(Udp.parsePacket() > 0) {
-        //   while(Udp.available()) {
-        //     Udp.read(); 
-        //   }
-        // }
-        break;
-
-        // 追加: マスターからの確定BPMを受信
-      case 'N':
-        if (pktSize >= 2) {
-          uint8_t confirmedBpm = packetBuffer[1];
-          setBpm(confirmedBpm);
-          // Serial.print(F("[N] 確定BPM受信: ")); Serial.println(confirmedBpm);
-        }
-        break;
-      
-
-      default: break;
-    }
-  // } else if (pktSize > 0) {
-  //   while (Udp.available()) Udp.read();
-  } else {
-    Udp.read(); // 空読みして破棄
-  }
-  pktSize = Udp.parsePacket(); // 次のパケットがあるか確認
-  }
-
-  if (state == 4) return;
-
-  // ---- レーザー検知 ----
-  bool laser = syncManager.update(cdsValue, now);
-
-  // ---- ステートマシン ----
-  switch (state) {
-
-    // --- state0: BPM安定待ち ---
-    case 0:
-      if (laser) {
-        int s = syncManager.getStableCount();
-        uint8_t curLaserBpm = syncManager.getCorrectedBPM();
-        // Serial.print(F("[S0] BPM=")); Serial.print(curLaserBpm);
-        // Serial.print(F(" stable=")); Serial.println(s);
-
-        sendMPacket(curLaserBpm); // M通信でドラムに提案！
-
-        if (s >= MIN_STABLE_COUNT) {
-          state = 1;
-          lastTick = micros();
-          // setBpm(syncManager.getCorrectedBPM());
-
-          // Serial.println(F("[S0→1] BPM安定(N通信待ち)"));
-        }
-      }
-      break;
-
-    // --- state1: 同期中 ---
-    case 1:
-      updateTick();
-      if (laser) {
-        static unsigned long lastSentTime = 0;
-        if (now - lastSentTime > 200) { // 🚨 200ms以内の連続送信（チャタリング）をブロック
-        // setBpm(syncManager.getCorrectedBPM());
-        // レーザー通過のたびにTパケットを送信してdiff返信を要求
-          sendMPacket(syncManager.getCorrectedBPM()); // M通信で提案！
-          lastTPacketTick = globalTick;
-          sendTPacket();
-          lastSentTime = now;
-        }
-      }
-
-      // waitingForStart かつ startGlobalTick に到達したら演奏開始
-      if (waitingForStart && (int32_t)(globalTick - startGlobalTick) >= 0) {
-        waitingForStart = false;
-        curTick  = songStartParams[currentSongId].startTick;
-        scoreIdx = songStartParams[currentSongId].startNoteIdx;
-        state    = 2;
-        // Serial.println(F("[S1→2] 演奏開始！"));
-      }
-      break;
-
-    // --- state2: 演奏中 ---
-    case 2:
-      updateTick();
-      if (laser) {
-        static unsigned long lastSentTime = 0;
-        if (now - lastSentTime > 200) { // 🚨 200ms以内の連続送信（チャタリング）をブロック
-        // setBpm(syncManager.getCorrectedBPM());
-        // レーザー通過のたびにTパケットを送信してdiff返信を要求
-          sendMPacket(syncManager.getCorrectedBPM()); // M通信で提案！
-          lastTPacketTick = globalTick;
-          sendTPacket();
-          lastSentTime = now;
-        }
-      }
-      break;
-    
-    // --- state4: システム停止（笑）中 ---
-    // case 4: break; 
-  }
-}
-
-// ==========================================
-// diff補正によるtickIval算出
-//   diff = drumGlobalTick - myGlobalTick
-//   diff > 0: 自分が遅れている → 速く進む（tickIvalを小さく）
-//   diff < 0: 自分が早すぎる  → 遅く進む（tickIvalを大きく）
-// ==========================================
-void applyDiffCorrection(int32_t diff) {
-  if (baseTickIval == 0) return;
-
-  // if(state == 1) {
-  //   globalTick += diff;
-  //   return;
-  // }
 
   float SYNC_READY_THRESHOLD = 60 * 1000 / baseTickIval;
   
   if (abs(diff) <= SYNC_READY_THRESHOLD) {
-    // 不感帯：ズレが±2 Tick以内なら何もしない（ネットワーク遅延のブレを吸収）
+    // ズレが±2 Tick以内なら何もしない
     tickIval = baseTickIval;
     ticksToCorrect = 0;
-  } else if (diff <= -12) {
+  } else if (diff <= -24) {
     // 大幅に早い → ×2 で -diff Tick間遅らせる
     tickIval       = baseTickIval * 2;
     ticksToCorrect = -diff;
-    // Serial.println(F("[SYNC] 大幅早い: ×2"));
+    Serial.println(F("[SYNC] 大幅早い: ×2"));
   } else if (diff >= 24) {
-    // 大幅に遅い → ×1/2 で diff×2 Tick間速める
-    tickIval       = baseTickIval * 1 / 2;
-    ticksToCorrect = diff * 2;
-    // Serial.println(F("[SYNC] 大幅遅い: ×2/3"));
+    // 大幅に遅い → ×2/3 で diff×3 Tick間速める
+    tickIval       = baseTickIval * 2 / 3;
+    ticksToCorrect = diff * 3;
+    Serial.println(F("[SYNC] 大幅遅い: ×2/3"));
   } else {
-    // 小さいズレ → 次の24Tickでdiffを吸収する比率補正
-    tickIval       = (uint32_t)((24UL * baseTickIval) / (24 + diff));
-    ticksToCorrect = 24 + diff;
-    // Serial.print(F("[SYNC] 微補正 diff=")); Serial.println(diff);
+    // 小さいズレ → 次の48Tickでdiffを吸収する比率補正
+    tickIval       = (uint32_t)((48UL * baseTickIval) / (48 + diff));
+    ticksToCorrect = 48 + diff;
+    Serial.print(F("[SYNC] 微補正 diff=")); Serial.println(diff);
   }
 
   uint8_t sendProcessingBpm = (uint8_t)(60000000UL / (tickIval * 24));
@@ -3463,14 +1585,10 @@ void setBpm(uint8_t bpm) {
   uint32_t oldBaseTickIval = baseTickIval;
   baseTickIval = 60000000UL / (uint32_t)bpm / 24;
 
-  // if (ticksToCorrect > 0) {
-  //   // BPM変化後も補正を継続する場合は lastDiff で再計算
-  //   applyDiffCorrection(lastDiff);
-  //   Serial.println(F("[BPM変化] 補正を再計算"));
   if (oldBaseTickIval > 0 && ticksToCorrect > 0) {
-    // 昔のズレ(lastDiff)で計算し直すのではなく、現在の補正スピードを新しいBPMの比率に合わせてスケールさせるだけ
+    // 現在の補正スピードを新しいBPMの比率に合わせてスケールさせる
     tickIval = (tickIval * baseTickIval) / oldBaseTickIval;
-    // Serial.println(F("[BPM変化] 補正スピードを新BPMにスケール"));
+    Serial.println(F("[BPM変化] 補正スピードを新BPMにスケール"));
   } else {
     tickIval = baseTickIval;
   }
@@ -3479,10 +1597,7 @@ void setBpm(uint8_t bpm) {
   Serial.print('B'); Serial.print(','); Serial.print(sendProcessingBpm); Serial.print('\n');
 }
 
-// ==========================================
 // Tパケット送信（自身のglobalTickをドラムへ）
-//   [0]='T' [1..4]=globalTick(uint32 big-endian) [5]=MY_INST_ID
-// ==========================================
 void sendTPacket() {
   Udp.beginPacket(drumIP, LOCAL_PORT);
   Udp.write('T');
@@ -3501,23 +1616,17 @@ void sendJPacket() {
     Udp.write('J');
     Udp.write(MY_INST_ID);
     Udp.endPacket();
-    delay(3); // 🚨 Wi-Fiのバッファ溢れを防ぐための必須の遅延
+    delay(3); // Wi-Fiのバッファ溢れを防ぐための必須の遅延
   }
 }
 
-// 🔽🔽 4. ファイルの下の方、sendTPacket() の下あたりに追加 🔽🔽
-// ==========================================
 // M通信送信（自身のレーザーBPMをドラムへ提案）
-//   [0]='M' [1]=bpm(uint8) [2]=MY_INST_ID
-// ==========================================
 void sendMPacket(uint8_t bpm) {
-  // for(int i=0;i<3;i++){
     Udp.beginPacket(drumIP, LOCAL_PORT);
     Udp.write('M');
     Udp.write(bpm);
     Udp.write(MY_INST_ID);
     Udp.endPacket();
-  // }
 }
 
 // ==========================================
@@ -3527,7 +1636,7 @@ void updateTick() {
   if (tickIval == 0) return;
   uint32_t now = micros();
   while (now - lastTick >= tickIval) {
-    uint32_t currentIval = tickIval; // ★ループ突入時の値を保存
+    uint32_t currentIval = tickIval; // ループ突入時の値を保存
 
     globalTick++;
 
@@ -3536,7 +1645,7 @@ void updateTick() {
       ticksToCorrect--;
       if (ticksToCorrect == 0) {
         tickIval = baseTickIval;
-        // Serial.println(F("[SYNC] 補正完了"));
+        Serial.println(F("[SYNC] 補正完了"));
       }
     }
 
@@ -3578,3 +1687,24 @@ void sendPacket() {
 }
 \end{lstlisting}
 
+\subsection{strings\_0706.ino（スレーブ機・相違箇所のみ）}
+\begin{lstlisting}[caption={strings\_0706.ino（piano\_0706.inoとの相違箇所のみ）}, label={lst:douki_strings_full}]
+// strings_0706.ino：以下の2定数と楽譜データ（Note[]配列）を除き，
+// piano_0706.ino と完全に同一である．
+
+IPAddress localIP(192, 168, 11, 13);
+
+// 楽器ID（0=ドラム, 1=ピアノ, 2=ストリングス, 3=フルート）
+const uint8_t MY_INST_ID = 2; // ストリングス
+\end{lstlisting}
+
+\subsection{flute\_0706.ino（スレーブ機・相違箇所のみ）}
+\begin{lstlisting}[caption={flute\_0706.ino（piano\_0706.inoとの相違箇所のみ）}, label={lst:douki_flute_full}]
+// flute_0706.ino：以下の2定数と楽譜データ（Note[]配列）を除き，
+// piano_0706.ino と完全に同一である．
+
+IPAddress localIP(192, 168, 11, 14);
+
+// 楽器ID（0=ドラム, 1=ピアノ, 2=ストリングス, 3=フルート）
+const uint8_t MY_INST_ID = 3; // フルート
+\end{lstlisting}
