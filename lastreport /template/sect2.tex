@@ -1352,7 +1352,7 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
     \begin{tabular}{p{3.9cm}p{3.4cm}p{6.2cm}}
     \hline
     変数名 & 型 & 説明\\
-    \hline
+    \hline\hline
     BPM\_STEP\_1〜5 & \#define & BPM5段階(60,90,120,150,180)の各値を定義\\
     \hline
     FONT\_WIDTH & \#define & 1文字の横ドット数(3)を定義\\
@@ -1385,8 +1385,8 @@ PWMとは，デジタル出力ピンから出力される矩形波のHIGH状態�
     \label{tab:func1}
     \begin{tabular}{p{2.6cm}p{1.6cm}p{3.3cm}p{6cm}}
     \hline
-    \textbf{関数名} & \textbf{戻り値} & \textbf{引数} & \textbf{説明}\\
-    \hline
+    関数名 & 戻り値 & 引数 & 説明\\
+    \hline\hline
     displaySetup & void & なし & LEDマトリクスの初期化を行う\\
     \hline
     displayBPM & void & uint8\_t stepNumber & 受信したBPM段階番号をLEDマトリクスに数値表示する\\
@@ -1422,9 +1422,9 @@ void displaySetup() {
 }
 \end{lstlisting}
 
-次に，displayBPM関数について説明する．この関数は，loop関数から受け取ったBPM段階番号（1〜5）をbpmTable[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．
-displayBPM関数の処理の流れを図\ref{fig:flow_displaybpm}に示す．
-また，displayBPM関数をコード\ref{lst:disp_displaybpm}に示す．
+次に，displayBPM()について説明する．この関数は，loop()から受け取ったBPM段階番号（1〜5）をbpmTable[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．
+displayBPM()の処理の流れを図\ref{fig:flow_displaybpm}に示す．
+また，displayBPM()をコード\ref{lst:disp_displaybpm}に示す．
 
 \begin{figure}[htbp]
     \centering
@@ -1478,8 +1478,8 @@ void displayBPM(uint8_t stepNumber) {
 }
 \end{lstlisting}
 
-次に，drawDigit関数について説明する．この関数は，引数の数字が0から9の範囲内であるかを確認した後，縦方向の中央寄せオフセットを算出し，独自フォント配列から該当する数字のドットパターンを1ドットずつ読み取ってフレームバッファの指定位置に書き込む．
-drawDigit関数をコード\ref{lst:disp_drawdigit}に示す．
+次に，drawDigit()について説明する．この関数は，引数の数字が0から9の範囲内であるかを確認した後，縦方向の中央寄せオフセットを算出し，独自フォント配列から該当する数字のドットパターンを1ドットずつ読み取ってフレームバッファの指定位置に書き込む．
+drawDigit()をコード\ref{lst:disp_drawdigit}に示す．
 
 \begin{lstlisting}[caption={drawDigit関数}, label={lst:disp_drawdigit}]
 void drawDigit(int digit, int x_offset) {
@@ -1497,8 +1497,8 @@ void drawDigit(int digit, int x_offset) {
 }
 \end{lstlisting}
 
-最後に，clearDisplay関数について説明する．この関数は，BPM値を初期値(-1)にリセットし，全消灯フレームをmatrix.loadFrame()で描画して表示のリセットを行う．
-clearDisplay関数をコード\ref{lst:disp_cleardisplay}に示す．
+次に，clearDisplay()について説明する．この関数は，BPM値を初期値(-1)にリセットし，全消灯フレームをmatrix.loadFrame()で描画して表示のリセットを行う．
+clearDisplay()をコード\ref{lst:disp_cleardisplay}に示す．
 
 \begin{lstlisting}[caption={clearDisplay関数}, label={lst:disp_cleardisplay}]
 void clearDisplay() {
@@ -1510,7 +1510,7 @@ void clearDisplay() {
 
 
 最後に，中継機デバイスのモータ回転速度を実測するために用いたプログラムであるLaserIntervalTestについて説明する．このプログラムは中継機デバイス本体には搭載せず，開発段階で観覧車に設置したレーザーとCdSセルを用いて，各PWM出力値における実際の回転周期を計測するために使用したものであり，表\ref{tab:pwm_lut}に示した実測周期の値はこのプログラムによって得られている．
-本プログラムは，CdSセルの出力値を監視し，レーザー光の通過を検知するたびに，直前のパルス検知からの経過時間（interval）をシリアルモニタへ出力する．周囲光量やレーザーの取り付け誤差による検知レベルのばらつきに対応するため，固定閾値ではなく，起動直後のキャリブレーションと直近のピーク値履歴に基づいて検知閾値を継続的に調整する適応閾値方式を採用している．
+本プログラムは，CdSセルの出力値を監視し，レーザー光の通過を検知するたびに直前のパルス検知からの経過時間（interval）をシリアルモニタへ出力する．周囲光量やレーザーの取り付け誤差による検知レベルのばらつきに対応するため，固定閾値ではなく，起動直後のキャリブレーションと直近のピーク値履歴に基づいて検知閾値を継続的に調整する適応閾値方式を採用している．
 
 \iffalse
 LaserIntervalTestで使用する主な定数の仕様を表\ref{table:laser_const}に示す．
@@ -1689,15 +1689,15 @@ bool detectLight(int v, unsigned long nowMs) {
 \subsection{楽器デバイス}
 
 \subsubsection{概要}
-最後に，楽器デバイスについて説明する．楽器デバイスの構成図を図\ref{fig:jusin_sys}に示す．本デバイスは，レーザー光を受光するためのCdSセルとArduino，そしてProcessingにより楽曲を再生するためのPCで構成され，楽器を再現するデバイスであり，主に以下の４つの機能を有する．本システムでは，ドラム，フルート，ストリングス，ピアノの4種類の楽器を再現する．
-
+最後に，楽器デバイスについて説明する．楽器デバイスの構成図を図\ref{fig:jusin_sys}に示す．本デバイスは，レーザー光を受光するためのCdSセルとArduino，そしてProcessingにより楽曲を再生するためのPCで構成され，楽器を再現するデバイスであり，主に以下の４つの機能を有する．
 第一の機能は，レーザー光の受光によるBPMの推定である．本機能のシーケンス図を図\ref{fig:jusin_jou5}に示す．中継機デバイスの回転に伴い照射されるレーザー光をCdSセルが検知すると，そのデジタル信号がArduinoへ送られ，レーザーの通過間隔から楽曲のBPMが検出される．
 
 第二の機能は，楽器デバイス間のUDP通信による同期補正である．ドラムを担当する楽器デバイスをマスター，ピアノ・ストリングス・フルートを担当する楽器デバイスをスレーブとし，各機で検出した発音タイミングのずれを相互に送受信することで，4台の楽器デバイス間の同期を補正する．
 
 第三の機能は，演奏の開始・終了および音量変更の受信である．これらの情報は，指揮デバイスからのUDP通信によって各楽器デバイスへ直接送信される．
 
-第四の機能は，楽曲の発音である．各楽器デバイスのArduinoに接続されたPC上で動作するProcessingが，ArduinoからのUSBシリアル通信で受け取った発音指示（音程・音量等）をもとに波形を合成することで再生される．
+第四の機能は，楽曲の発音である．各楽器デバイスのArduinoに接続されたPC上で動作するProcessingが，ArduinoからのUSBシリアル通信で受け取った発音指示（音程・音量等）をもとに波形を合成することで再生される．本システムでは，ドラム，フルート，ストリングス，ピアノの4種類の楽器を再現する．
+
 ここからは，外部設計と内部設計について説明する．
 
 \begin{figure}[h] % h:ここ, t:上, b:下, p:独立ページ
@@ -1718,17 +1718,18 @@ bool detectLight(int v, unsigned long nowMs) {
 \subsubsection{外部設計}
 本節では，楽器デバイスの外部設計について説明する．まず，本デバイスを構成する部品について表\ref{table:ota}に示す．
 本デバイスでは，光センサモジュールとしてCdSセルを使用する．CdSセルにレーザー光が照射された際の出力をArduinoのアナログピンへ接続することで，中継機デバイスのレーザー光の通過を検知する．
-また，今回はドラム，ピアノ，ストリングス，フルートの4種類の楽器の音色を再現するため，それぞれにArduinoを使用し，光センサおよびブレッドボードも4台用意する．
+また，今回はドラム，ピアノ，ストリングス，フルートの4種類の楽器の音色を再現するため，それぞれにArduinoを使用し，CdSセルおよびブレッドボードも4台用意する．
 
 
 \begin{table}[h]
     \caption{楽器デバイスに必要な機器}
     \centering
     \label{table:ota}
-    \begin{tabular}{llr}\hline
-    機材 & 品番 & 個数 [個] \\ \hline
-    Arduino UNO R4 & -& 4 \\ \hline
-    CdSセル  &GL5516& 4 \\ \hline
+    \begin{tabular}{llll}\hline
+    機材 & 品番 & 個数 [個] & 素子番号 \\ \hline\hline
+    Arduino UNO R4 & -& 4 & $A_1$ \\ \hline
+    CdSセル  &GL5516& 4 & $R_Photo$ \\ \hline
+    抵抗器\SI{10}{\kilo\ohm} & - & 4 & $R_2$ \\ \hline
     ブレッドボード & -& 4 \\ \hline
     ジャンパーワイヤー & - & 適宜 \\ \hline
     \end{tabular}
@@ -1772,13 +1773,14 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
 
 続いて，Processingプログラムのファイル構成を示す．表\ref{table:gakki_files}の通り，各ファイルは機能ごとに分割されている．
 
+
 \begin{table}[H]
     \caption{Processingプログラムのファイル構成}
     \label{table:gakki_files}
     \centering
     \begin{tabular}{|l|p{10cm}|}
         \hline
-        \textbf{ファイル名} & \textbf{概要} \\ \hline \hline
+        ファイル名 & 概要 \\ \hline \hline
         SoundProcessingCode.pde & setup/draw/serialEventによる全体制御，シリアル通信の受信処理，デバッグ用のキー入力処理 \\ \hline
         Utils.pde & LUTデータの読み込みと保持，ピッチ・ベロシティに応じた倍音プロファイルの生成を行うDataUtilsクラス \\ \hline
         InstrumentPlayer.pde & 発音命令を各楽器クラスへ委譲するInstrumentPlayerクラス \\ \hline
@@ -1793,7 +1795,7 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
     \end{tabular}
 \end{table}
 
-
+\noindent
 各楽器クラスは，Minimライブラリの提供するInstrumentインタフェースを実装しており，コンストラクタで音色を構築したうえで，noteOn関数で発音を，noteOff関数で消音を行う共通の枠組みに従っている．発音命令はInstrumentPlayerクラスを介して各楽器固有のクラスへ委譲され，波形生成に必要なLUTデータはDataUtilsクラスに集約されている．最終的な音声信号は，楽器の種類に応じてAddReverbによる残響エフェクトを通したうえでAudioOutputへ出力される．プログラム全文は付録に示す．
 
 
@@ -1814,7 +1816,7 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
 
 ここからは，シリアル通信によるArduinoとの連携，LUTデータの管理（DataUtils），発音命令の委譲（InstrumentPlayer），残響エフェクト（AddEffect），デバッグ用自動演奏（NoteSampler），各楽器クラスによる音色合成の順に説明する．
 まず，Arduinoとのシリアル通信および発音ディスパッチについて説明する．
-楽器デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，プログラム内で定義した楽器番号の定数によって，このProcessingインスタンスがどの楽器として動作するかを切り替える．
+本デバイスは1台のPCにつき1種類の楽器を担当する構成となっており，プログラム内で定義した楽器番号の定数によって，このProcessingインスタンスがどの楽器として動作するかを切り替える．
 Arduinoからのシリアル通信は，改行で区切られたテキストメッセージとして受信され，カンマで分割したうえで先頭のヘッダにより処理を分岐する．発音指示のメッセージには，音程，音の長さ，発音開始時と終了時の強さ，音色の種別の組が1音符分以上含まれており，これを解析して担当楽器のクラスへ発音命令として委譲する．このほか，BPM変更のメッセージを受信した場合は演奏テンポを，音量変更のメッセージを受信した場合は出力音量を，それぞれ受信値に応じて更新する．
 
 % 使用する変数・関数の仕様と処理内容について説明する．
@@ -2778,8 +2780,8 @@ for(int i = 0; i < numHarmonics; i++) {
     \label{table:douki_files}
     \begin{tabular}{p{4cm}p{10cm}}
     \hline
-    \textbf{ファイル名} & \textbf{概要}\\
-    \hline
+    ファイル名 & 概要\\
+    \hline\hline
     drum\_0706.ino & ドラム担当機のプログラム．同期のマスターとして動作し，全楽器デバイスの発音タイミングを管理する\\
     \hline
     flute\_0706.ino & フルート担当機のプログラム．同期のスレーブとして動作する\\
@@ -2801,8 +2803,8 @@ flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPア
     \label{table:douki_headers}
     \begin{tabular}{p{1.5cm}p{4.3cm}p{7.7cm}}
     \hline
-    \textbf{ヘッダ} & \textbf{送信元 → 送信先} & \textbf{概要}\\
-    \hline
+    ヘッダ & 送信元 → 送信先 & 概要\\
+    \hline\hline
     'S' & 指揮デバイス → 全楽器デバイス & 演奏開始指示．受信した各機は状態を初期化する\\
     \hline
     'E' & 指揮デバイス → 全楽器デバイス & 演奏終了指示．受信した各機は状態を停止状態に戻す\\
@@ -2830,8 +2832,9 @@ flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPア
 
 % 検知ロジックの詳細な実装は\ref{sec:kan_naibu}項および付録に示すプログラム全文を参照されたい．
 
-次に，ドラム機（マスター）における同期状態管理について説明する．
-マスターは，stateという状態変数によって管理される5段階の状態遷移に沿って動作する．具体的には，BPMの安定を待つ待機状態，各スレーブとのずれの補正を行う同期状態，同期完了後の演奏開始準備状態，演奏中の状態，および停止状態の5段階である．
+次に，マスターにおける同期状態管理について説明する．
+マスターは，stateという状態変数によって管理される5段階の状態遷移に沿って動作する．
+具体的には，BPMの安定を待つ待機状態，各スレーブとのずれの補正を行う同期状態，同期完了後の演奏開始準備状態，演奏中の状態，および停止状態の5段階である．
 
 \iffalse
 各状態の内容を表\ref{table:douki_master_state}に示す．
@@ -2931,7 +2934,8 @@ flute\_0706.ino・piano\_0706.ino・strings\_0706.inoの3ファイルは，IPア
 
 \fi
 
-ここからは，マスターの同期制御における中核部分について説明する．まず，'T'通信（スレーブからのTick報告）の受信処理について説明する．
+\noindent
+まず，'T'通信の受信処理について説明する．
 この処理は，スレーブのglobalTickとマスター自身のglobalTickとの差であるdiffを算出し，'R'通信で即座に返信する．
 
 \iffalse
@@ -3019,8 +3023,9 @@ if (instId == drumInstId) {
 
 \fi
 
+\noindent
 次に，スレーブにおける同期処理について説明する．
-スレーブは，stateが0（BPM安定待ち）・1（マスターと同期中）・2（演奏中）・4（停止中）の4状態で動作し，'R'通信で受け取ったdiffの大きさに応じて自身のTickの周期を一時的に伸縮させることでマスターとの同期を保つ．
+スレーブは，stateが4段階であり，具体的にはBPM安定待ち，マスターと同期中，演奏中，停止中である．'R'通信で受け取ったdiffの大きさに応じて自身のTickの周期を一時的に伸縮させることでマスターとの同期を保つ．
 
 \iffalse
 続いて，楽器デバイス（スレーブ）で使用する主な変数の仕様を表\ref{table:douki_slave_var}に示す．
@@ -3143,7 +3148,6 @@ void applyDiffCorrection(int32_t diff) {
 
 \fi
 
-最後に，'O'通信（マスターからの演奏開始指示）の受信処理について説明する．この処理は，指示された演奏開始時刻（globalTick値）と自身のglobalTickを比較し，まだ到達していなければ開始待ちの状態で待機し，すでに超過していれば超過分だけ楽譜の再生位置を進めて即座に演奏へ合流する．
-なお，'O'通信の受信および状態遷移に関する処理の詳細な実装は付録に示すプログラム全文を参照されたい．
-
+\noindent
+最後に，'O'通信の受信処理について説明する．この処理は，指示された演奏開始時刻（globalTick値）と自身のglobalTickを比較し，まだ到達していなければ開始待ちの状態で待機し，すでに超過していれば超過分だけ楽譜の再生位置を進めて即座に演奏へ合流する．
 プログラム全文は付録に示す．
