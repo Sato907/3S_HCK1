@@ -1,0 +1,9 @@
+{
+  "theme": "neutral",
+  "flowchart": {
+    "wrappingWidth": 1000,
+    "nodeSpacing": 40,
+    "rankSpacing": 45,
+    "curve": "basis"
+  }
+}

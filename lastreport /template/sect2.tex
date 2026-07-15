@@ -1109,7 +1109,15 @@ void loop() {
 \fi
 
 
-本デバイスの全体の処理の流れは次の通りである．起動時に，Wi-Fiネットワークへの接続とUDP受信用ポートの開放，およびモータ制御・LEDマトリクス表示の初期化を行う．その後は，指揮デバイスから送信される固定長2バイトのパケットを常時監視し，先頭のヘッダに応じて処理を分岐する．演奏開始の指令を受信すると，パケットに付与されたBPM段階番号に対応する速度でモータの回転を開始し，LEDマトリクスに該当するBPM値を表示する．演奏中にBPM変更の指令を受信した場合は，回転速度と表示を新しい段階に更新する．なお，BPM変更の指令は演奏中のみ受け付け，停止中は無視する．演奏終了の指令を受信すると，モータを停止させ，LEDマトリクスを消灯する．
+本デバイスの全体の処理の流れを図\ref{fig:flow_kan_zentai}に示す．起動時に，Wi-Fiネットワークへの接続とUDP受信用ポートの開放，およびモータ制御・LEDマトリクス表示の初期化を行う．その後は，指揮デバイスから送信される固定長2バイトのパケットを常時監視し，先頭のヘッダに応じて処理を分岐する．演奏開始の指令を受信すると，パケットに付与されたBPM段階番号に対応する速度でモータの回転を開始し，LEDマトリクスに該当するBPM値を表示する．演奏中にBPM変更の指令を受信した場合は，回転速度と表示を新しい段階に更新する．なお，BPM変更の指令は演奏中のみ受け付け，停止中は無視する．演奏終了の指令を受信すると，モータを停止させ，LEDマトリクスを消灯する．いずれの処理も完了後は受信待ちへ戻り，次の指令に備える．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figs/flow_kan_zentai.pdf}
+    \caption{中継機デバイス全体の処理フローチャート}
+    \label{fig:flow_kan_zentai}
+\end{figure}
+\FloatBarrier
 
 ここからは，モータの制御，LEDMatrixでのBPM表示，回転速度実測プログラム（LaserIntervalTest）の順に説明する．
 
@@ -1411,7 +1419,16 @@ LEDMatrixプログラムのクラス図は以下の図\ref{matcla}の通りで�
 
 以下では，表\ref{tab:func1}に示した順に，各関数の処理内容を説明する．はじめに，displaySetup関数について説明する．
 この関数は，matrix.begin()を呼び出した後，消灯フレームを一度描画してから\SI{200}{ms}待機する．これは，begin()直後の最初のloadFrame()は反映されない場合があるための対策である．
-displaySetup関数をコード\ref{lst:disp_setup}に示す．
+displaySetup関数の処理の流れを図\ref{fig:flow_displaysetup}に示す．図\ref{fig:flow_displaysetup}に示すように，本関数は分岐を持たない直列の初期化処理であり，マトリクスの初期化，消灯フレームの描画，待機の3ステップを順に実行する．
+また，displaySetup関数をコード\ref{lst:disp_setup}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.4\textwidth]{figs/flow_displaysetup.pdf}
+    \caption{displaySetup関数の処理フローチャート}
+    \label{fig:flow_displaysetup}
+\end{figure}
+\FloatBarrier
 
 \begin{lstlisting}[caption={displaySetup関数}, label={lst:disp_setup}]
 void displaySetup() {
@@ -1423,7 +1440,7 @@ void displaySetup() {
 \end{lstlisting}
 
 次に，displayBPM()について説明する．この関数は，loop()から受け取ったBPM段階番号（1〜5）をbpmTable[]で参照して実際のBPM値に変換したうえで各桁ごとに分割し，drawDigit()を用いてフレームバッファに描画する．そして，uint32\_t[3]形式にビットパックした後，matrix.loadFrame()で描画を行う．
-displayBPM()の処理の流れを図\ref{fig:flow_displaybpm}に示す．
+displayBPM()の処理の流れを図\ref{fig:flow_displaybpm}に示す．図\ref{fig:flow_displaybpm}に示すように，本関数は最初に段階番号の範囲確認を行い，範囲外であれば何も表示せずに処理を終了することで，不正な受信値による誤表示を防いでいる．範囲内であれば，BPM値への変換，フレームバッファの初期化，桁分割，中央揃えの開始位置算出，桁ごとの描画，ビットパックと表示の順に処理を進める．
 また，displayBPM()をコード\ref{lst:disp_displaybpm}に示す．
 
 \begin{figure}[htbp]
@@ -1479,7 +1496,16 @@ void displayBPM(uint8_t stepNumber) {
 \end{lstlisting}
 
 次に，drawDigit()について説明する．この関数は，引数の数字が0から9の範囲内であるかを確認した後，縦方向の中央寄せオフセットを算出し，独自フォント配列から該当する数字のドットパターンを1ドットずつ読み取ってフレームバッファの指定位置に書き込む．
-drawDigit()をコード\ref{lst:disp_drawdigit}に示す．
+drawDigit()の処理の流れを図\ref{fig:flow_drawdigit}に示す．図\ref{fig:flow_drawdigit}に示すように，本関数も最初に引数の範囲確認を行い，範囲外であれば描画を行わない．範囲内であれば，3×5の15ドット分の繰り返し処理により，フォント配列の各ドットをフレームバッファへ書き込む．このとき，書き込み先の座標がマトリクスの範囲内であることをドットごとに確認しており，画面端での配列範囲外への書き込みを防止している．
+また，drawDigit()をコード\ref{lst:disp_drawdigit}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.5\textwidth]{figs/flow_drawdigit.pdf}
+    \caption{drawDigit関数の処理フローチャート}
+    \label{fig:flow_drawdigit}
+\end{figure}
+\FloatBarrier
 
 \begin{lstlisting}[caption={drawDigit関数}, label={lst:disp_drawdigit}]
 void drawDigit(int digit, int x_offset) {
@@ -1498,7 +1524,16 @@ void drawDigit(int digit, int x_offset) {
 \end{lstlisting}
 
 次に，clearDisplay()について説明する．この関数は，BPM値を初期値(-1)にリセットし，全消灯フレームをmatrix.loadFrame()で描画して表示のリセットを行う．
-clearDisplay()をコード\ref{lst:disp_cleardisplay}に示す．
+clearDisplay()の処理の流れを図\ref{fig:flow_cleardisplay}に示す．図\ref{fig:flow_cleardisplay}に示すように，本関数は表示状態を保持する変数のリセットと全消灯フレームの描画のみを行う単純な構成であり，演奏終了の指令を受信した際に呼び出される．表示状態の変数を初期値へ戻すことで，次回の演奏開始時に同じBPMが指定された場合でも確実に再描画が行われる．
+また，clearDisplay()をコード\ref{lst:disp_cleardisplay}に示す．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.4\textwidth]{figs/flow_cleardisplay.pdf}
+    \caption{clearDisplay関数の処理フローチャート}
+    \label{fig:flow_cleardisplay}
+\end{figure}
+\FloatBarrier
 
 \begin{lstlisting}[caption={clearDisplay関数}, label={lst:disp_cleardisplay}]
 void clearDisplay() {
@@ -1767,7 +1802,17 @@ A0ピンに入力される出力電圧($V_{out}$)は，式\ref{eq:jukou}のよ�
 
 \subsubsection{内部設計}
 \label{sec:gakki_naibu}
-本節では，楽器デバイスの内部設計について説明する．楽器デバイスのソフトウェアは，PC上で音色表現を担うProcessingプログラムと，レーザー受光の検知および楽器デバイス間の同期を担うArduinoプログラム（douki\_saigo）の2つで構成される．まず前者のProcessingプログラムについて説明する．
+本節では，楽器デバイスの内部設計について説明する．楽器デバイスのソフトウェアは，PC上で音色表現を担うProcessingプログラムと，レーザー受光の検知および楽器デバイス間の同期を担うArduinoプログラム（douki\_saigo）の2つで構成される．
+
+両プログラムを含む楽器デバイス全体の処理の流れを図\ref{fig:flow_gakki_zentai}に示す．図\ref{fig:flow_gakki_zentai}に示すように，各楽器デバイスのArduinoは，起動後に指揮デバイスからの演奏開始指示を待機し，指示を受けるとレーザー受光間隔からのBPM推定と楽器デバイス間の同期補正を行う．全楽器デバイスのずれが閾値以内に収まって同期が確立すると，楽譜データに基づく発音情報をPCへシリアル送信し，PC上のProcessingが波形を合成して演奏音を出力する．この送信と発音は，演奏終了指示を受信して停止状態へ移行するまで繰り返される．まず前者のProcessingプログラムについて説明する．
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.55\textwidth]{figs/flow_gakki_zentai.pdf}
+    \caption{楽器デバイス全体の処理フローチャート}
+    \label{fig:flow_gakki_zentai}
+\end{figure}
+\FloatBarrier
 
 楽器デバイスは，Arduinoから受信した発音指示をもとに，Processing上で波形を合成して音を鳴らす構成となっている．合成方式は，あらかじめ実在の楽器音をFFT解析して得た周波数・振幅データ（ルックアップテーブル，以下LUT）をもとに多数の正弦波を重ね合わせる加算合成を基本とし，これに息や弦の摩擦音を模したノイズ成分を加えることで音色を再現している．
 

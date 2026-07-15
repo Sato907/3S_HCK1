@@ -1,0 +1,5 @@
+flowchart TD
+    S([開始]) --> A["matrix.begin()で<br/>LEDマトリクスを初期化"]
+    A --> B[/"全消灯フレームを<br/>matrix.loadFrame()で描画"/]
+    B --> C["200 ms待機<br/>（初回描画の不反映対策）"]
+    C --> Z([処理終了])
